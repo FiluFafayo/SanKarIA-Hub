@@ -4,50 +4,70 @@ import { Campaign, Character } from '../types';
 
 class DataService {
     private supabase: SupabaseClient | null = null;
+    private initPromise: Promise<SupabaseClient | null> | null = null; // Track initialization
 
-    public init(url: string, anonKey: string) {
-        if (url && anonKey && !this.supabase) {
-            try {
-                this.supabase = createClient(url, anonKey, {
-                    auth: {
-                        persistSession: true,
-                        autoRefreshToken: true,
-                        detectSessionInUrl: true
+    // Fungsi init baru, mengembalikan promise client
+    public initialize(url: string, anonKey: string): Promise<SupabaseClient | null> {
+        // Jika sudah ada client atau sedang proses init, kembalikan promise yg ada
+        if (this.supabase) {
+            return Promise.resolve(this.supabase);
+        }
+        if (this.initPromise) {
+            return this.initPromise;
+        }
+
+        if (url && anonKey) {
+            console.log("Memulai inisialisasi Supabase client...");
+            this.initPromise = new Promise(async (resolve, reject) => {
+                try {
+                    const client = createClient(url, anonKey, {
+                        auth: {
+                            persistSession: true,
+                            autoRefreshToken: true,
+                            detectSessionInUrl: false, // Biasanya false untuk SPA
+                            storageKey: 'sankaria-supabase-auth' // Key unik biar ga konflik
+                        }
+                    });
+                    // Coba ambil sesi awal untuk memastikan koneksi OK
+                    const { data: { session }, error: sessionError } = await client.auth.getSession();
+                    if (sessionError) {
+                        console.error("Gagal getSession saat init:", sessionError);
+                        // Jangan reject, mungkin koneksi network sementara, tapi client tetap dibuat
                     }
-                });
-                console.log("Koneksi Supabase berhasil diinisialisasi.");
-            } catch (e) {
-                console.error("Gagal menginisialisasi klien Supabase:", e);
-                this.supabase = null;
-            }
-        } else if (!url || !anonKey) {
+                    console.log("Koneksi Supabase berhasil diinisialisasi. Sesi awal:", session ? session.user.id : 'null');
+                    this.supabase = client; // Simpan client setelah berhasil
+                    resolve(this.supabase);
+                } catch (e) {
+                    console.error("Gagal membuat klien Supabase:", e);
+                    this.supabase = null;
+                    this.initPromise = null; // Reset promise on failure
+                    reject(e); // Reject promise jika createClient gagal total
+                }
+            });
+            return this.initPromise;
+        } else {
+            console.warn("URL/Key Supabase kosong, inisialisasi dibatalkan.");
             this.supabase = null;
+            return Promise.resolve(null); // Resolve dengan null jika tidak ada kredensial
         }
     }
 
-    private getFromLocalStorage<T>(key: string, defaultValue: T): T {
-        try {
-            const item = window.localStorage.getItem(key);
-            return item ? JSON.parse(item) : defaultValue;
-        } catch (error) {
-            console.error(`Gagal membaca localStorage “${key}”:`, error);
-            return defaultValue;
+    // Getter aman untuk client, HARUS dipanggil SETELAH initialize resolve
+    private getClient(): SupabaseClient {
+        if (!this.supabase) {
+            throw new Error("Supabase client belum diinisialisasi atau gagal. Panggil initialize() dan tunggu promise-nya.");
         }
+        return this.supabase;
     }
 
-    private saveToLocalStorage<T>(key: string, value: T) {
-        try {
-            window.localStorage.setItem(key, JSON.stringify(value));
-        } catch (error) {
-             console.error(`Gagal menyimpan ke localStorage “${key}”:`, error);
-        }
-    }
-
+    // --- Method Auth (pakai getClient) ---
     async signInWithFirebaseToken(token: string): Promise<void> {
+      // Tidak perlu getClient di sini karena auth ada di instance
       if (!this.supabase) throw new Error("Supabase client belum diinisialisasi.");
-      console.log("Mencoba sign in ke Supabase dengan token Firebase...");
+      console.log("Mencoba sign in ke Supabase dengan token Firebase (tanpa provider)...");
+
+      // @ts-ignore - Mengabaikan error TS karena 'provider' wajib (workaround)
       const { data, error } = await this.supabase.auth.signInWithIdToken({
-        provider: 'google',
         token: token,
       });
 
@@ -55,10 +75,16 @@ class DataService {
         console.error("Supabase signInWithIdToken gagal:", error);
         throw error;
       }
-      console.log("Supabase sign in berhasil:", data.user?.id);
+      if (data && data.user) {
+          console.log("Supabase sign in berhasil:", data.user.id);
+      } else {
+          console.warn("Supabase sign in tidak error, tapi data user null.");
+          throw new Error("Supabase sign in succeeded but returned null user data.");
+      }
     }
 
     async signOut(): Promise<void> {
+      // Jangan error jika belum init
       if (!this.supabase) return;
       console.log("Signing out from Supabase...");
       const { error } = await this.supabase.auth.signOut();
@@ -69,124 +95,86 @@ class DataService {
       }
     }
 
+    // --- Method Data (pakai getClient) ---
     async getCampaigns(): Promise<Campaign[]> {
-        if (this.supabase) {
-            // RLS Policy "Allow authenticated read access" mengizinkan ini
-            const { data, error } = await this.supabase.from('campaigns').select('*');
-            if (error) {
-                console.error('Gagal mengambil kampanye dari Supabase:', error);
-                throw error;
-            }
+        try {
+            const client = this.getClient();
+            const { data, error } = await client.from('campaigns').select('*');
+            if (error) throw error;
             return data || [];
-        } else {
-            return this.getFromLocalStorage<Campaign[]>('sankaria-campaigns', []);
+        } catch (error) {
+            console.error('Gagal mengambil kampanye:', error);
+            // Fallback ke local storage jika Supabase gagal (opsional)
+            // return this.getFromLocalStorage<Campaign[]>('sankaria-campaigns', []);
+            throw error; // Atau lempar error saja
         }
     }
 
     async saveCampaign(campaign: Campaign): Promise<Campaign> {
-        if (this.supabase) {
-            // RLS Policy INSERT dan UPDATE campaigns mengizinkan ini untuk user authenticated
-            const { data, error } = await this.supabase.from('campaigns').upsert(campaign).select().single();
-            if (error) {
-                console.error('Gagal menyimpan kampanye ke Supabase:', error);
-                throw error;
-            }
+        try {
+            const client = this.getClient();
+            const { data, error } = await client.from('campaigns').upsert(campaign).select().single();
+            if (error) throw error;
+            if (!data) throw new Error("Upsert campaign tidak mengembalikan data.");
             return data;
-        } else {
-            const campaigns = this.getFromLocalStorage<Campaign[]>('sankaria-campaigns', []);
-            const index = campaigns.findIndex(c => c.id === campaign.id);
-            if (index > -1) campaigns[index] = campaign;
-            else campaigns.push(campaign);
-            this.saveToLocalStorage('sankaria-campaigns', campaigns);
-            return campaign;
+        } catch (error) {
+            console.error('Gagal menyimpan kampanye:', error);
+            throw error;
         }
     }
 
     async saveCampaigns(campaigns: Campaign[]): Promise<Campaign[]> {
-        if (this.supabase) {
-             // RLS Policy INSERT campaigns mengizinkan ini untuk user authenticated
-             const { data, error } = await this.supabase.from('campaigns').upsert(campaigns).select();
-             if (error) {
-                 console.error('Gagal menyimpan kampanye (plural) ke Supabase:', error);
-                 throw error;
-             }
-             return data || [];
-        } else {
-             this.saveToLocalStorage('sankaria-campaigns', campaigns);
-             return campaigns;
+        try {
+            const client = this.getClient();
+            const { data, error } = await client.from('campaigns').upsert(campaigns).select();
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Gagal menyimpan kampanye (plural):', error);
+            throw error;
         }
     }
 
     async getCharacters(): Promise<Character[]> {
-        if (this.supabase) {
-             // RLS Policy SELECT characters mengizinkan user authenticated membaca semua,
-             // tapi kita filter di App.tsx. Atau bisa ubah policy SELECT jadi `USING (auth.uid() = "ownerId")`
-             // jika ingin Supabase yang filter. Untuk sekarang, filter di App.tsx lebih fleksibel.
-             const { data, error } = await this.supabase.from('characters').select('*');
-             if (error) {
-                 console.error('Gagal mengambil karakter dari Supabase:', error);
-                 throw error;
-             }
-             return data || [];
-        } else {
-             return this.getFromLocalStorage<Character[]>('sankaria-characters', []);
+        try {
+            const client = this.getClient();
+            // Policy RLS SELECT characters `USING (auth.role() = 'authenticated')` akan mengizinkan ini
+            // Filter by ownerId dilakukan di App.tsx
+            const { data, error } = await client.from('characters').select('*');
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Gagal mengambil karakter:', error);
+            throw error;
         }
     }
 
-    // Menerima data karakter TANPA ownerId untuk insert/update
     async saveCharacter(characterData: Omit<Character, 'ownerId'> | Character): Promise<Character> {
-       if (this.supabase) {
-           // Upsert akan:
-           // - INSERT jika ID belum ada (ownerId diisi default auth.uid() oleh DB, RLS INSERT check auth.uid())
-           // - UPDATE jika ID sudah ada (RLS UPDATE check auth.uid() = "ownerId")
-           // Kita bisa kirim data dengan atau tanpa ownerId, upsert seharusnya handle
-           const { data, error } = await this.supabase.from('characters').upsert(characterData).select().single();
-           if (error) {
-               console.error('Gagal menyimpan karakter ke Supabase:', error);
-               throw error;
-           }
-           // Supabase mengembalikan data lengkap termasuk ownerId
-           return data as Character;
-       } else {
-           console.warn("Menyimpan karakter ke Local Storage, ownerId mungkin tidak sesuai format Supabase.");
-           const characters = this.getFromLocalStorage<Character[]>('sankaria-characters', []);
-           // @ts-ignore ownerId mungkin ada atau tidak, paksa tipe untuk local storage
-           const charToSave: Character = { ...characterData, ownerId: 'ownerId' in characterData ? characterData.ownerId : 'local-user' };
-           const index = characters.findIndex(c => c.id === charToSave.id);
-           if (index > -1) characters[index] = charToSave;
-           else characters.push(charToSave);
-           this.saveToLocalStorage('sankaria-characters', characters);
-           return charToSave;
-       }
-   }
+        try {
+            const client = this.getClient();
+            // RLS INSERT: CHECK (auth.uid() = "ownerId")
+            // RLS UPDATE: USING (auth.uid() = "ownerId") WITH CHECK (auth.uid() = "ownerId")
+            const { data, error } = await client.from('characters').upsert(characterData).select().single();
+            if (error) throw error;
+            if (!data) throw new Error("Upsert character tidak mengembalikan data.");
+            return data as Character;
+        } catch (error) {
+            console.error('Gagal menyimpan karakter:', error);
+            throw error;
+        }
+    }
 
-   // Fungsi ini sekarang lebih fokus untuk bulk UPDATE atau INSERT oleh user yang sama
-   // Jika insert, ownerId akan diisi otomatis oleh DB. Jika update, RLS akan cek ownerId.
-   async saveCharacters(characters: Character[] | Omit<Character, 'ownerId'>[]): Promise<Character[]> {
-       if (this.supabase) {
-           const { data, error } = await this.supabase.from('characters').upsert(characters).select();
-           if (error) {
-               console.error('Gagal menyimpan karakter (plural) ke Supabase:', error);
-               throw error;
-           }
-           return (data || []) as Character[];
-       } else {
-           // Logic local storage mungkin perlu penyesuaian lebih lanjut jika sering dipakai
-           console.warn("Menyimpan karakter (plural) ke Local Storage.");
-           const allChars = this.getFromLocalStorage<Character[]>('sankaria-characters', []);
-           const updatedChars = [...allChars];
-           characters.forEach(char => {
-               // @ts-ignore ownerId mungkin ada atau tidak
-               const charToSave: Character = { ...char, ownerId: 'ownerId' in char ? char.ownerId : 'local-user' };
-               const index = updatedChars.findIndex(c => c.id === charToSave.id);
-               if (index > -1) updatedChars[index] = charToSave;
-               else updatedChars.push(charToSave);
-           });
-           this.saveToLocalStorage('sankaria-characters', updatedChars);
-           // Mengembalikan array input sebagai konfirmasi (mungkin tidak ideal)
-           return characters as Character[];
-       }
-   }
+    async saveCharacters(characters: Character[] | Omit<Character, 'ownerId'>[]): Promise<Character[]> {
+        try {
+            const client = this.getClient();
+            const { data, error } = await client.from('characters').upsert(characters).select();
+            if (error) throw error;
+            return (data || []) as Character[];
+        } catch (error) {
+            console.error('Gagal menyimpan karakter (plural):', error);
+            throw error;
+        }
+    }
 }
 
 export const dataService = new DataService();
