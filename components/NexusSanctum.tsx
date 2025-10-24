@@ -28,7 +28,7 @@ export const NexusSanctum: React.FC<NexusSanctumProps> = ({ onLocationClick }) =
       {/* Content */}
       <div className="relative z-10 text-center mb-8 md:mb-12">
          <h1 className="font-cinzel text-5xl md:text-7xl font-bold text-white text-shadow-lg tracking-widest" style={{textShadow: '0 0 15px rgba(255,223,186,0.8)'}}>
-          SanKarIA
+          SanKarlA
         </h1>
         <p className="text-amber-100 text-sm md:text-lg opacity-80 font-light tracking-wider">Nadi Suaka</p>
       </div>

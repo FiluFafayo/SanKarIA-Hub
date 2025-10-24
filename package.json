@@ -1,22 +1,16 @@
 {
-  "name": "sankaria-v2",
+  "name": "sankarla-v2",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "esbuild index.tsx --bundle --outfile=dist/bundle.js --loader:.tsx=tsx --define:process.env.NODE_ENV='\"production\"' --define:process.env.API_KEY='\"'\"$API_KEY\"'\"' && cp index.html dist/index.html"
-  },
-  "dependencies": {
-    "@google/genai": "^1.25.0",
-    "@supabase/supabase-js": "^2.45.0",
-    "firebase": "^12.4.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "build": "esbuild index.tsx --bundle --outfile=dist/bundle.js --loader:.tsx=tsx --define:process.env.NODE_ENV='\"production\"' --define:process.env.API_KEY='\"'\"$API_KEY\"'\"'"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
     "esbuild": "^0.25.11",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   }
 }
