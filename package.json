@@ -8,5 +8,9 @@
   "devDependencies": {
     "esbuild": "^0.25.11",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   }
 }
