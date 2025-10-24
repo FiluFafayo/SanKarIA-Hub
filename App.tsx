@@ -20,9 +20,18 @@ type View = Location | 'nexus' | 'character-selection';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('nexus');
-  const [apiKeys, setApiKeys] = useLocalStorage<string[]>('sankaria-apikeys', ['']);
-  const [supabaseUrl, setSupabaseUrl] = useLocalStorage<string>('sankaria-supabase-url', '');
-  const [supabaseKey, setSupabaseKey] = useLocalStorage<string>('sankaria-supabase-key', '');
+  // Default API keys
+  const defaultApiKeys = [
+    'AIzaSyD3uJ5i0E6xw3wPtfjz02k8ES-rMU6nDt8',
+    'AIzaSyAQOBMFPQ5VrqQH2-TwGvQD9ZMcFz0i7Pc'
+  ];
+  // Default Supabase details
+  const defaultSupabaseUrl = 'https://pbonacsblhcdpthfiwxz.supabase.co/';
+  const defaultSupabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBib25hY3NibGhjZHB0aGZpd3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA3NDkwNTcsImV4cCI6MjA3NjMyNTA1N30.ArFEjlL7Z_mz_bxDpQz38DWxvwY2dOccMIopI9tbaLE';
+
+  const [apiKeys, setApiKeys] = useLocalStorage<string[]>('sankaria-apikeys', defaultApiKeys);
+  const [supabaseUrl, setSupabaseUrl] = useLocalStorage<string>('sankaria-supabase-url', defaultSupabaseUrl);
+  const [supabaseKey, setSupabaseKey] = useLocalStorage<string>('sankaria-supabase-key', defaultSupabaseKey);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [userId, setUserId] = useLocalStorage<string>('sankaria-userId', '');
