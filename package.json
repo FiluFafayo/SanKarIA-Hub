@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "esbuild index.tsx --bundle --outfile=dist/bundle.js --loader:.tsx=tsx --define:process.env.NODE_ENV='\"production\"' --define:process.env.API_KEY='\"'\"$API_KEY\"'\"'"
+    "build": "esbuild index.tsx --bundle --outfile=dist/bundle.js --loader:.tsx=tsx --define:process.env.NODE_ENV='\"production\"' --define:process.env.API_KEY='\"'\"$API_KEY\"'\"' && cp index.html dist/index.html"
   },
   "dependencies": {
     "@google/genai": "^1.25.0",
@@ -12,7 +12,7 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "@types/node": "^24.9.1",
+    "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "esbuild": "^0.25.11",
