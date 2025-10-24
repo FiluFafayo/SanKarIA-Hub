@@ -1,0 +1,489 @@
+import { GoogleGenAI, Type, FunctionDeclaration, Modality } from "@google/genai";
+import { Campaign, Character, StructuredApiResponse, ToolCall, GameEvent, MapMarker, WorldTime, WorldWeather } from '../types';
+import { RESPONSE_SCHEMA, MECHANICS_SCHEMA, parseStructuredApiResponse, parseMechanicsResponse } from "./responseParser";
+
+const CAMPAIGN_FRAMEWORK_SCHEMA = {
+    type: Type.OBJECT,
+    properties: {
+        proposedTitle: { 
+            type: Type.STRING,
+            description: "Judul yang menarik dan ringkas untuk kampanye."
+        },
+        proposedMainQuest: {
+            type: Type.OBJECT,
+            properties: {
+                title: { type: Type.STRING, description: "Judul untuk misi utama." },
+                description: { type: Type.STRING, description: "Deskripsi singkat tentang tujuan misi utama." },
+            },
+            required: ['title', 'description'],
+        },
+        proposedMainNPCs: {
+            type: Type.ARRAY,
+            description: "Dua karakter non-pemain (NPC) kunci yang akan ditemui pemain.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    name: { type: Type.STRING, description: "Nama NPC." },
+                    description: { type: Type.STRING, description: "Deskripsi singkat tentang peran atau kepribadian NPC." },
+                },
+                required: ['name', 'description'],
+            },
+        },
+        potentialSideQuests: {
+            type: Type.ARRAY,
+            description: "Satu misi sampingan potensial yang dapat ditemukan pemain.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING, description: "Judul untuk misi sampingan." },
+                    description: { type: Type.STRING, description: "Deskripsi singkat tentang tujuan misi sampingan." },
+                },
+                required: ['title', 'description'],
+            },
+        },
+    },
+    required: ['proposedTitle', 'proposedMainQuest', 'proposedMainNPCs', 'potentialSideQuests'],
+};
+
+const MAP_MARKER_SCHEMA = {
+    type: Type.ARRAY,
+    description: "Daftar penanda lokasi pada peta.",
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            id: { type: Type.STRING, description: "ID unik untuk penanda, dalam format kebab-case (misal, 'desa-awal')." },
+            name: { type: Type.STRING, description: "Nama lokasi." },
+            x: { type: Type.NUMBER, description: "Koordinat X sebagai persentase dari kiri (0-100)." },
+            y: { type: Type.NUMBER, description: "Koordinat Y sebagai persentase dari atas (0-100)." },
+        },
+        required: ["id", "name", "x", "y"]
+    }
+}
+
+const TOOLS: FunctionDeclaration[] = [
+    {
+        name: 'add_items_to_inventory',
+        description: "Menambahkan satu atau lebih item ke inventaris karakter pemain. Gunakan ini saat pemain menemukan loot, mengambil item, atau diberi hadiah.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                characterId: { type: Type.STRING, description: "ID karakter yang menerima item." },
+                items: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            name: { type: Type.STRING },
+                            quantity: { type: Type.INTEGER },
+                            type: { type: Type.STRING, enum: ['weapon', 'armor', 'consumable', 'tool', 'other'] }
+                        },
+                        required: ['name', 'quantity', 'type']
+                    }
+                }
+            },
+            required: ['characterId', 'items']
+        }
+    },
+    {
+        name: 'update_quest_log',
+        description: "Menambah atau memperbarui misi di jurnal pemain.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                id: { type: Type.STRING, description: "ID unik untuk misi (misal, 'nama-desa-01'). Tetap konsisten jika memperbarui." },
+                title: { type: Type.STRING },
+                description: { type: Type.STRING, description: "Deskripsi misi. Harus jelas dan memberikan tujuan yang bisa ditindaklanjuti oleh pemain." },
+                status: { type: Type.STRING, enum: ['proposed', 'active', 'completed', 'failed'] },
+                isMainQuest: { type: Type.BOOLEAN, description: "Setel ke true jika ini adalah bagian dari alur cerita utama." },
+                reward: { type: Type.STRING, description: "Imbalan yang dijanjikan untuk menyelesaikan misi (misal, '100 Keping Emas', 'Pedang Ajaib')." }
+            },
+            required: ['id', 'title', 'description', 'status']
+        }
+    },
+    {
+        name: 'log_npc_interaction',
+        description: "Mencatat atau memperbarui informasi tentang NPC yang ditemui pemain.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                npcId: { type: Type.STRING, description: "ID NPC yang ada dari konteks, jika memperbarui. Biarkan kosong jika ini adalah NPC yang benar-benar baru." },
+                npcName: { type: Type.STRING, description: "Nama NPC. Gunakan nama yang sama untuk memperbarui NPC yang ada, atau berikan nama baru jika sebelumnya tidak diketahui (misal, 'Penjaga Toko' menjadi 'Bartholomew')." },
+                summary: { type: Type.STRING, description: "Ringkasan singkat berupa FAKTA dari interaksi saat ini. HARUS berupa catatan orang ketiga yang ringkas (misalnya, 'Berhasil diintimidasi, mengungkapkan info soal kegilaan di gunung.'), BUKAN prosa naratif." },
+                description: { type: Type.STRING, description: "Deskripsi fisik atau kepribadian NPC. Hanya berikan saat pertama kali bertemu." },
+                location: { type: Type.STRING, description: "Lokasi saat ini atau biasa dari NPC." },
+                disposition: { type: Type.STRING, enum: ['Friendly', 'Neutral', 'Hostile', 'Unknown'], description: "Sikap NPC terhadap pemain." }
+            },
+            required: ['npcName', 'summary']
+        }
+    }
+];
+
+class GeminiService {
+    private apiKeys: string[] = [''];
+    private currentKeyIndex = 0;
+    private genAI: GoogleGenAI | null = null;
+
+    public updateKeys(keys: string[]) {
+        this.apiKeys = keys.filter(k => k.trim() !== '');
+        this.currentKeyIndex = 0;
+        this.genAI = null;
+    }
+
+    private getClient(): GoogleGenAI {
+        if (this.genAI) return this.genAI;
+        if (this.apiKeys.length === 0) throw new Error("Tidak ada Kunci API Gemini yang valid.");
+        const key = this.apiKeys[this.currentKeyIndex];
+        this.genAI = new GoogleGenAI({ apiKey: key });
+        return this.genAI;
+    }
+
+    private rotateKey() {
+        this.currentKeyIndex = (this.currentKeyIndex + 1) % this.apiKeys.length;
+        this.genAI = null;
+        console.log(`Beralih ke Kunci API #${this.currentKeyIndex + 1}`);
+    }
+
+    private async makeApiCall<T>(call: () => Promise<T>): Promise<T> {
+        let attempts = 0;
+        while (attempts < Math.max(1, this.apiKeys.length)) {
+             try {
+                const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("API call timed out after 30 seconds")), 30000));
+                // @ts-ignore
+                const result = await Promise.race([call(), timeoutPromise]);
+                return result;
+            } catch (error) {
+                console.error(`Upaya API ${attempts + 1} gagal:`, error);
+                attempts++;
+                if (this.apiKeys.length > 1) this.rotateKey();
+                if (attempts >= Math.max(1, this.apiKeys.length)) {
+                    throw new Error("Semua upaya panggilan API gagal.");
+                }
+            }
+        }
+        throw new Error("Gagal melakukan panggilan API.");
+    }
+
+    async generateCampaignFramework(pillars: { premise: string; keyElements: string; endGoal: string }): Promise<any> {
+        const prompt = `Berdasarkan pilar-pilar kampanye D&D berikut, hasilkan kerangka kampanye yang kreatif dan menarik.
+    
+        Premis: ${pillars.premise}
+        Elemen Kunci: ${pillars.keyElements}
+        Tujuan Akhir: ${pillars.endGoal || 'Tidak ditentukan'}
+
+        Kembangkan ini menjadi judul yang diusulkan, misi utama, dua NPC kunci, dan satu misi sampingan potensial. Respons HARUS dalam bahasa Indonesia.`;
+
+        const call = async () => {
+             const ai = this.getClient();
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    responseSchema: CAMPAIGN_FRAMEWORK_SCHEMA,
+                }
+            });
+            return JSON.parse(response.text);
+        }
+        return this.makeApiCall(call);
+    }
+
+    async mechanizeCampaignFramework(framework: any): Promise<ToolCall[]> {
+        const prompt = `Konversikan kerangka kampanye berikut menjadi serangkaian pemanggilan alat terstruktur.
+        - Buat misi utama menggunakan 'update_quest_log'. Atur statusnya menjadi 'active' dan isMainQuest menjadi true. Berikan 'id' yang unik dan relevan.
+        - Buat setiap NPC kunci menggunakan 'log_npc_interaction'. Berikan ringkasan berdasarkan deskripsi mereka.
+        - JANGAN buat pemanggilan alat untuk misi sampingan.
+
+        Kerangka:
+        Judul: ${framework.proposedTitle}
+        Misi Utama: ${framework.proposedMainQuest.title} - ${framework.proposedMainQuest.description}
+        NPC: ${framework.proposedMainNPCs.map((npc: any) => `${npc.name} - ${npc.description}`).join('; ')}
+        `;
+        
+        const call = async () => {
+            const ai = this.getClient();
+            const relevantTools = TOOLS.filter(t => t.name === 'update_quest_log' || t.name === 'log_npc_interaction');
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    tools: [{ functionDeclarations: relevantTools }],
+                }
+            });
+
+            if (response.functionCalls) {
+                return response.functionCalls.map(fc => ({
+                    functionName: fc.name as ToolCall['functionName'],
+                    args: fc.args,
+                }));
+            }
+            console.warn("Mekanisasi kerangka tidak menghasilkan pemanggilan alat.");
+            return [];
+        }
+        return this.makeApiCall(call);
+    }
+    
+    async generateNarration(campaign: Campaign, players: Character[], playerAction: string, onStateChange: (state: 'thinking' | 'retrying') => void): Promise<Omit<StructuredApiResponse, 'choices' | 'rollRequest' | 'tool_calls'>> {
+        onStateChange('thinking');
+
+        let styleInstruction = '';
+        if (campaign.dmNarrationStyle === 'Langsung & Percakapan') {
+            styleInstruction = 'Gaya narasimu HARUS langsung, sederhana, dan seperti percakapan. Hindari deskripsi puitis. Fokus pada apa yang karakter lihat dan dengar secara langsung.';
+        }
+
+        const systemInstruction = `Anda adalah AI Dungeon Master (DM) untuk TTRPG fantasi. Kepribadian Anda adalah: ${campaign.dmPersonality}. Panjang respons Anda harus: ${campaign.responseLength}. ${styleInstruction}
+        
+        ATURAN UTAMA:
+        1.  HANYA NARASI: Tanggapi aksi pemain dengan narasi yang deskriptif.
+        2.  OBJEK INTERAKTIF: Jika Anda menyebutkan objek penting yang dapat berinteraksi (peti, tuas, pintu, mayat, buku), tandai dalam narasi Anda menggunakan format [OBJECT:nama-objek|id-unik]. Contoh: "Di sudut ruangan, Anda melihat sebuah [OBJECT:peti kayu|peti-ruangan-1]." JANGAN menandai NPC atau makhluk hidup.
+        3.  FORMAT JSON: Respons Anda HARUS berupa objek JSON yang valid dengan field 'reaction' (opsional, singkat) dan 'narration' (wajib, lebih detail).`;
+        
+        const prompt = this.buildPrompt(campaign, players, playerAction);
+
+        const call = async () => {
+            const ai = this.getClient();
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    systemInstruction,
+                    responseMimeType: "application/json",
+                    responseSchema: RESPONSE_SCHEMA,
+                    temperature: 0.75,
+                }
+            });
+             if (!response.text) {
+                 throw new Error("AI narration response was empty.");
+            }
+            return parseStructuredApiResponse(response.text);
+        };
+        
+        try {
+            return await this.makeApiCall(call);
+        } catch (error) {
+             console.error("Gagal total menghasilkan narasi:", error);
+            return {
+                narration: "Dunia terasa hening sejenak saat DM merenungkan tindakan Anda...",
+            };
+        }
+    }
+
+    async determineNextStep(campaign: Campaign, players: Character[], playerAction: string, newNarration: string): Promise<Omit<StructuredApiResponse, 'reaction' | 'narration'>> {
+        const systemInstruction = `Anda adalah AI Logika Permainan untuk TTRPG. Tugas Anda BUKAN untuk bercerita, tetapi untuk menentukan MEKANIKA permainan selanjutnya.
+        
+        ATURAN UTAMA:
+        1.  FOKUS PADA MEKANIKA: Berdasarkan aksi pemain dan narasi, tentukan apakah pemain harus membuat pilihan ('choices'), melempar dadu ('rollRequest'), atau jika ada pembaruan state game ('tool_calls').
+        2.  PILIHAN vs. LEMPARAN DADU: Berikan 'choices' ATAU 'rollRequest', JANGAN KEDUANYA.
+        3.  GUNAKAN ALAT: Panggil alat jika aksi dan narasi menyiratkan perubahan pada inventaris (misalnya menemukan loot), misi, atau NPC. Jika pemain menemukan item, GUNAKAN alat 'add_items_to_inventory'.
+        4.  LEMPARAN DADU WAJIB: Jika aksi memiliki hasil yang tidak pasti (menyerang, membujuk, menyelidiki), Anda HARUS membuat 'rollRequest'. Jangan menarasikan hasilnya.
+        5.  KONTEKS NPC & MISI: Periksa konteks NPC dan Misi yang ada sebelum membuat alat baru untuk menghindari duplikasi. Gunakan ID yang ada untuk memperbarui.`;
+
+        const prompt = `${this.buildPrompt(campaign, players, playerAction)}\nNarasi yang Baru Dihasilkan: "${newNarration}"\n\nTentukan langkah mekanis selanjutnya.`;
+        
+         const call = async () => {
+            const ai = this.getClient();
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    systemInstruction,
+                    responseMimeType: "application/json",
+                    responseSchema: MECHANICS_SCHEMA,
+                    tools: [{ functionDeclarations: TOOLS }],
+                }
+            });
+            
+            const parsedTextPart = parseMechanicsResponse(response.text);
+            const tool_calls = response.functionCalls?.map(fc => ({
+                functionName: fc.name as ToolCall['functionName'],
+                args: fc.args
+            })) || [];
+
+            return { ...parsedTextPart, tool_calls };
+        };
+
+        try {
+            return await this.makeApiCall(call);
+        } catch(error) {
+            console.error("Gagal total menentukan langkah selanjutnya:", error);
+            return {
+                choices: ["Ulangi tindakan terakhir", "Amati sekeliling", "Tunggu sebentar"],
+            };
+        }
+    }
+
+    private buildPrompt(campaign: Campaign, players: Character[], playerAction: string): string {
+        const worldState = `Saat ini adalah ${campaign.currentTime} hari, dengan cuaca ${campaign.currentWeather}.`;
+        const questContext = `Misi Saat Ini: ${JSON.stringify(campaign.quests.map(q => ({id: q.id, title: q.title, status: q.status})))}`;
+        const npcContext = `NPC Saat Ini: ${JSON.stringify(campaign.npcs.map(n => ({id: n.id, name: n.name, disposition: n.disposition})))}`;
+        
+        const recentEvents = campaign.eventLog.slice(-10).map((event: GameEvent) => {
+            switch (event.type) {
+                case 'player_action':
+                    const player = players.find(p => p.id === event.characterId);
+                    return `${player ? player.name : 'Player'}: ${event.text}`;
+                case 'dm_narration':
+                case 'dm_reaction':
+                    return `DM: ${event.text}`;
+                case 'roll_result':
+                    const roller = players.find(p => p.id === event.characterId);
+                    return `SYSTEM: ${roller ? roller.name : 'Player'} rolled ${event.roll.total} for ${event.reason} (${event.roll.success ? 'Success' : 'Failure'}).`;
+                case 'system':
+                    return `SYSTEM: ${event.text}`;
+                default:
+                    return '';
+            }
+        }).filter(Boolean).join('\n');
+        
+        return `KONTEKS KAMPANYE:
+        - Cerita Jangka Panjang: ${campaign.longTermMemory}
+        - ${worldState}
+        - ${questContext}
+        - ${npcContext}
+        
+        PERISTIWA TERBARU:
+        ${recentEvents}
+        
+        AKSI PEMAIN SAAT INI: "${playerAction}"`;
+    }
+
+    async generateOpeningScene(campaign: Campaign): Promise<string> {
+        const prompt = `Anda adalah Dungeon Master. Mulai kampanye baru dengan detail berikut dan tuliskan adegan pembuka yang menarik dalam 1-2 paragraf.
+
+        Judul: ${campaign.title}
+        Deskripsi: ${campaign.description}
+        Kepribadian DM: ${campaign.dmPersonality}
+
+        Tulis adegan pembuka yang imersif yang menempatkan para pemain langsung ke dalam aksi atau misteri. Jangan ajukan pertanyaan, cukup atur panggungnya.`;
+
+        const call = async () => {
+            const ai = this.getClient();
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+            });
+            return response.text.trim();
+        };
+        return this.makeApiCall(call);
+    }
+    
+    async generateWorldEvent(campaign: Campaign): Promise<{ event: string, time: WorldTime, weather: WorldWeather }> {
+        const { currentTime, currentWeather } = campaign;
+        const prompt = `Ini adalah TTRPG fantasi. Waktu saat ini adalah ${currentTime} dan cuacanya ${currentWeather}.
+        
+        Tuliskan peristiwa dunia singkat (1 kalimat) yang terjadi di latar belakang. Bisa berupa perubahan cuaca, suara, atau pengamatan kecil.
+        
+        Kemudian, tentukan waktu dan cuaca BERIKUTNYA.
+        
+        Respons dalam format JSON: { "event": "...", "nextTime": "...", "nextWeather": "..." }
+        Contoh: { "event": "Angin dingin bertiup dari utara, membawa aroma hujan.", "nextTime": "Sore", "nextWeather": "Berawan" }
+        `;
+
+        const call = async () => {
+            const ai = this.getClient();
+            const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+            try {
+                const parsed = JSON.parse(response.text);
+                return {
+                    event: parsed.event,
+                    time: parsed.nextTime,
+                    weather: parsed.nextWeather
+                };
+            } catch {
+                return { event: "Dunia bergeser secara halus.", time: "Siang", weather: "Cerah" };
+            }
+        };
+        return this.makeApiCall(call);
+    }
+
+    async generateMapImage(description: string): Promise<string> {
+        const prompt = `Buat peta fantasi dunia 2D top-down, gaya perkamen antik, untuk kampanye TTRPG berdasarkan deskripsi ini: "${description}". Fokus pada geografi yang jelas seperti hutan, gunung, sungai, dan kota.`;
+        const call = async () => {
+            const ai = this.getClient();
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: { parts: [{ text: prompt }] },
+                config: { responseModalities: [Modality.IMAGE] },
+            });
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    return part.inlineData.data; // base64 string
+                }
+            }
+            throw new Error("Tidak ada gambar yang dihasilkan untuk peta.");
+        };
+        return this.makeApiCall(call);
+    }
+
+    // FIX: Changed return type to { markers: MapMarker[], startLocationId: string } to match the actual return value.
+    async generateMapMarkers(campaignFramework: any): Promise<{ markers: MapMarker[], startLocationId: string }> {
+        const locations = [
+            ...campaignFramework.proposedMainNPCs.map((npc: any) => npc.name),
+            ...campaignFramework.potentialSideQuests.map((q: any) => q.title),
+            campaignFramework.proposedMainQuest.title
+        ];
+
+        const prompt = `Berdasarkan kerangka kampanye ini, tempatkan lokasi-lokasi berikut pada peta 2D imajiner.
+        Berikan koordinat X dan Y untuk setiap lokasi sebagai persentase (0-100).
+        
+        Kerangka:
+        - Judul: ${campaignFramework.proposedTitle}
+        - Deskripsi: ${campaignFramework.description}
+        - Lokasi untuk Ditempatkan: ${locations.join(', ')}
+        
+        Tentukan juga lokasi awal yang paling masuk akal untuk para pemain.
+        
+        Respons HARUS berupa objek JSON dengan dua kunci: 'markers' (sebuah array objek penanda) dan 'startLocationId' (ID penanda awal).`;
+
+        const call = async () => {
+            const ai = this.getClient();
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: {
+                        type: Type.OBJECT,
+                        properties: {
+                            markers: MAP_MARKER_SCHEMA,
+                            startLocationId: { type: Type.STRING }
+                        },
+                        required: ["markers", "startLocationId"]
+                    }
+                }
+            });
+            return JSON.parse(response.text);
+        }
+        return this.makeApiCall(call);
+    }
+
+    async testApiKey(key: string): Promise<{ success: boolean; message: string }> {
+        if (!key || key.trim() === '') {
+            return { success: false, message: 'Kunci API tidak boleh kosong.' };
+        }
+        try {
+            const testClient = new GoogleGenAI({ apiKey: key });
+            const response = await testClient.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: 'Test'
+            });
+
+            if (response.text !== undefined && response.text !== null) {
+                return { success: true, message: 'Kunci API valid dan berfungsi.' };
+            } else {
+                return { success: false, message: 'Kunci API tampaknya valid, tetapi respons tidak terduga.' };
+            }
+        } catch (error: any) {
+            console.error("Test Kunci API gagal:", error);
+            if (error.message && error.message.includes('API key not valid')) {
+                return { success: false, message: 'Kunci API tidak valid. Periksa kembali kunci Anda.' };
+            }
+            if (error.message && error.message.includes('fetch')) {
+                 return { success: false, message: 'Gagal menghubungi server Google. Periksa koneksi jaringan Anda.' };
+            }
+            return { success: false, message: 'Kunci API tidak valid atau terjadi kesalahan jaringan.' };
+        }
+    }
+}
+
+export const geminiService = new GeminiService();

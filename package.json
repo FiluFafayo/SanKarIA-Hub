@@ -1,0 +1,13 @@
+
+{
+  "name": "sankarla-v2",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild index.tsx --bundle --outfile=dist/bundle.js --loader:.tsx=tsx --define:process.env.NODE_ENV='\"production\"' --define:process.env.API_KEY='\"'\"$API_KEY\"'\"'"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.2",
+    "typescript": "^5.4.5"
+  }
+}
