@@ -5,12 +5,16 @@
   "scripts": {
     "build": "esbuild index.tsx --bundle --outfile=dist/bundle.js --loader:.tsx=tsx --define:process.env.NODE_ENV='\"production\"' --define:process.env.API_KEY='\"'\"$API_KEY\"'\"'"
   },
+  "dependencies": {
+    "@google/genai": "^0.1.0",
+    "@supabase/supabase-js": "^2.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
   "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
     "esbuild": "^0.25.11",
     "typescript": "^5.4.5"
-  },
-  "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
   }
 }
