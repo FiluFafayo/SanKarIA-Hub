@@ -6,8 +6,8 @@
     "build": "esbuild index.tsx --bundle --outfile=dist/bundle.js --loader:.tsx=tsx --define:process.env.NODE_ENV='\"production\"' --define:process.env.API_KEY='\"'\"$API_KEY\"'\"'"
   },
   "dependencies": {
-    "@google/genai": "^0.1.0",
-    "@supabase/supabase-js": "^2.0.0",
+    "@google/genai": "^1.25.0",
+    "@supabase/supabase-js": "^2.45.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
