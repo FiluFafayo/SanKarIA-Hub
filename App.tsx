@@ -103,7 +103,10 @@ const App: React.FC = () => {
       // Seed campaigns jika kosong (opsional, tergantung maumu)
       if (fetchedCampaigns.length === 0) {
         console.log("No campaigns found, seeding default campaigns...");
+
+        // Langsung panggil dengan array asli:
         await dataService.saveCampaigns(DEFAULT_CAMPAIGNS);
+
         fetchedCampaigns = await dataService.getCampaigns();
         console.log("Seeded campaigns:", fetchedCampaigns);
       }
