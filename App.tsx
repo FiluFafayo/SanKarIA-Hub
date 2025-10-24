@@ -26,8 +26,8 @@ const App: React.FC = () => {
     'AIzaSyAQOBMFPQ5VrqQH2-TwGvQD9ZMcFz0i7Pc'
   ];
   // Default Supabase details
-  const defaultSupabaseUrl = 'https://pbonacsblhcdpthfiwxz.supabase.co/';
-  const defaultSupabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBib25hY3NibGhjZHB0aGZpd3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA3NDkwNTcsImV4cCI6MjA3NjMyNTA1N30.ArFEjlL7Z_mz_bxDpQz38DWxvwY2dOccMIopI9tbaLE';
+  const defaultSupabaseUrl = 'https://apofprrwfcjwtovvqhds.supabase.co';
+  const defaultSupabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwb2ZwcnJ3ZmNqd3RvdnZxaGRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEyNzg5ODksImV4cCI6MjA3Njg1NDk4OX0.SrurgXy8wLzYC0xTTYD8F4RggY8kYHARB9Tw9wJNvUs';
 
   const [apiKeys, setApiKeys] = useLocalStorage<string[]>('sankaria-apikeys', defaultApiKeys);
   const [supabaseUrl, setSupabaseUrl] = useLocalStorage<string>('sankaria-supabase-url', defaultSupabaseUrl);
