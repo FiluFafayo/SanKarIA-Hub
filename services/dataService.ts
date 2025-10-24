@@ -46,7 +46,7 @@ class DataService {
             }
             return data || [];
         } else {
-            return this.getFromLocalStorage<Campaign[]>('sankarla-campaigns', []);
+            return this.getFromLocalStorage<Campaign[]>('sankaria-campaigns', []);
         }
     }
 
@@ -59,14 +59,14 @@ class DataService {
             }
             return data;
         } else {
-            const campaigns = this.getFromLocalStorage<Campaign[]>('sankarla-campaigns', []);
+            const campaigns = this.getFromLocalStorage<Campaign[]>('sankaria-campaigns', []);
             const index = campaigns.findIndex(c => c.id === campaign.id);
             if (index > -1) {
                 campaigns[index] = campaign;
             } else {
                 campaigns.push(campaign);
             }
-            this.saveToLocalStorage('sankarla-campaigns', campaigns);
+            this.saveToLocalStorage('sankaria-campaigns', campaigns);
             return campaign;
         }
     }
@@ -80,7 +80,7 @@ class DataService {
             }
             return data || [];
         } else {
-            this.saveToLocalStorage('sankarla-campaigns', campaigns);
+            this.saveToLocalStorage('sankaria-campaigns', campaigns);
             return campaigns;
         }
     }
@@ -95,7 +95,7 @@ class DataService {
             }
             return data || [];
         } else {
-             return this.getFromLocalStorage<Character[]>('sankarla-characters', []);
+             return this.getFromLocalStorage<Character[]>('sankaria-characters', []);
         }
     }
 
@@ -108,14 +108,14 @@ class DataService {
             }
             return data;
         } else {
-            const characters = this.getFromLocalStorage<Character[]>('sankarla-characters', []);
+            const characters = this.getFromLocalStorage<Character[]>('sankaria-characters', []);
             const index = characters.findIndex(c => c.id === character.id);
             if (index > -1) {
                 characters[index] = character;
             } else {
                 characters.push(character);
             }
-            this.saveToLocalStorage('sankarla-characters', characters);
+            this.saveToLocalStorage('sankaria-characters', characters);
             return character;
         }
     }
@@ -129,7 +129,7 @@ class DataService {
             }
             return data || [];
         } else {
-             this.saveToLocalStorage('sankarla-characters', characters);
+             this.saveToLocalStorage('sankaria-characters', characters);
              return characters;
         }
     }

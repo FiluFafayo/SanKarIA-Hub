@@ -20,13 +20,13 @@ type View = Location | 'nexus' | 'character-selection';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('nexus');
-  const [apiKeys, setApiKeys] = useLocalStorage<string[]>('sankarla-apikeys', ['']);
-  const [supabaseUrl, setSupabaseUrl] = useLocalStorage<string>('sankarla-supabase-url', '');
-  const [supabaseKey, setSupabaseKey] = useLocalStorage<string>('sankarla-supabase-key', '');
+  const [apiKeys, setApiKeys] = useLocalStorage<string[]>('sankaria-apikeys', ['']);
+  const [supabaseUrl, setSupabaseUrl] = useLocalStorage<string>('sankaria-supabase-url', '');
+  const [supabaseKey, setSupabaseKey] = useLocalStorage<string>('sankaria-supabase-key', '');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [userId, setUserId] = useLocalStorage<string>('sankarla-userId', '');
-  const [theme, setTheme] = useLocalStorage<string>('sankarla-theme', 'theme-sanc');
+  const [userId, setUserId] = useLocalStorage<string>('sankaria-userId', '');
+  const [theme, setTheme] = useLocalStorage<string>('sankaria-theme', 'theme-sanc');
   const [isLoading, setIsLoading] = useState(true);
 
   // State for the game session
@@ -279,7 +279,7 @@ const App: React.FC = () => {
   if (isLoading) {
     return (
         <div className={`w-screen h-screen bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme}`}>
-            <h1 className="font-cinzel text-5xl animate-pulse">SanKarlA</h1>
+            <h1 className="font-cinzel text-5xl animate-pulse">SanKarIA</h1>
             <p className="mt-2">Memuat semesta...</p>
         </div>
     );
