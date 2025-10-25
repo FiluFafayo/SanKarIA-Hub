@@ -38,7 +38,7 @@ const App: React.FC = () => {
   // State untuk sesi permainan
   const [playingCampaign, setPlayingCampaign] = useState<Campaign | null>(null);
   const [playingCharacter, setPlayingCharacter] = useState<Character | null>(null);
-  
+
   // Efek Inisialisasi Layanan
   useEffect(() => {
     // Ambil kunci Gemini dari environment variable
@@ -63,17 +63,17 @@ const App: React.FC = () => {
     }
     dataService.init(supabaseUrl, supabaseKey);
   }, []);
-  
+
   // Efek Otentikasi
   useEffect(() => {
     setIsAuthLoading(true);
     dataService.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        setIsAuthLoading(false);
+      setSession(session);
+      setIsAuthLoading(false);
     });
 
     const { data: { subscription } } = dataService.onAuthStateChange((_event, session) => {
-        setSession(session);
+      setSession(session);
     });
 
     return () => subscription.unsubscribe();
@@ -83,41 +83,41 @@ const App: React.FC = () => {
   useEffect(() => {
     // Hanya muat data saat ada sesi
     if (!session) {
-        setIsLoading(false);
-        setCampaigns([]);
-        setCharacters([]);
-        return;
+      setIsLoading(false);
+      setCampaigns([]);
+      setCharacters([]);
+      return;
     }
-    
-    const loadData = async () => {
-        setIsLoading(true);
-        try {
-            let fetchedCampaigns = await dataService.getCampaigns();
-            let fetchedCharacters = await dataService.getCharacters();
 
-            // Seed data jika database kosong
-            if (fetchedCampaigns.length === 0) {
-                await dataService.saveCampaigns(DEFAULT_CAMPAIGNS);
-                fetchedCampaigns = DEFAULT_CAMPAIGNS;
-            }
-            if (fetchedCharacters.length === 0 && userId) {
-                const userCharacters = DEFAULT_CHARACTERS.map(char => ({
-                    ...char,
-                    id: generateId('char'),
-                    ownerId: userId,
-                }));
-                await dataService.saveCharacters(userCharacters);
-                fetchedCharacters = userCharacters;
-            }
-            
-            setCampaigns(fetchedCampaigns);
-            setCharacters(fetchedCharacters);
-        } catch (error) {
-            console.error("Gagal memuat data:", error);
-            alert("Gagal memuat data dari Supabase. Periksa koneksi internet Anda atau coba lagi nanti.");
-        } finally {
-            setIsLoading(false);
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        let fetchedCampaigns = await dataService.getCampaigns();
+        let fetchedCharacters = await dataService.getCharacters();
+
+        // Seed data jika database kosong
+        if (fetchedCampaigns.length === 0) {
+          await dataService.saveCampaigns(DEFAULT_CAMPAIGNS);
+          fetchedCampaigns = DEFAULT_CAMPAIGNS;
         }
+        if (fetchedCharacters.length === 0 && userId) {
+          const userCharacters = DEFAULT_CHARACTERS.map(char => ({
+            ...char,
+            id: generateId('char'),
+            ownerId: userId,
+          }));
+          await dataService.saveCharacters(userCharacters);
+          fetchedCharacters = userCharacters;
+        }
+
+        setCampaigns(fetchedCampaigns);
+        setCharacters(fetchedCharacters);
+      } catch (error) {
+        console.error("Gagal memuat data:", error);
+        alert("Gagal memuat data dari Supabase. Periksa koneksi internet Anda atau coba lagi nanti.");
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadData();
@@ -125,7 +125,7 @@ const App: React.FC = () => {
 
   const myCharacters = characters.filter(c => c.ownerId === userId);
   const [campaignToJoinOrStart, setCampaignToJoinOrStart] = useState<Campaign | null>(null);
-  
+
   const handleLocationClick = useCallback((location: Location) => {
     setCurrentView(location);
   }, []);
@@ -137,76 +137,76 @@ const App: React.FC = () => {
 
   const handleSaveCampaign = async (updatedCampaign: Campaign) => {
     try {
-        await dataService.saveCampaign(updatedCampaign);
-        setCampaigns(prev => {
-            const index = prev.findIndex(c => c.id === updatedCampaign.id);
-            if (index !== -1) {
-                const newCampaigns = [...prev];
-                newCampaigns[index] = updatedCampaign;
-                return newCampaigns;
-            }
-            return [...prev, updatedCampaign]; // Fallback jika kampanye baru
-        });
+      await dataService.saveCampaign(updatedCampaign);
+      setCampaigns(prev => {
+        const index = prev.findIndex(c => c.id === updatedCampaign.id);
+        if (index !== -1) {
+          const newCampaigns = [...prev];
+          newCampaigns[index] = updatedCampaign;
+          return newCampaigns;
+        }
+        return [...prev, updatedCampaign]; // Fallback jika kampanye baru
+      });
     } catch (e) {
-        console.error("Gagal menyimpan kampanye:", e);
-        alert("Gagal menyimpan progres kampanye. Periksa koneksi Anda.");
+      console.error("Gagal menyimpan kampanye:", e);
+      alert("Gagal menyimpan progres kampanye. Periksa koneksi Anda.");
     }
   };
 
   const handleUpdateCharacter = async (updatedCharacter: Character) => {
     try {
-        await dataService.saveCharacter(updatedCharacter);
-        setCharacters(prev => {
-            const index = prev.findIndex(c => c.id === updatedCharacter.id);
-            if (index !== -1) {
-                const newCharacters = [...prev];
-                newCharacters[index] = updatedCharacter;
-                return newCharacters;
-            }
-            return prev;
-        });
-        if (playingCharacter && playingCharacter.id === updatedCharacter.id) {
-            setPlayingCharacter(updatedCharacter);
+      await dataService.saveCharacter(updatedCharacter);
+      setCharacters(prev => {
+        const index = prev.findIndex(c => c.id === updatedCharacter.id);
+        if (index !== -1) {
+          const newCharacters = [...prev];
+          newCharacters[index] = updatedCharacter;
+          return newCharacters;
         }
-    } catch(e) {
-         console.error("Gagal menyimpan karakter:", e);
-         alert("Gagal menyimpan progres karakter. Periksa koneksi Anda.");
+        return prev;
+      });
+      if (playingCharacter && playingCharacter.id === updatedCharacter.id) {
+        setPlayingCharacter(updatedCharacter);
+      }
+    } catch (e) {
+      console.error("Gagal menyimpan karakter:", e);
+      alert("Gagal menyimpan progres karakter. Periksa koneksi Anda.");
     }
   };
 
   const handleCreateCampaign = async (newCampaign: Campaign) => {
     try {
       const openingScene = await geminiService.generateOpeningScene(newCampaign);
-       newCampaign.eventLog.push({
-         id: generateId('event'),
-         type: 'dm_narration',
-         text: openingScene,
-         timestamp: new Date().toISOString(),
-         turnId: 'turn-0'
-       });
+      newCampaign.eventLog.push({
+        id: generateId('event'),
+        type: 'dm_narration',
+        text: openingScene,
+        timestamp: new Date().toISOString(),
+        turnId: 'turn-0'
+      });
     } catch (e) {
       console.error("Gagal menghasilkan adegan pembuka:", e);
       newCampaign.eventLog.push({
-         id: generateId('event'),
-         type: 'system',
-         text: "Gagal menghasilkan adegan pembuka. Silakan mulai petualangan Anda.",
-         timestamp: new Date().toISOString(),
-         turnId: 'turn-0'
+        id: generateId('event'),
+        type: 'system',
+        text: "Gagal menghasilkan adegan pembuka. Silakan mulai petualangan Anda.",
+        timestamp: new Date().toISOString(),
+        turnId: 'turn-0'
       });
     }
     const savedCampaign = await dataService.saveCampaign(newCampaign);
     setCampaigns(prev => [...prev, savedCampaign]);
     handleReturnToNexus();
   };
-  
+
   const handleSelectCampaign = (campaign: Campaign) => {
     if (!userId) return;
 
     const playerCharacterInCampaign = characters.find(c => campaign.playerIds.includes(c.id));
-    
+
     if (playerCharacterInCampaign && playerCharacterInCampaign.ownerId === userId) {
-        setPlayingCampaign(campaign);
-        setPlayingCharacter(playerCharacterInCampaign);
+      setPlayingCampaign(campaign);
+      setPlayingCharacter(playerCharacterInCampaign);
     } else {
       if (campaign.playerIds.length >= campaign.maxPlayers) {
         alert("Maaf, kampanye ini sudah penuh.");
@@ -216,7 +216,7 @@ const App: React.FC = () => {
       setCurrentView('character-selection');
     }
   };
-  
+
   const handleCharacterSelection = (character: Character) => {
     if (!campaignToJoinOrStart || !userId) return;
 
@@ -244,9 +244,9 @@ const App: React.FC = () => {
     setPlayingCharacter(null);
     setCurrentView('nexus');
   };
-  
+
   const handleFoundCampaignToJoin = (campaign: Campaign) => {
-      handleSelectCampaign(campaign);
+    handleSelectCampaign(campaign);
   }
 
   const renderView = () => {
@@ -258,7 +258,7 @@ const App: React.FC = () => {
           characters={myCharacters}
           onSelect={(characterId) => {
             const character = characters.find(c => c.id === characterId);
-            if(character) {
+            if (character) {
               handleCharacterSelection(character);
             }
           }}
@@ -277,31 +277,31 @@ const App: React.FC = () => {
       case Location.MarketOfAThousandTales:
         return <MarketplaceView onClose={handleReturnToNexus} allCampaigns={campaigns} setCampaigns={setCampaigns} userId={userId} />;
       case Location.TinkerersWorkshop:
-        return <SettingsView 
-                    onClose={handleReturnToNexus} 
-                    currentTheme={theme} 
-                    setTheme={setTheme}
-                    userEmail={session?.user?.email}
-                    onSignOut={() => dataService.signOut()}
-                />;
+        return <SettingsView
+          onClose={handleReturnToNexus}
+          currentTheme={theme}
+          setTheme={setTheme}
+          userEmail={session?.user?.email}
+          onSignOut={() => dataService.signOut()}
+        />;
       case Location.MirrorOfSouls:
         return <ProfileView onClose={handleReturnToNexus} characters={characters} setCharacters={setCharacters} userId={userId} />;
       default:
         return null;
     }
   };
-  
+
   const LoadingScreen = () => (
-     <div className={`w-screen h-screen bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme}`}>
-        <h1 className="font-cinzel text-5xl animate-pulse">SanKarIA Hub</h1>
-        <p className="mt-2">Memuat semesta...</p>
+    <div className={`w-screen h-screen bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme}`}>
+      <h1 className="font-cinzel text-5xl animate-pulse">SanKarIA Hub</h1>
+      <p className="mt-2">Memuat semesta...</p>
     </div>
   );
 
   if (isAuthLoading) {
     return <LoadingScreen />;
   }
-  
+
   // Jika tidak ada sesi, tampilkan login
   if (!session) {
     return <div className={theme}><LoginView /></div>;
@@ -311,9 +311,9 @@ const App: React.FC = () => {
     const campaignPlayers = characters.filter(c => playingCampaign.playerIds.includes(c.id));
     return (
       <div className={theme}>
-        <GameScreen 
-          initialCampaign={playingCampaign} 
-          character={playingCharacter} 
+        <GameScreen
+          initialCampaign={playingCampaign}
+          character={playingCharacter}
           players={campaignPlayers}
           onExit={handleExitGame}
           updateCharacter={handleUpdateCharacter}
@@ -328,7 +328,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className={`w-screen h-screen bg-black overflow-hidden ${theme}`}>
+    <div className={`w-screen h-screen overflow-hidden ${theme}`}>
       {currentView === 'nexus' && <NexusSanctum onLocationClick={handleLocationClick} userEmail={session?.user?.email} />}
       {currentView !== 'nexus' && renderView()}
     </div>
