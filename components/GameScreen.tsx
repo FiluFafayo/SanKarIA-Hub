@@ -76,7 +76,23 @@ export const GameScreen: React.FC<GameScreenProps> = ({ initialCampaign, charact
         campaignActions
     });
 
-    const isDisabled = campaign.thinkingState !== 'idle' || !!campaign.turnId || (campaign.gameState === 'combat' && !isMyTurn) || !!campaign.activeRollRequest;
+    // PERBAIKAN KRITIS: Logika `isDisabled` diubah total
+    // GANTI DENGAN LOGIKA BARU:
+    const isCombat = campaign.gameState === 'combat';
+    // Giliran kombat kita adalah saat: mode kombat, giliran kita, DAN ada turnId aktif
+    const isMyCombatTurn = isCombat && isMyTurn && !!campaign.turnId;
+    // Mode eksplorasi adalah saat: BUKAN kombat, DAN TIDAK ada turnId aktif (game sedang menunggu input)
+    const isExploration = !isCombat && !campaign.turnId;
+
+    // Tombol Aksi di-disable JIKA:
+    // 1. AI sedang berpikir (selalu)
+    // 2. Ada RollModal aktif (selalu)
+    // 3. Kita lagi kombat, TAPI BUKAN giliran kita (isMyCombatTurn false)
+    // 4. Kita lagi eksplorasi, TAPI AI sedang memproses aksi (isExploration false)
+    // Jadi, kita aktif HANYA jika (AI tidak berpikir) DAN (tidak ada modal) DAN (ini giliran kombat kita ATAU ini mode eksplorasi)
+    const isDisabled = campaign.thinkingState !== 'idle'
+                     || !!campaign.activeRollRequest
+                     || (!isMyCombatTurn && !isExploration);
 
     const handleActionSubmit = (actionText: string) => {
         campaignActions.clearChoices();

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, FunctionDeclaration, Modality } from "@google/genai";
-import { Campaign, Character, StructuredApiResponse, ToolCall, GameEvent, MapMarker, WorldTime, WorldWeather } from '../types';
+import { Campaign, Character, StructuredApiResponse, ToolCall, GameEvent, MapMarker, WorldTime, WorldWeather, RollRequest } from '../types'; // Tambahkan RollRequest
 import { RESPONSE_SCHEMA, MECHANICS_SCHEMA, parseStructuredApiResponse, parseMechanicsResponse } from "./responseParser";
 
 const CAMPAIGN_FRAMEWORK_SCHEMA = {
@@ -316,83 +316,53 @@ class GeminiService {
         return this.makeApiCall(call);
     }
     
-    async generateNarration(campaign: Campaign, players: Character[], playerAction: string, onStateChange: (state: 'thinking' | 'retrying') => void): Promise<Omit<StructuredApiResponse, 'choices' | 'rollRequest' | 'tool_calls'>> {
+    // FUNGSI BARU: Menggantikan generateNarration + determineNextStep
+    async generateTurnResult(
+        campaign: Campaign, 
+        players: Character[], 
+        playerAction: string, 
+        onStateChange: (state: 'thinking' | 'retrying') => void
+    ): Promise<StructuredApiResponse> {
         onStateChange('thinking');
 
         let styleInstruction = '';
         if (campaign.dmNarrationStyle === 'Langsung & Percakapan') {
-            styleInstruction = 'Gaya narasimu HARUS langsung, sederhana, dan seperti percakapan. Hindari deskripsi puitis. Fokus pada apa yang karakter lihat dan dengar secara langsung.';
+            styleInstruction = 'Gaya narasimu HARUS langsung, sederhana, dan seperti percakapan. Hindari deskripsi puitis.';
         }
 
-        const systemInstruction = `Anda adalah AI Dungeon Master (DM) untuk TTRPG fantasi. Kepribadian Anda adalah: ${campaign.dmPersonality}. Panjang respons Anda harus: ${campaign.responseLength}. ${styleInstruction}
+        const systemInstruction = `Anda adalah AI Dungeon Master (DM) untuk TTRPG fantasi. Kepribadian Anda: ${campaign.dmPersonality}. Panjang respons: ${campaign.responseLength}. ${styleInstruction}
         
         ATURAN UTAMA:
-        1.  HANYA NARASI: Tanggapi aksi pemain dengan narasi yang deskriptif.
-        2.  OBJEK INTERAKTIF: Jika Anda menyebutkan objek penting yang dapat berinteraksi (peti, tuas, pintu, mayat, buku), tandai dalam narasi Anda menggunakan format [OBJECT:nama-objek|id-unik]. Contoh: "Di sudut ruangan, Anda melihat sebuah [OBJECT:peti kayu|peti-ruangan-1]." JANGAN menandai NPC atau makhluk hidup.
-        3.  FORMAT JSON: Respons Anda HARUS berupa objek JSON yang valid dengan field 'reaction' (opsional, singkat) dan 'narration' (wajib, lebih detail).`;
+        1.  RESPONS JSON: Respons Anda HARUS berupa objek JSON yang valid sesuai skema 'RESPONSE_SCHEMA' (menyediakan 'reaction' dan 'narration').
+        2.  PANGGIL FUNGSI MEKANIK: Anda JUGA HARUS memanggil TEPAT SATU dari fungsi mekanika utama ('propose_choices', 'request_roll', 'spawn_monsters') JIKA diperlukan oleh narasi.
+        3.  ATURAN KOMBO: Jika narasi memicu pertarungan, Anda HARUS memanggil 'spawn_monsters' DAN JUGA memberikan narasi tentang kemunculan mereka dalam JSON Anda.
+        4.  ALAT TAMBAHAN: Anda DAPAT memanggil alat lain ('add_items_to_inventory', 'update_quest_log') jika narasi membenarkannya.
+        5.  OBJEK INTERAKTIF: Jika Anda menyebutkan objek penting (peti, tuas, pintu), tandai dalam 'narration' JSON Anda menggunakan format [OBJECT:nama-objek|id-unik].`;
         
         const prompt = this.buildPrompt(campaign, players, playerAction);
 
         const call = async () => {
             const ai = this.getClient();
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-2.5-flash', // Model yang cukup pintar untuk tugas ganda
                 contents: prompt,
                 config: {
                     systemInstruction,
                     responseMimeType: "application/json",
-                    responseSchema: RESPONSE_SCHEMA,
-                    temperature: 0.75,
+                    responseSchema: RESPONSE_SCHEMA, // 1. Paksa narasi JSON
+                    tools: [{ functionDeclarations: TOOLS }], // 2. Izinkan pemanggilan alat mekanik
+                    temperature: 0.7,
                 }
             });
-             if (!response.text) {
-                 throw new Error("AI narration response was empty.");
-            }
-            return parseStructuredApiResponse(response.text);
-        };
-        
-        try {
-            return await this.makeApiCall(call);
-        } catch (error) {
-             console.error("Gagal total menghasilkan narasi:", error);
-            return {
-                narration: "Dunia terasa hening sejenak saat DM merenungkan tindakan Anda...",
-            };
-        }
-    }
 
-    async determineNextStep(campaign: Campaign, players: Character[], playerAction: string, newNarration: string): Promise<Omit<StructuredApiResponse, 'reaction' | 'narration'>> {
-        const systemInstruction = `Anda adalah AI Logika Permainan untuk TTRPG. Tugas Anda BUKAN untuk bercerita, tetapi untuk menentukan MEKANIKA permainan selanjutnya.
-    
-        ATURAN UTAMA:
-        1.  HANYA GUNAKAN FUNGSI: Respons Anda HARUS berupa satu atau lebih pemanggilan fungsi. JANGAN berikan teks biasa.
-        2.  PILIH MEKANIKA UTAMA: Anda HARUS memanggil TEPAT SATU dari 'propose_choices' ATAU 'request_roll' ATAU 'spawn_monsters'. JANGAN panggil lebih dari satu dari grup ini.
-        3.  MULAI PERTARUNGAN: Jika pemain menyatakan niat untuk menyerang, atau jika narasi memicu pertarungan, Anda HARUS memanggil 'spawn_monsters'.
-        4.  LEMPARAN DADU: Jika aksi (di luar pertarungan) memiliki hasil tidak pasti (membujuk, menyelidiki), panggil 'request_roll'.
-        5.  GUNAKAN ALAT TAMBAHAN: Anda DAPAT memanggil alat lain ('add_items_to_inventory', 'update_quest_log') BERSAMAAN DENGAN mekanika utama.
-        6.  KONTEKS NPC & MISI: Periksa konteks NPC dan Misi yang ada dari prompt sebelum membuat alat baru.
-        7.  STAT MONSTER: Saat memanggil 'spawn_monsters', HANYA berikan 'stats' jika monster itu (seperti 'Rubah') tidak ada dalam daftar monster default.
-        8.  ATURAN KHUSUS KOMBAT: Jika Anda sedang dalam pertarungan (giliran monster) dan Anda menarasikan monster BARU yang bergabung, Anda HARUS memanggil 'spawn_monsters' LAGI untuk menambahkan mereka ke pertarungan, BERSAMAAN dengan 'request_roll' untuk serangan monster yang sekarang.`;
+            // 1. Urai bagian Narasi (dari response.text)
+            const narrationPart = parseStructuredApiResponse(response.text);
 
-        const prompt = `${this.buildPrompt(campaign, players, playerAction)}\nNarasi yang Baru Dihasilkan: "${newNarration}"\n\nTentukan langkah mekanis selanjutnya dengan memanggil fungsi yang sesuai.`;
-
-         const call = async () => {
-            const ai = this.getClient();
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-                config: {
-                    systemInstruction,
-                    // Hapus mimeType dan schema, kita hanya pakai tools
-                    tools: [{ functionDeclarations: TOOLS }],
-                }
-            });
-            
-            // Logika baru: Urai hasil dari response.functionCalls
+            // 2. Urai bagian Mekanik (dari response.functionCalls)
             let choices: string[] | undefined = undefined;
             let rollRequest: Omit<RollRequest, 'characterId' | 'originalActionText'> | undefined = undefined;
             const tool_calls: ToolCall[] = [];
-            let didSpawnMonsters = false; // <-- 1. TAMBAHKAN FLAG INI
+            let didSpawnMonsters = false;
 
             if (response.functionCalls) {
                 for (const fc of response.functionCalls) {
@@ -404,11 +374,8 @@ class GeminiService {
                             rollRequest = fc.args as any;
                             break;
                         case 'spawn_monsters':
-                            tool_calls.push({
-                                functionName: fc.name,
-                                args: fc.args
-                            });
-                            didSpawnMonsters = true; // <-- 2. SET FLAG-NYA DI SINI
+                            tool_calls.push({ functionName: fc.name, args: fc.args });
+                            didSpawnMonsters = true;
                             break;
                         case 'add_items_to_inventory':
                         case 'update_quest_log':
@@ -422,21 +389,25 @@ class GeminiService {
                 }
             }
 
-            // Fallback jika AI gagal memanggil 'propose_choices' atau 'request_roll'
-            if (!choices && !rollRequest && !didSpawnMonsters) { // <-- CEK FLAG-NYA
+            // 3. Fallback jika AI gagal memanggil mekanika utama (penting untuk eksplorasi)
+            if (!choices && !rollRequest && !didSpawnMonsters && campaign.gameState === 'exploration') {
                 console.warn("AI tidak memanggil mekanika utama ('choices', 'roll', 'spawn'). Menggunakan fallback.");
-                choices = ["Maaf, AI gagal memberi pilihan. Coba lagi.", "Amati sekeliling"];
+                choices = ["Lanjutkan...", "Amati sekeliling", "Ulangi tindakan"];
             }
 
-            return { choices, rollRequest, tool_calls };
+            // 4. Gabungkan semuanya
+            return { ...narrationPart, choices, rollRequest, tool_calls };
         };
-
+        
         try {
             return await this.makeApiCall(call);
-        } catch(error) {
-            console.error("Gagal total menentukan langkah selanjutnya:", error);
+        } catch (error) {
+             console.error("Gagal total menghasilkan TurnResult:", error);
+            // Kembalikan state aman jika terjadi error
             return {
-                choices: ["Ulangi tindakan terakhir", "Amati sekeliling", "Tunggu sebentar"],
+                narration: "Dunia terasa hening sejenak saat DM merenungkan tindakan Anda... (Terjadi Error)",
+                choices: ["Ulangi tindakan terakhir", "Amati sekeliling"],
+                tool_calls: [],
             };
         }
     }

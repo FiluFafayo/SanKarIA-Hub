@@ -101,7 +101,7 @@ export const DEFAULT_CHARACTERS: Omit<Character, 'id' | 'ownerId'>[] = [
     },
     maxHp: 11,
     currentHp: 11,
-    armorClass: 18,
+    armorClass: 16,
     speed: 25,
     hitDice: '1d8',
     hitDiceSpent: 0,

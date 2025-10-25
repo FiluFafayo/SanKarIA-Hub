@@ -81,20 +81,21 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 campaignActions.updateWorldState(worldEventResult.time, worldEventResult.weather);
             }
 
-            // Step 1: Get Narration
-            const narrationResult = await geminiService.generateNarration(campaign, players, actionText, campaignActions.setThinkingState);
-            if (narrationResult.reaction) {
-                campaignActions.logEvent({ type: 'dm_reaction', text: narrationResult.reaction }, turnId);
+            // PERBAIKAN: Ganti 2 panggilan AI menjadi 1
+            // PANGGILAN BARU:
+            const result = await geminiService.generateTurnResult(campaign, players, actionText, campaignActions.setThinkingState);
+
+            // Proses hasil gabungan
+            if (result.reaction) {
+                campaignActions.logEvent({ type: 'dm_reaction', text: result.reaction }, turnId);
             }
-            if (narrationResult.narration) {
-                campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
+            if (result.narration) {
+                campaignActions.logEvent({ type: 'dm_narration', text: result.narration }, turnId);
             } else {
                 campaignActions.logEvent({ type: 'system', text: "DM merenung sejenak..." }, turnId);
             }
 
-            // Step 2: Get Mechanics
-            const mechanicsResult = await geminiService.determineNextStep(campaign, players, actionText, narrationResult.narration);
-            await processMechanics(turnId, mechanicsResult, actionText);
+            await processMechanics(turnId, result, actionText); // Kirim 'result' yg berisi mekanik
 
         } catch (error) {
             console.error("Gagal mendapatkan langkah selanjutnya dari AI:", error);
@@ -120,14 +121,15 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         const actionText = `Hasil dari lemparan dadu ${character.name}: ${roll.success ? 'BERHASIL' : 'GAGAL'}. (Aksi asli: ${request.originalActionText})`;
 
         try {
-            // Step 1: Get Narration
-            const narrationResult = await geminiService.generateNarration(campaign, players, actionText, campaignActions.setThinkingState);
-            if (narrationResult.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: narrationResult.reaction }, turnId);
-            if (narrationResult.narration) campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
+            // PERBAIKAN: Ganti 2 panggilan AI menjadi 1
+            // PANGGILAN BARU:
+            const result = await geminiService.generateTurnResult(campaign, players, actionText, campaignActions.setThinkingState);
 
-            // Step 2: Get Mechanics
-            const mechanicsResult = await geminiService.determineNextStep(campaign, players, actionText, narrationResult.narration);
-            await processMechanics(turnId, mechanicsResult, actionText);
+            // Proses hasil gabungan
+            if (result.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: result.reaction }, turnId);
+            if (result.narration) campaignActions.logEvent({ type: 'dm_narration', text: result.narration }, turnId);
+
+            await processMechanics(turnId, result, actionText); // Kirim 'result' yg berisi mekanik
         } catch (error) {
             console.error("Gagal mendapatkan langkah selanjutnya dari AI setelah lemparan:", error);
             campaignActions.logEvent({

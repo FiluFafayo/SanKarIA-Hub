@@ -287,17 +287,22 @@ export const useCampaign = (initialCampaign: Campaign, initialPlayers: Character
                     
                     for (let i = 0; i < m.quantity; i++) {
                         const uniqueName = m.quantity > 1 ? `${m.name} ${i + 1}` : m.name;
+                        
+                        // PERBAIKAN DATA: Prioritaskan template default
                         let monsterData: Omit<Monster, 'id' | 'currentHp' | 'initiative' | 'conditions'> | null = null;
                         
-                        if (m.stats) {
+                        // 1. Cari template default
+                        const template = DEFAULT_MONSTERS.find(dm => dm.name.toLowerCase() === m.name.toLowerCase());
+                        
+                        if (template) {
+                            // 2. Jika template ada, SELALU gunakan template. Abaikan stats dari AI.
+                            monsterData = template;
+                        } 
+                        else if (m.stats) {
+                            // 3. Jika tidak ada template, BARU gunakan stats kustom dari AI.
                             monsterData = { name: m.name, ...m.stats };
                         } 
-                        else {
-                            const template = DEFAULT_MONSTERS.find(dm => dm.name.toLowerCase() === m.name.toLowerCase());
-                            if (template) {
-                                monsterData = template;
-                            }
-                        }
+                        // (Logika lama ada di bawah, dibalik)
 
                         if (monsterData) {
                             newMonsters.push({
