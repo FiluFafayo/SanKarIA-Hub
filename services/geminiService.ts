@@ -355,7 +355,17 @@ class GeminiService {
             });
 
             // 1. Urai bagian Narasi (dari response.text)
-            const narrationPart = parseStructuredApiResponse(response.text);
+            // PERBAIKAN: Ambil teks narasi secara manual dari 'parts'
+            let narrationText = "";
+            // Cari bagian teks pertama dalam respons
+            const textPart = response.candidates?.[0]?.content?.parts?.find((part: Part) => 'text' in part);
+            if (textPart && 'text' in textPart) {
+                narrationText = textPart.text;
+            } else {
+                console.warn("Tidak menemukan bagian teks dalam respons API, fallback narasi.");
+            }
+            // Parse teks narasi yang sudah diekstrak
+            const narrationPart = parseStructuredApiResponse(narrationText); // <-- Gunakan narrationText
 
             // 2. Urai bagian Mekanik (dari response.functionCalls)
             let choices: string[] | undefined = undefined;
