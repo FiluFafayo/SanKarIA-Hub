@@ -1,7 +1,7 @@
 // postcss.config.js
 export default {
   plugins: {
-    '@tailwindcss/postcss': {}, // Ganti 'tailwindcss' menjadi '@tailwindcss/postcss'
+    '@tailwindcss/postcss': {}, // Nama plugin yang benar
     autoprefixer: {},
   },
 }

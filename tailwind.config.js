@@ -2,13 +2,12 @@
 export default {
   content: [
     "./index.html",             // Index HTML di root
-    "./*.{js,ts,jsx,tsx}",     // SEMUA file .ts/.tsx/.js/.jsx di root (index.tsx, App.tsx, utils.ts, types.ts, etc.)
-    "./components/**/*.{js,ts,jsx,tsx}", // Semua file di dalam folder components
-    "./views/**/*.{js,ts,jsx,tsx}",      // Semua file di dalam folder views
-    "./hooks/**/*.{js,ts,jsx,tsx}",       // Semua file di dalam folder hooks
-    // Tambahkan pola lain jika ada folder lain yang berisi komponen/view
+    "./*.{js,ts,jsx,tsx}",     // SEMUA file .ts/.tsx/.js/.jsx di root
+    "./components/**/*.{js,ts,jsx,tsx}", // Semua file di dalam folder components di root
+    "./views/**/*.{js,ts,jsx,tsx}",      // Semua file di dalam folder views di root
+    "./hooks/**/*.{js,ts,jsx,tsx}",       // Semua file di dalam folder hooks di root
   ],
-  theme: {
+  theme: { // Pastikan theme & extend ada
     extend: {
         fontFamily: {
             sans: ['Lato', 'sans-serif'],
