@@ -157,13 +157,26 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
                     campaignActions.setGameState('exploration');
                     try {
                         const actionText = "Pertarungan telah berakhir. Apa yang terjadi selanjutnya?";
-                        // Step 1: Get Narration
+                        
+                        // ==========================================================
+                        // PERBAIKAN: Menggunakan alur 2 panggilan (Narasi -> Mekanik)
+                        // ==========================================================
+                        
+                        // PANGGILAN 1: Dapatkan Narasi Akhir Kombat
                         const narrationResult = await geminiService.generateNarration(campaign, players, actionText, campaignActions.setThinkingState);
                         if (narrationResult.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: narrationResult.reaction }, turnId);
                         if (narrationResult.narration) campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
+                        
+                        const contextNarration = narrationResult.narration || narrationResult.reaction || "Pertarungan berakhir.";
 
-                        // Step 2: Get Mechanics (JANGAN PANGGIL processMechanics)
-                        const mechanicsResult = await geminiService.determineNextStep(campaign, players, actionText, narrationResult.narration);
+                        // PANGGILAN 2: Dapatkan Mekanik (loot, quest, dll)
+                        const mechanicsResult = await geminiService.determineNextStep(
+                            campaign, 
+                            players, 
+                            actionText, 
+                            contextNarration, 
+                            campaignActions.setThinkingState
+                        );
 
                         if (mechanicsResult.tool_calls && mechanicsResult.tool_calls.length > 0) {
                             processToolCalls(turnId, mechanicsResult.tool_calls);
@@ -171,14 +184,9 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
                         if (mechanicsResult.choices && mechanicsResult.choices.length > 0) {
                             campaignActions.setChoices(mechanicsResult.choices!);
                         }
-                        if (mechanicsResult.rollRequest) {
-                            const fullRollRequest: RollRequest = {
-                                ...mechanicsResult.rollRequest!,
-                                characterId: character.id, // default ke pemain
-                                originalActionText: actionText,
-                            };
-                            campaignActions.setActiveRollRequest(fullRollRequest);
-                        }
+                        // Kita asumsikan tidak ada roll request langsung setelah kombat berakhir
+                        // Jika ada, tambahkan logikanya di sini.
+
                     } finally {
                         campaignActions.endTurn();
                     }
@@ -349,17 +357,40 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
                     if (target) {
                         const actionText = `${nextCombatant.name} menyerang ${target.name}.`;
 
-                        // PERBAIKAN: Ganti 2 panggilan AI menjadi 1 (Lihat Bagian 2)
-                        // PANGGILAN BARU:
-                        const result = await geminiService.generateTurnResult(campaign, players, actionText, campaignActions.setThinkingState);
+                        // ==========================================================
+                        // PERBAIKAN: Menggunakan alur 2 panggilan (Narasi -> Mekanik)
+                        // ==========================================================
 
-                        // Proses hasil gabungan
-                        if (result.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: result.reaction }, turnId);
-                        if (result.narration) campaignActions.logEvent({ type: 'dm_narration', text: result.narration }, turnId);
-                        processMechanics(turnId, result, actionText); // <-- PANGGILAN INI SEKARANG AMAN
+                        // PANGGILAN 1: Dapatkan Narasi Aksi Monster
+                        const narrationResult = await geminiService.generateNarration(
+                            campaign, 
+                            players, 
+                            actionText, 
+                            campaignActions.setThinkingState
+                        );
+
+                        // Log narasi monster SEKARANG
+                        if (narrationResult.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: narrationResult.reaction }, turnId);
+                        if (narrationResult.narration) campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
+                        
+                        // Buat konteks untuk panggilan kedua
+                        const contextNarration = narrationResult.narration || narrationResult.reaction || "Monster itu bertindak.";
+
+                        // PANGGILAN 2: Dapatkan Mekanik (yang akan di-auto-roll oleh processMechanics)
+                        const mechanicsResult = await geminiService.determineNextStep(
+                            campaign,
+                            players,
+                            actionText,
+                            contextNarration,
+                            campaignActions.setThinkingState
+                        );
+                        
+                        // processMechanics akan menangani roll otomatis monster
+                        processMechanics(turnId, mechanicsResult, actionText);
+                        // ==========================================================
 
                     } else {
-                        campaignActions.logEvent({ type: 'dm_narration', text: `${nextCombatant.name} melihat sekeliling, tidak menemukan target.` }, turnId);
+                        campaignActions.logEvent({ type: 'dm_narration', text: `${nextCombatant.name} tidak menemukan target.` }, turnId);
                         campaignActions.endTurn();
                     }
                 } catch (e) {
