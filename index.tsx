@@ -1,8 +1,7 @@
-
+import './index.css'; // Langsung refer ke root
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './index.css'; // Langsung refer ke root
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

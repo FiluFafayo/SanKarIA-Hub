@@ -1,15 +1,12 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    "./index.html",
-    "./index.tsx", // Tambahkan index.tsx di root
-    "./App.tsx",   // Tambahkan App.tsx di root
-    "./utils.ts", // Tambahkan utils.ts di root
-    "./types.ts", // Tambahkan types.ts di root
-    "./components/**/*.{js,ts,jsx,tsx}", // Scan components di root
-    "./views/**/*.{js,ts,jsx,tsx}",      // Scan views di root
-    "./hooks/**/*.{js,ts,jsx,tsx}",       // Scan hooks di root
-    // Tambahkan path lain jika perlu
+    "./index.html",             // Index HTML di root
+    "./*.{js,ts,jsx,tsx}",     // SEMUA file .ts/.tsx/.js/.jsx di root (index.tsx, App.tsx, utils.ts, types.ts, etc.)
+    "./components/**/*.{js,ts,jsx,tsx}", // Semua file di dalam folder components
+    "./views/**/*.{js,ts,jsx,tsx}",      // Semua file di dalam folder views
+    "./hooks/**/*.{js,ts,jsx,tsx}",       // Semua file di dalam folder hooks
+    // Tambahkan pola lain jika ada folder lain yang berisi komponen/view
   ],
   theme: {
     extend: {
