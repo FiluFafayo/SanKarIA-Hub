@@ -21,18 +21,6 @@ import { LoginView } from './views/LoginView';
 
 type View = Location | 'nexus' | 'character-selection';
 
-// --- Konfigurasi Default ---
-const GEMINI_API_KEYS = [
-  'AIzaSyAQOBMFPQ5VrqQH2-TwGvQD9ZMcFz0i7Pc',
-  'AIzaSyD3uJ5i0E6xw3wPtfjz02k8ES-rMU6nDt8',
-  'AIzaSyBzIjNaED6Rwzwjxui2cD9k2nCeDXAWJug',
-  'AIzaSyB_pBnG4VG1bzyHae_3bl7mspJo9q_7oOI',
-  'AIzaSyCTF5nLyePtslUbcxWFe0Leqvg8XrYXl9A'
-];
-const SUPABASE_URL = 'https://bpvyproignkexabdoccx.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwdnlwcm9pZ25rZXhhYmRvY2N4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEyOTA2NDgsImV4cCI6MjA3Njg2NjY0OH0.W4xsiWMvrAprEvOnsCZNDBd-8uB8tGm3BlCtG3tA_cw';
-// --- Akhir Konfigurasi ---
-
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('nexus');
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -53,8 +41,27 @@ const App: React.FC = () => {
   
   // Efek Inisialisasi Layanan
   useEffect(() => {
-    geminiService.updateKeys(GEMINI_API_KEYS);
-    dataService.init(SUPABASE_URL, SUPABASE_KEY);
+    // Ambil kunci Gemini dari environment variable
+    const geminiKeysString = import.meta.env.VITE_GEMINI_API_KEYS || '';
+    // Pisahkan string kunci menjadi array, hilangkan spasi, dan filter kunci kosong
+    const geminiKeys = geminiKeysString.split(',')
+      .map(key => key.trim())
+      .filter(key => key);
+
+    if (geminiKeys.length === 0) {
+      console.warn("⚠️ VITE_GEMINI_API_KEYS environment variable tidak disetel atau kosong.");
+    }
+    geminiService.updateKeys(geminiKeys);
+
+    // Ambil kredensial Supabase dari environment variable
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+    const supabaseKey = import.meta.env.VITE_SUPABASE_KEY || '';
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error("❌ VITE_SUPABASE_URL atau VITE_SUPABASE_KEY environment variable belum disetel!");
+      alert("Konfigurasi database belum lengkap. Aplikasi mungkin tidak berfungsi dengan benar.");
+    }
+    dataService.init(supabaseUrl, supabaseKey);
   }, []);
   
   // Efek Otentikasi
