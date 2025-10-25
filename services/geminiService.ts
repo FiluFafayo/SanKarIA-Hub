@@ -334,11 +334,12 @@ class GeminiService {
         
         ATURAN UTAMA:
         1.  RESPONS JSON: Respons Anda HARUS berupa objek JSON yang valid sesuai skema 'RESPONSE_SCHEMA' (menyediakan 'reaction' dan 'narration').
-        2.  PANGGIL FUNGSI MEKANIK: Anda JUGA HARUS memanggil TEPAT SATU dari fungsi mekanika utama ('propose_choices', 'request_roll', 'spawn_monsters') JIKA diperlukan oleh narasi.
+        2.  PANGGIL FUNGSI MEKANIK: Anda HARUS memanggil TEPAT SATU dari ('propose_choices', 'request_roll', 'spawn_monsters') JIKA diperlukan oleh narasi ATAU jika kondisi di aturan #6 terpenuhi.
         3.  ATURAN KOMBO: Jika narasi memicu pertarungan, Anda HARUS memanggil 'spawn_monsters' DAN JUGA memberikan narasi tentang kemunculan mereka dalam JSON Anda.
         4.  ALAT TAMBAHAN: Anda DAPAT memanggil alat lain ('add_items_to_inventory', 'update_quest_log') jika narasi membenarkannya.
-        5.  OBJEK INTERAKTIF: Jika Anda menyebutkan objek penting (peti, tuas, pintu), tandai dalam 'narration' JSON Anda menggunakan format [OBJECT:nama-objek|id-unik].`;
-        
+        5.  OBJEK INTERAKTIF: Jika Anda menyebutkan objek penting (peti, tuas, pintu), tandai dalam 'narration' JSON Anda menggunakan format [OBJECT:nama-objek|id-unik].
+        6.  WAJIB LANJUTAN EKSPLORASI: Jika status game saat ini adalah 'exploration' DAN aksi pemain tidak memicu 'request_roll' atau 'spawn_monsters', Anda WAJIB memanggil 'propose_choices' untuk memberikan kelanjutan kepada pemain.`;
+
         const prompt = this.buildPrompt(campaign, players, playerAction);
 
         const call = async () => {
