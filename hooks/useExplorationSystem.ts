@@ -13,7 +13,7 @@ interface ExplorationSystemProps {
 }
 
 export function useExplorationSystem({ campaign, character, players, campaignActions }: ExplorationSystemProps) {
-    
+
     const processToolCalls = useCallback((turnId: string, toolCalls: ToolCall[]) => {
         toolCalls.forEach(call => {
             let message = '';
@@ -31,25 +31,25 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                     message = `Catatan NPC diperbarui: ${call.args.npcName}`;
                     break;
                 case 'spawn_monsters':
-                     campaignActions.spawnMonsters(call.args.monsters);
-                     message = `Bahaya! Musuh muncul!`;
+                    campaignActions.spawnMonsters(call.args.monsters);
+                    message = `Bahaya! Musuh muncul!`;
                     break;
             }
             if (message) {
-                 campaignActions.logEvent({ type: 'system', text: `--- ${message} ---` }, turnId);
+                campaignActions.logEvent({ type: 'system', text: `--- ${message} ---` }, turnId);
             }
         });
     }, [campaignActions]);
-    
+
     const processMechanics = useCallback(async (turnId: string, mechanics: Omit<StructuredApiResponse, 'reaction' | 'narration'>, originalActionText: string) => {
         const hasTools = mechanics.tool_calls && mechanics.tool_calls.length > 0;
         if (hasTools) {
             processToolCalls(turnId, mechanics.tool_calls!);
         }
-        
+
         const hasChoices = mechanics.choices && mechanics.choices.length > 0;
         const hasRollRequest = !!mechanics.rollRequest;
-    
+
         if (hasChoices) {
             campaignActions.setChoices(mechanics.choices!);
         } else if (hasRollRequest) {
@@ -60,7 +60,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             };
             campaignActions.setActiveRollRequest(fullRollRequest);
         }
-    
+
         if (!hasRollRequest) {
             campaignActions.endTurn();
         }
@@ -89,7 +89,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             if (narrationResult.narration) {
                 campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
             } else {
-                 campaignActions.logEvent({ type: 'system', text: "DM merenung sejenak..." }, turnId);
+                campaignActions.logEvent({ type: 'system', text: "DM merenung sejenak..." }, turnId);
             }
 
             // Step 2: Get Mechanics
@@ -106,35 +106,35 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         }
     }, [campaign, character.id, players, campaignActions, processMechanics]);
 
-    const handleRollComplete = useCallback(async (roll: DiceRoll, request: RollRequest) => {
-        const turnId = campaign.turnId;
+    const handleRollComplete = useCallback(async (roll: DiceRoll, request: RollRequest, turnId: string) => {
+        // const turnId = campaign.turnId; // <-- HAPUS BARIS INI
         if (!turnId) {
-            console.error("Tidak dapat mencatat peristiwa: tidak ada giliran aktif.");
+            console.error("Mencoba mencatat peristiwa eksplorasi tanpa turnId eksplisit.");
             return;
         };
 
         campaignActions.setActiveRollRequest(null);
-        
+
         campaignActions.logEvent({ type: 'roll_result', characterId: character.id, roll: roll, reason: request.reason }, turnId);
 
         const actionText = `Hasil dari lemparan dadu ${character.name}: ${roll.success ? 'BERHASIL' : 'GAGAL'}. (Aksi asli: ${request.originalActionText})`;
-        
+
         try {
             // Step 1: Get Narration
             const narrationResult = await geminiService.generateNarration(campaign, players, actionText, campaignActions.setThinkingState);
             if (narrationResult.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: narrationResult.reaction }, turnId);
             if (narrationResult.narration) campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
-            
+
             // Step 2: Get Mechanics
             const mechanicsResult = await geminiService.determineNextStep(campaign, players, actionText, narrationResult.narration);
             await processMechanics(turnId, mechanicsResult, actionText);
         } catch (error) {
-             console.error("Gagal mendapatkan langkah selanjutnya dari AI setelah lemparan:", error);
-             campaignActions.logEvent({
+            console.error("Gagal mendapatkan langkah selanjutnya dari AI setelah lemparan:", error);
+            campaignActions.logEvent({
                 type: 'system',
                 text: "Terjadi kesalahan saat menghubungi AI setelah lemparan. Silakan coba lagi."
             }, turnId);
-             campaignActions.endTurn();
+            campaignActions.endTurn();
         }
     }, [campaign, character.id, character.name, players, campaignActions, processMechanics]);
 
