@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, FunctionDeclaration, Modality } from "@google/genai";
+import { GoogleGenAI, Type, FunctionDeclaration, Modality, Part, Content } from "@google/genai";
 import { Campaign, Character, StructuredApiResponse, ToolCall, GameEvent, MapMarker, WorldTime, WorldWeather, RollRequest } from '../types'; // Tambahkan RollRequest
 import { RESPONSE_SCHEMA, MECHANICS_SCHEMA, parseStructuredApiResponse, parseMechanicsResponse } from "./responseParser";
 
@@ -594,6 +594,65 @@ class GeminiService {
             return { success: false, message: 'Kunci API tidak valid atau terjadi kesalahan jaringan.' };
         }
     }
-}
+
+    // Fungsi BARU: Khusus untuk minta 'propose_choices' saat fallback
+    // =================================================================
+    async generateExplorationChoices(
+        campaign: Campaign,
+        players: Character[],
+        lastNarration: string,
+        onStateChange: (state: 'thinking' | 'retrying') => void
+    ): Promise<string[] | undefined> {
+        onStateChange('thinking');
+        const systemInstruction = `Anda adalah AI Logika Permainan TTRPG. Tugas Anda HANYA memanggil fungsi 'propose_choices'. Berikan 3-4 pilihan aksi yang relevan berdasarkan narasi terakhir.`;
+
+        // Kita pakai buildPrompt tapi mungkin perlu sedikit modifikasi jika buildPrompt butuh playerAction
+        // Untuk simpelnya, kita buat prompt baru di sini
+        const simplePrompt = `KONTEKS KAMPANYE:
+        - Cerita Jangka Panjang: ${campaign.longTermMemory}
+        - State Dunia: ${campaign.currentTime}, ${campaign.currentWeather}.
+        - Pemain saat ini: ${players.find(p => p.id === campaign.currentPlayerId)?.name || 'Pemain'}
+
+        NARASI TERAKHIR DARI DM: "${lastNarration}"
+
+        Tentukan pilihan aksi selanjutnya untuk pemain dengan memanggil fungsi 'propose_choices'.`;
+
+        const call = async () => {
+            const ai = this.getClient();
+            // Hanya sediakan tool 'propose_choices'
+            const choiceTool: FunctionDeclaration[] = [PROPOSE_CHOICES_TOOL];
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-1.5-flash', // Model flash cukup untuk tugas simpel ini
+                contents: simplePrompt,
+                config: {
+                    systemInstruction,
+                    tools: [{ functionDeclarations: choiceTool }],
+                    temperature: 0.5, // Bisa lebih rendah karena tugasnya spesifik
+                }
+            });
+
+            // Langsung ekstrak dari functionCalls
+            if (response.functionCalls) {
+                const choiceCall = response.functionCalls.find(fc => fc.name === 'propose_choices');
+                if (choiceCall && choiceCall.args.choices) {
+                    return choiceCall.args.choices as string[];
+                }
+            }
+            console.warn("Panggilan AI kedua untuk choices gagal menghasilkan function call.");
+            return undefined; // Gagal mendapatkan pilihan
+        };
+
+        try {
+            return await this.makeApiCall(call);
+        } catch (error) {
+            console.error("Gagal total menghasilkan exploration choices:", error);
+            return undefined; // Gagal mendapatkan pilihan
+        } finally {
+             onStateChange('idle'); // Pastikan state kembali idle
+        }
+    }
+
+} // Akhir dari class GeminiService
 
 export const geminiService = new GeminiService();

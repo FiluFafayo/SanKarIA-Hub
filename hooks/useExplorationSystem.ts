@@ -95,7 +95,28 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 campaignActions.logEvent({ type: 'system', text: "DM merenung sejenak..." }, turnId);
             }
 
-            await processMechanics(turnId, result, actionText); // Kirim 'result' yg berisi mekanik
+            // PENGECEKAN & PANGGILAN KEDUA (Fallback Robust)
+            const hasPrimaryMechanic = result.choices || result.rollRequest || result.tool_calls?.some(tc => tc.functionName === 'spawn_monsters');
+
+            if (!hasPrimaryMechanic && campaign.gameState === 'exploration') {
+                console.log("AI utama tidak memberi mekanik. Meminta choices ke AI (panggilan kedua)...");
+                const fallbackChoices = await geminiService.generateExplorationChoices(
+                    campaign,
+                    players,
+                    result.narration, // Beri narasi terakhir sebagai konteks
+                    campaignActions.setThinkingState // Biar ada indikator thinking lagi
+                );
+
+                if (fallbackChoices) {
+                    result.choices = fallbackChoices; // Timpa choices di result dengan hasil fallback
+                } else {
+                    // Jika panggilan kedua GAGAL TOTAL (jarang terjadi), baru pakai fallback manual
+                    console.error("Panggilan AI kedua untuk choices GAGAL. Menggunakan fallback manual.");
+                    result.choices = ["Lanjutkan...", "Amati sekeliling", "Ulangi tindakan"];
+                }
+            }
+
+            await processMechanics(turnId, result, actionText); // Lanjutkan dengan result yg sudah diperbarui (jika perlu)
 
         } catch (error) {
             console.error("Gagal mendapatkan langkah selanjutnya dari AI:", error);
@@ -128,7 +149,26 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             // Proses hasil gabungan
             if (result.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: result.reaction }, turnId);
             if (result.narration) campaignActions.logEvent({ type: 'dm_narration', text: result.narration }, turnId);
+            
+            // PENGECEKAN & PANGGILAN KEDUA (Fallback Robust) - Sama seperti di handlePlayerAction
+            const hasPrimaryMechanic = result.choices || result.rollRequest || result.tool_calls?.some(tc => tc.functionName === 'spawn_monsters');
 
+            if (!hasPrimaryMechanic && campaign.gameState === 'exploration') {
+                console.log("AI utama tidak memberi mekanik setelah roll. Meminta choices ke AI (panggilan kedua)...");
+                const fallbackChoices = await geminiService.generateExplorationChoices(
+                    campaign,
+                    players,
+                    result.narration,
+                    campaignActions.setThinkingState
+                );
+
+                if (fallbackChoices) {
+                    result.choices = fallbackChoices;
+                } else {
+                    console.error("Panggilan AI kedua untuk choices GAGAL setelah roll. Menggunakan fallback manual.");
+                    result.choices = ["Lanjutkan...", "Amati sekeliling"];
+                }
+            }
             await processMechanics(turnId, result, actionText); // Kirim 'result' yg berisi mekanik
         } catch (error) {
             console.error("Gagal mendapatkan langkah selanjutnya dari AI setelah lemparan:", error);
