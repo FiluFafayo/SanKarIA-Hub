@@ -1,7 +1,11 @@
 import { GoogleGenAI, Type, FunctionDeclaration, Modality, Part, Content } from "@google/genai";
-import { Campaign, Character, StructuredApiResponse, ToolCall, GameEvent, MapMarker, WorldTime, WorldWeather, RollRequest } from '../types'; // Tambahkan RollRequest
+import { Campaign, Character, StructuredApiResponse, ToolCall, GameEvent, MapMarker, WorldTime, WorldWeather, RollRequest } from '../types';
 import { RESPONSE_SCHEMA, MECHANICS_SCHEMA, parseStructuredApiResponse, parseMechanicsResponse } from "./responseParser";
 
+// ... (Salin semua skema dari file lamamu: CAMPAIGN_FRAMEWORK_SCHEMA, MAP_MARKER_SCHEMA, PROPOSE_CHOICES_TOOL, REQUEST_ROLL_TOOL, SPAWN_MONSTERS_TOOL, dan TOOLS) ...
+// ... (Pastikan semua skema dan konstanta TOOLS ada di sini) ...
+
+// PASTIIN SEMUA SKEMA DI ATAS SUDAH DI-SALIN LENGKAP
 const CAMPAIGN_FRAMEWORK_SCHEMA = {
     type: Type.OBJECT,
     properties: {
@@ -60,7 +64,6 @@ const MAP_MARKER_SCHEMA = {
     }
 }
 
-// Skema untuk pilihan (dari MECHANICS_SCHEMA)
 const PROPOSE_CHOICES_TOOL: FunctionDeclaration = {
     name: 'propose_choices',
     description: "Memberikan pemain daftar pilihan tindakan yang bisa diambil. Gunakan ini jika tidak ada lemparan dadu yang diperlukan.",
@@ -77,7 +80,6 @@ const PROPOSE_CHOICES_TOOL: FunctionDeclaration = {
     }
 };
 
-// Skema untuk lemparan dadu (dari MECHANICS_SCHEMA)
 const REQUEST_ROLL_TOOL: FunctionDeclaration = {
     name: 'request_roll',
     description: "Meminta pemain untuk melempar dadu untuk menyelesaikan tindakan dengan hasil yang tidak pasti.",
@@ -103,7 +105,6 @@ const REQUEST_ROLL_TOOL: FunctionDeclaration = {
     }
 };
 
-// Skema untuk spawn monster
 const SPAWN_MONSTERS_TOOL: FunctionDeclaration = {
     name: 'spawn_monsters',
     description: "Memulai mode pertarungan dengan memunculkan satu atau lebih musuh.",
@@ -149,11 +150,10 @@ const SPAWN_MONSTERS_TOOL: FunctionDeclaration = {
     }
 };
 
-
 const TOOLS: FunctionDeclaration[] = [
-    SPAWN_MONSTERS_TOOL,  // <-- TAMBAHKAN INI
-    PROPOSE_CHOICES_TOOL, // <-- BARU
-    REQUEST_ROLL_TOOL,    // <-- BARU
+    SPAWN_MONSTERS_TOOL,
+    PROPOSE_CHOICES_TOOL,
+    REQUEST_ROLL_TOOL,
     {
         name: 'add_items_to_inventory',
         description: "Menambahkan satu atau lebih item ke inventaris karakter pemain. Gunakan ini saat pemain menemukan loot, mengambil item, atau diberi hadiah.",
@@ -211,6 +211,7 @@ const TOOLS: FunctionDeclaration[] = [
     }
 ];
 
+
 class GeminiService {
     private apiKeys: string[] = [''];
     private currentKeyIndex = 0;
@@ -256,6 +257,7 @@ class GeminiService {
         throw new Error("Gagal melakukan panggilan API.");
     }
 
+    // ... (Salin fungsi: generateCampaignFramework, mechanizeCampaignFramework) ...
     async generateCampaignFramework(pillars: { premise: string; keyElements: string; endGoal: string }): Promise<any> {
         const prompt = `Berdasarkan pilar-pilar kampanye D&D berikut, hasilkan kerangka kampanye yang kreatif dan menarik.
     
@@ -316,13 +318,15 @@ class GeminiService {
         return this.makeApiCall(call);
     }
     
-    // FUNGSI BARU: Menggantikan generateNarration + determineNextStep
-    async generateTurnResult(
+    // =================================================================
+    // FUNGSI BARU 1: Hanya Menghasilkan Narasi (Tugas Simpel & Robust)
+    // =================================================================
+    async generateNarration(
         campaign: Campaign, 
         players: Character[], 
         playerAction: string, 
         onStateChange: (state: 'thinking' | 'retrying') => void
-    ): Promise<StructuredApiResponse> {
+    ): Promise<Omit<StructuredApiResponse, 'tool_calls' | 'choices' | 'rollRequest'>> {
         onStateChange('thinking');
 
         let styleInstruction = '';
@@ -333,42 +337,90 @@ class GeminiService {
         const systemInstruction = `Anda adalah AI Dungeon Master (DM) untuk TTRPG fantasi. Kepribadian Anda: ${campaign.dmPersonality}. Panjang respons: ${campaign.responseLength}. ${styleInstruction}
         
         ATURAN UTAMA:
-        1.  RESPONS JSON: Respons Anda HARUS berupa objek JSON yang valid sesuai skema 'RESPONSE_SCHEMA' (menyediakan 'reaction' dan 'narration').
-        2.  PANGGIL FUNGSI MEKANIK: Anda HARUS memanggil TEPAT SATU dari ('propose_choices', 'request_roll', 'spawn_monsters') JIKA diperlukan oleh narasi ATAU jika kondisi di aturan #6 terpenuhi.
-        3.  ATURAN KOMBO: Jika narasi memicu pertarungan, Anda HARUS memanggil 'spawn_monsters' DAN JUGA memberikan narasi tentang kemunculan mereka dalam JSON Anda.
-        4.  ALAT TAMBAHAN: Anda DAPAT memanggil alat lain ('add_items_to_inventory', 'update_quest_log') jika narasi membenarkannya.
-        5.  OBJEK INTERAKTIF: Jika Anda menyebutkan objek penting (peti, tuas, pintu), tandai dalam 'narration' JSON Anda menggunakan format [OBJECT:nama-objek|id-unik].
-        6.  WAJIB LANJUTAN EKSPLORASI: Jika status game saat ini adalah 'exploration' DAN aksi pemain tidak memicu 'request_roll' atau 'spawn_monsters', Anda WAJIB memanggil 'propose_choices' untuk memberikan kelanjutan kepada pemain.`;
+        1.  Tugas Anda HANYA merespons aksi pemain dengan narasi.
+        2.  JANGAN panggil fungsi/alat apa pun.
+        3.  JANGAN berikan pilihan atau minta lemparan dadu.
+        4.  Fokus HANYA pada penceritaan (reaction dan narration) sebagai respons terhadap aksi pemain.
+        5.  Tandai objek interaktif (peti, tuas, pintu) dalam 'narration' menggunakan format [OBJECT:nama-objek|id-unik].
+        6.  Respons Anda HARUS berupa objek JSON yang valid sesuai skema 'RESPONSE_SCHEMA'.`;
 
         const prompt = this.buildPrompt(campaign, players, playerAction);
 
         const call = async () => {
             const ai = this.getClient();
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash', // Model yang cukup pintar untuk tugas ganda
+                model: 'gemini-2.5-flash', // Model flash cepat untuk narasi
                 contents: prompt,
                 config: {
                     systemInstruction,
-                    responseSchema: RESPONSE_SCHEMA, // 1. Paksa narasi JSON
-                    tools: [{ functionDeclarations: TOOLS }], // 2. Izinkan pemanggilan alat mekanik
+                    responseMimeType: "application/json", // Minta JSON
+                    responseSchema: RESPONSE_SCHEMA,     // Paksa skema narasi
+                    tools: [], // <-- PENTING: Jangan berikan alat apa pun
                     temperature: 0.7,
                 }
             });
+            // response.text dijamin JSON karena kita pakai responseSchema
+            return parseStructuredApiResponse(response.text); 
+        };
+        
+        try {
+            return await this.makeApiCall(call);
+        } catch (error) {
+             console.error("Gagal total menghasilkan Narration:", error);
+            return {
+                reaction: "DM tampak bingung sejenak...",
+                narration: "Terjadi kesalahan saat DM merangkai kata. (Error: Gagal generateNarration)",
+            };
+        }
+    }
 
-            // 1. Urai bagian Narasi (dari response.text)
-            // PERBAIKAN: Ambil teks narasi secara manual dari 'parts'
-            let narrationText = "";
-            // Cari bagian teks pertama dalam respons
-            const textPart = response.candidates?.[0]?.content?.parts?.find((part: Part) => 'text' in part);
-            if (textPart && 'text' in textPart) {
-                narrationText = textPart.text;
-            } else {
-                console.warn("Tidak menemukan bagian teks dalam respons API, fallback narasi.");
-            }
-            // Parse teks narasi yang sudah diekstrak
-            const narrationPart = parseStructuredApiResponse(narrationText); // <-- Gunakan narrationText
+    // =================================================================
+    // FUNGSI BARU 2: Hanya Menentukan Mekanik (Tugas Simpel & Robust)
+    // =================================================================
+    async determineNextStep(
+        campaign: Campaign, 
+        players: Character[], 
+        playerAction: string,
+        narrationContext: string, // Narasi yang BARU SAJA terjadi
+        onStateChange: (state: 'thinking' | 'retrying') => void
+    ): Promise<Omit<StructuredApiResponse, 'reaction' | 'narration'>> {
+        onStateChange('thinking');
 
-            // 2. Urai bagian Mekanik (dari response.functionCalls)
+        const systemInstruction = `Anda adalah AI Logika Permainan TTRPG.
+        
+        ATURAN UTAMA:
+        1.  Tugas Anda HANYA menentukan kelanjutan mekanik permainan.
+        2.  Anda HARUS memanggil TEPAT SATU dari ('propose_choices', 'request_roll', 'spawn_monsters') JIKA diperlukan oleh konteks.
+        3.  Anda DAPAT memanggil alat tambahan ('add_items_to_inventory', 'update_quest_log') jika dibenarkan oleh konteks.
+        4.  JANGAN HASILKAN TEKS NARASI/REAKSI. Fokus hanya pada pemanggilan fungsi.
+        5.  WAJIB LANJUTAN EKSPLORASI: Jika status game 'exploration' DAN aksi pemain/narasi tidak memicu 'request_roll' atau 'spawn_monsters', Anda WAJIB memanggil 'propose_choices'.`;
+
+        // Prompt untuk mekanik sedikit berbeda, lebih fokus pada "setelah ini, lalu apa"
+        const prompt = `KONTEKS KAMPANYE:
+        - Cerita Jangka Panjang: ${campaign.longTermMemory}
+        - State Dunia: ${campaign.currentTime}, ${campaign.currentWeather}.
+        - Game State: ${campaign.gameState}
+        
+        KONTEKS LANGSUNG:
+        - Aksi Pemain: "${playerAction}"
+        - Narasi DM (Hasil Aksi): "${narrationContext}"
+        
+        Tentukan langkah mekanik selanjutnya berdasarkan Konteks Langsung di atas. Panggil fungsi yang sesuai.`;
+
+
+        const call = async () => {
+            const ai = this.getClient();
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash', // Model flash cukup untuk logika tool
+                contents: prompt,
+                config: {
+                    systemInstruction,
+                    tools: [{ functionDeclarations: TOOLS }], // <-- PENTING: Hanya berikan alat
+                    temperature: 0.5,
+                }
+            });
+
+            // Urai hasil pemanggilan fungsi
             let choices: string[] | undefined = undefined;
             let rollRequest: Omit<RollRequest, 'characterId' | 'originalActionText'> | undefined = undefined;
             const tool_calls: ToolCall[] = [];
@@ -398,29 +450,24 @@ class GeminiService {
                     }
                 }
             }
-
-            // 3. Fallback jika AI gagal memanggil mekanika utama (penting untuk eksplorasi)
-            if (!choices && !rollRequest && !didSpawnMonsters && campaign.gameState === 'exploration') {
-                console.warn("AI tidak memanggil mekanika utama ('choices', 'roll', 'spawn'). Menggunakan fallback.");
-                choices = ["Lanjutkan...", "Amati sekeliling", "Ulangi tindakan"];
-            }
-
-            // 4. Gabungkan semuanya
-            return { ...narrationPart, choices, rollRequest, tool_calls };
+            
+            // Kembalikan objek mekanik
+            return { choices, rollRequest, tool_calls, didSpawnMonsters }; // Tambahkan didSpawnMonsters untuk logika fallback
         };
         
         try {
             return await this.makeApiCall(call);
         } catch (error) {
-             console.error("Gagal total menghasilkan TurnResult:", error);
-            // Kembalikan state aman jika terjadi error
+             console.error("Gagal total menghasilkan Mechanics:", error);
+            // Kembalikan state aman (kosong) jika terjadi error
             return {
-                narration: "Dunia terasa hening sejenak saat DM merenungkan tindakan Anda... (Terjadi Error)",
-                choices: ["Ulangi tindakan terakhir", "Amati sekeliling"],
+                choices: undefined,
+                rollRequest: undefined,
                 tool_calls: [],
             };
         }
     }
+
 
     private buildPrompt(campaign: Campaign, players: Character[], playerAction: string): string {
         const worldState = `Saat ini adalah ${campaign.currentTime} hari, dengan cuaca ${campaign.currentWeather}.`;
@@ -457,6 +504,7 @@ class GeminiService {
         AKSI PEMAIN SAAT INI: "${playerAction}"`;
     }
 
+    // ... (Salin fungsi: generateOpeningScene, generateWorldEvent, generateMapImage, generateMapMarkers, testApiKey) ...
     async generateOpeningScene(campaign: Campaign): Promise<string> {
         const prompt = `Anda adalah Dungeon Master. Mulai kampanye baru dengan detail berikut dan tuliskan adegan pembuka yang menarik dalam 1-2 paragraf.
 
@@ -525,7 +573,6 @@ class GeminiService {
         return this.makeApiCall(call);
     }
 
-    // FIX: Changed return type to { markers: MapMarker[], startLocationId: string } to match the actual return value.
     async generateMapMarkers(campaignFramework: any): Promise<{ markers: MapMarker[], startLocationId: string }> {
         const locations = [
             ...campaignFramework.proposedMainNPCs.map((npc: any) => npc.name),
@@ -595,7 +642,8 @@ class GeminiService {
         }
     }
 
-    // Fungsi BARU: Khusus untuk minta 'propose_choices' saat fallback
+    // =================================================================
+    // FUNGSI FALLBACK CERDAS (dari solusi kita sebelumnya, ini tetap KRUSIAL)
     // =================================================================
     async generateExplorationChoices(
         campaign: Campaign,
@@ -606,8 +654,6 @@ class GeminiService {
         onStateChange('thinking');
         const systemInstruction = `Anda adalah AI Logika Permainan TTRPG. Tugas Anda HANYA memanggil fungsi 'propose_choices'. Berikan 3-4 pilihan aksi yang relevan berdasarkan narasi terakhir.`;
 
-        // Kita pakai buildPrompt tapi mungkin perlu sedikit modifikasi jika buildPrompt butuh playerAction
-        // Untuk simpelnya, kita buat prompt baru di sini
         const simplePrompt = `KONTEKS KAMPANYE:
         - Cerita Jangka Panjang: ${campaign.longTermMemory}
         - State Dunia: ${campaign.currentTime}, ${campaign.currentWeather}.
@@ -619,20 +665,18 @@ class GeminiService {
 
         const call = async () => {
             const ai = this.getClient();
-            // Hanya sediakan tool 'propose_choices'
             const choiceTool: FunctionDeclaration[] = [PROPOSE_CHOICES_TOOL];
 
             const response = await ai.models.generateContent({
-                model: 'gemini-1.5-flash', // Model flash cukup untuk tugas simpel ini
+                model: 'gemini-1.5-flash', 
                 contents: simplePrompt,
                 config: {
                     systemInstruction,
                     tools: [{ functionDeclarations: choiceTool }],
-                    temperature: 0.5, // Bisa lebih rendah karena tugasnya spesifik
+                    temperature: 0.5,
                 }
             });
 
-            // Langsung ekstrak dari functionCalls
             if (response.functionCalls) {
                 const choiceCall = response.functionCalls.find(fc => fc.name === 'propose_choices');
                 if (choiceCall && choiceCall.args.choices) {
@@ -640,16 +684,17 @@ class GeminiService {
                 }
             }
             console.warn("Panggilan AI kedua untuk choices gagal menghasilkan function call.");
-            return undefined; // Gagal mendapatkan pilihan
+            return undefined;
         };
 
         try {
             return await this.makeApiCall(call);
         } catch (error) {
             console.error("Gagal total menghasilkan exploration choices:", error);
-            return undefined; // Gagal mendapatkan pilihan
+            return undefined;
         } finally {
-             onStateChange('idle'); // Pastikan state kembali idle
+             //  Perbaikan: Jangan set 'idle' di sini, biarkan pemanggil yang atur
+             //  onStateChange('idle'); 
         }
     }
 
