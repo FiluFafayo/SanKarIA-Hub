@@ -391,6 +391,7 @@ class GeminiService {
             let choices: string[] | undefined = undefined;
             let rollRequest: Omit<RollRequest, 'characterId' | 'originalActionText'> | undefined = undefined;
             const tool_calls: ToolCall[] = [];
+            let didSpawnMonsters = false; // <-- 1. TAMBAHKAN FLAG INI
 
             if (response.functionCalls) {
                 for (const fc of response.functionCalls) {
@@ -406,6 +407,7 @@ class GeminiService {
                                 functionName: fc.name,
                                 args: fc.args
                             });
+                            didSpawnMonsters = true; // <-- 2. SET FLAG-NYA DI SINI
                             break;
                         case 'add_items_to_inventory':
                         case 'update_quest_log':
@@ -420,8 +422,8 @@ class GeminiService {
             }
 
             // Fallback jika AI gagal memanggil 'propose_choices' atau 'request_roll'
-            if (!choices && !rollRequest) {
-                console.warn("AI tidak memanggil 'propose_choices' atau 'request_roll'. Menggunakan fallback.");
+            if (!choices && !rollRequest && !didSpawnMonsters) { // <-- CEK FLAG-NYA
+                console.warn("AI tidak memanggil mekanika utama ('choices', 'roll', 'spawn'). Menggunakan fallback.");
                 choices = ["Maaf, AI gagal memberi pilihan. Coba lagi.", "Amati sekeliling"];
             }
 
