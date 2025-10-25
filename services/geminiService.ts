@@ -60,7 +60,53 @@ const MAP_MARKER_SCHEMA = {
     }
 }
 
+// Skema untuk pilihan (dari MECHANICS_SCHEMA)
+const PROPOSE_CHOICES_TOOL: FunctionDeclaration = {
+    name: 'propose_choices',
+    description: "Memberikan pemain daftar pilihan tindakan yang bisa diambil. Gunakan ini jika tidak ada lemparan dadu yang diperlukan.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            choices: {
+                type: Type.ARRAY,
+                description: "Daftar 3-4 tindakan yang dapat diambil pemain.",
+                items: { type: Type.STRING }
+            }
+        },
+        required: ['choices']
+    }
+};
+
+// Skema untuk lemparan dadu (dari MECHANICS_SCHEMA)
+const REQUEST_ROLL_TOOL: FunctionDeclaration = {
+    name: 'request_roll',
+    description: "Meminta pemain untuk melempar dadu untuk menyelesaikan tindakan dengan hasil yang tidak pasti.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            type: { type: Type.STRING, enum: ['skill', 'savingThrow', 'attack'] },
+            reason: { type: Type.STRING },
+            skill: { type: Type.STRING, nullable: true },
+            ability: { type: Type.STRING, enum: ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'], nullable: true },
+            dc: { type: Type.INTEGER, description: "Wajib diisi untuk tipe 'skill' dan 'savingThrow'. Menentukan tingkat kesulitan.", nullable: true },
+            target: {
+              type: Type.OBJECT,
+              description: "Wajib untuk tipe 'attack'. Menjelaskan target.",
+              nullable: true,
+              properties: {
+                  name: { type: Type.STRING, description: "Nama NPC atau makhluk target." },
+                  ac: { type: Type.INTEGER, description: "Armor Class target." }
+              }
+            }
+        },
+        required: ['type', 'reason']
+    }
+};
+
+
 const TOOLS: FunctionDeclaration[] = [
+    PROPOSE_CHOICES_TOOL, // <-- BARU
+    REQUEST_ROLL_TOOL,    // <-- BARU
     {
         name: 'add_items_to_inventory',
         description: "Menambahkan satu atau lebih item ke inventaris karakter pemain. Gunakan ini saat pemain menemukan loot, mengambil item, atau diberi hadiah.",
@@ -270,15 +316,15 @@ class GeminiService {
 
     async determineNextStep(campaign: Campaign, players: Character[], playerAction: string, newNarration: string): Promise<Omit<StructuredApiResponse, 'reaction' | 'narration'>> {
         const systemInstruction = `Anda adalah AI Logika Permainan untuk TTRPG. Tugas Anda BUKAN untuk bercerita, tetapi untuk menentukan MEKANIKA permainan selanjutnya.
-        
+    
         ATURAN UTAMA:
-        1.  FOKUS PADA MEKANIKA: Berdasarkan aksi pemain dan narasi, tentukan apakah pemain harus membuat pilihan ('choices'), melempar dadu ('rollRequest'), atau jika ada pembaruan state game ('tool_calls').
-        2.  PILIHAN vs. LEMPARAN DADU: Berikan 'choices' ATAU 'rollRequest', JANGAN KEDUANYA.
-        3.  GUNAKAN ALAT: Panggil alat jika aksi dan narasi menyiratkan perubahan pada inventaris (misalnya menemukan loot), misi, atau NPC. Jika pemain menemukan item, GUNAKAN alat 'add_items_to_inventory'.
-        4.  LEMPARAN DADU WAJIB: Jika aksi memiliki hasil yang tidak pasti (menyerang, membujuk, menyelidiki), Anda HARUS membuat 'rollRequest'. Jangan menarasikan hasilnya.
-        5.  KONTEKS NPC & MISI: Periksa konteks NPC dan Misi yang ada sebelum membuat alat baru untuk menghindari duplikasi. Gunakan ID yang ada untuk memperbarui.`;
+        1.  HANYA GUNAKAN FUNGSI: Respons Anda HARUS berupa satu atau lebih pemanggilan fungsi. JANGAN berikan teks biasa.
+        2.  PILIH MEKANIKA UTAMA: Anda HARUS memanggil TEPAT SATU dari 'propose_choices' ATAU 'request_roll'. JANGAN panggil keduanya.
+        3.  LEMPARAN DADU WAJIB: Jika aksi memiliki hasil yang tidak pasti (menyerang, membujuk, menyelidiki), Anda HARUS memanggil 'request_roll'.
+        4.  GUNAKAN ALAT TAMBAHAN: Jika aksi dan narasi menyiratkan perubahan pada inventaris (misalnya menemukan loot), misi, atau NPC, Anda HARUS memanggil alat yang sesuai ('add_items_to_inventory', 'update_quest_log', 'log_npc_interaction') BERSAMAAN DENGAN mekanika utama.
+        5.  KONTEKS NPC & MISI: Periksa konteks NPC dan Misi yang ada dari prompt sebelum membuat alat baru untuk menghindari duplikasi. Gunakan ID yang ada untuk memperbarui 'update_quest_log' atau 'log_npc_interaction' jika NPC/misi itu sudah ada.`;
 
-        const prompt = `${this.buildPrompt(campaign, players, playerAction)}\nNarasi yang Baru Dihasilkan: "${newNarration}"\n\nTentukan langkah mekanis selanjutnya.`;
+        const prompt = `${this.buildPrompt(campaign, players, playerAction)}\nNarasi yang Baru Dihasilkan: "${newNarration}"\n\nTentukan langkah mekanis selanjutnya dengan memanggil fungsi yang sesuai.`;
         
          const call = async () => {
             const ai = this.getClient();
@@ -287,19 +333,44 @@ class GeminiService {
                 contents: prompt,
                 config: {
                     systemInstruction,
-                    // responseMimeType: "application/json",
-                    // responseSchema: MECHANICS_SCHEMA,
+                    // Hapus mimeType dan schema, kita hanya pakai tools
                     tools: [{ functionDeclarations: TOOLS }],
                 }
             });
             
-            const parsedTextPart = parseMechanicsResponse(response.text);
-            const tool_calls = response.functionCalls?.map(fc => ({
-                functionName: fc.name as ToolCall['functionName'],
-                args: fc.args
-            })) || [];
+            // Logika baru: Urai hasil dari response.functionCalls
+            let choices: string[] | undefined = undefined;
+            let rollRequest: Omit<RollRequest, 'characterId' | 'originalActionText'> | undefined = undefined;
+            const tool_calls: ToolCall[] = [];
 
-            return { ...parsedTextPart, tool_calls };
+            if (response.functionCalls) {
+                for (const fc of response.functionCalls) {
+                    switch (fc.name) {
+                        case 'propose_choices':
+                            choices = fc.args.choices as string[];
+                            break;
+                        case 'request_roll':
+                            rollRequest = fc.args as any;
+                            break;
+                        case 'add_items_to_inventory':
+                        case 'update_quest_log':
+                        case 'log_npc_interaction':
+                            tool_calls.push({
+                                functionName: fc.name as ToolCall['functionName'],
+                                args: fc.args
+                            });
+                            break;
+                    }
+                }
+            }
+
+            // Fallback jika AI gagal memanggil 'propose_choices' atau 'request_roll'
+            if (!choices && !rollRequest) {
+                console.warn("AI tidak memanggil 'propose_choices' atau 'request_roll'. Menggunakan fallback.");
+                choices = ["Maaf, AI gagal memberi pilihan. Coba lagi.", "Amati sekeliling"];
+            }
+
+            return { choices, rollRequest, tool_calls };
         };
 
         try {
