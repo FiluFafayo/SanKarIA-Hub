@@ -367,11 +367,12 @@ class GeminiService {
         ATURAN UTAMA:
         1.  HANYA GUNAKAN FUNGSI: Respons Anda HARUS berupa satu atau lebih pemanggilan fungsi. JANGAN berikan teks biasa.
         2.  PILIH MEKANIKA UTAMA: Anda HARUS memanggil TEPAT SATU dari 'propose_choices' ATAU 'request_roll' ATAU 'spawn_monsters'. JANGAN panggil lebih dari satu dari grup ini.
-        3.  MULAI PERTARUNGAN: Jika pemain menyatakan niat untuk menyerang, atau jika narasi dengan jelas memicu pertarungan (misal 'Goblin melompat keluar!'), Anda HARUS memanggil 'spawn_monsters'.
-        4.  LEMPARAN DADU: Jika aksi memiliki hasil tidak pasti (membujuk, menyelidiki) DAN BUKAN pertarungan, panggil 'request_roll'.
-        5.  GUNAKAN ALAT TAMBAHAN: Jika diperlukan, Anda DAPAT memanggil alat lain ('add_items_to_inventory', 'update_quest_log') BERSAMAAN DENGAN mekanika utama.
-        6.  KONTEKS NPC & MISI: Periksa konteks NPC dan Misi yang ada dari prompt sebelum membuat alat baru untuk menghindari duplikasi.
-        7.  STAT MONSTER: Saat memanggil 'spawn_monsters', HANYA berikan 'stats' jika monster itu (seperti 'Rubah') tidak ada dalam daftar monster default. Untuk monster umum (seperti 'Goblin', 'Penduduk Desa'), cukup berikan 'name' dan 'quantity'.`;
+        3.  MULAI PERTARUNGAN: Jika pemain menyatakan niat untuk menyerang, atau jika narasi memicu pertarungan, Anda HARUS memanggil 'spawn_monsters'.
+        4.  LEMPARAN DADU: Jika aksi (di luar pertarungan) memiliki hasil tidak pasti (membujuk, menyelidiki), panggil 'request_roll'.
+        5.  GUNAKAN ALAT TAMBAHAN: Anda DAPAT memanggil alat lain ('add_items_to_inventory', 'update_quest_log') BERSAMAAN DENGAN mekanika utama.
+        6.  KONTEKS NPC & MISI: Periksa konteks NPC dan Misi yang ada dari prompt sebelum membuat alat baru.
+        7.  STAT MONSTER: Saat memanggil 'spawn_monsters', HANYA berikan 'stats' jika monster itu (seperti 'Rubah') tidak ada dalam daftar monster default.
+        8.  ATURAN KHUSUS KOMBAT: Jika Anda sedang dalam pertarungan (giliran monster) dan Anda menarasikan monster BARU yang bergabung, Anda HARUS memanggil 'spawn_monsters' LAGI untuk menambahkan mereka ke pertarungan, BERSAMAAN dengan 'request_roll' untuk serangan monster yang sekarang.`;
 
         const prompt = `${this.buildPrompt(campaign, players, playerAction)}\nNarasi yang Baru Dihasilkan: "${newNarration}"\n\nTentukan langkah mekanis selanjutnya dengan memanggil fungsi yang sesuai.`;
 

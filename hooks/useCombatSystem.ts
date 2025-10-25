@@ -3,7 +3,7 @@ import { CampaignState, CampaignActions } from './useCampaign';
 import { Character, DiceRoll, RollRequest, InventoryItem, Spell, Monster, StructuredApiResponse, ToolCall } from '../types';
 import { rollInitiative } from '../utils';
 import { geminiService } from '../services/geminiService';
-
+import { rollDice } from '../utils';
 
 interface CombatSystemProps {
     campaign: CampaignState;
@@ -14,7 +14,6 @@ interface CombatSystemProps {
 }
 
 export function useCombatSystem({ campaign, character, players, campaignActions, updateCharacter }: CombatSystemProps) {
-
     const processToolCalls = useCallback((turnId: string, toolCalls: ToolCall[]) => {
         toolCalls.forEach(call => {
             let message = '';
@@ -45,26 +44,72 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
 
         const hasChoices = mechanics.choices && mechanics.choices.length > 0;
         const hasRollRequest = !!mechanics.rollRequest;
+        const isMonsterTurn = campaign.monsters.some(m => m.id === campaign.currentPlayerId);
 
         if (hasChoices) {
             campaignActions.setChoices(mechanics.choices!);
         } 
-        if (hasRollRequest) {
+        
+        if (hasRollRequest && !isMonsterTurn) { // --- INI UNTUK PEMAIN ---
             const fullRollRequest: RollRequest = {
                 ...mechanics.rollRequest!,
                 characterId: campaign.currentPlayerId || character.id,
                 originalActionText: originalActionText,
             };
             campaignActions.setActiveRollRequest(fullRollRequest);
+        } else if (hasRollRequest && isMonsterTurn) { // --- INI LOGIKA BARU UNTUK MONSTER ---
+            const monster = campaign.monsters.find(m => m.id === campaign.currentPlayerId)!;
+            const request = mechanics.rollRequest!;
+            
+            let rollNotation = '1d20';
+            let modifier = 0;
+            let dc = 10; // default
+            let stage: 'attack' | 'damage' = 'attack';
+
+            if (request.type === 'attack') {
+                const monsterAction = monster.actions.find(a => a.name.toLowerCase().includes(request.reason.toLowerCase())) || monster.actions[0];
+                modifier = monsterAction.toHitBonus;
+                dc = request.target?.ac || 10;
+                stage = 'attack';
+                rollNotation = '1d20';
+            }
+            // (Kita bisa tambahkan logika 'damage' di sini nanti, tapi 'attack' adalah yang utama)
+
+            const result = rollDice(rollNotation);
+            const total = result.total + modifier;
+            const success = total >= dc;
+
+            const simulatedRoll: DiceRoll = {
+                notation: rollNotation,
+                rolls: result.rolls,
+                modifier: modifier,
+                total: total,
+                success: success,
+                type: request.type,
+            };
+
+            const fullRollRequest: RollRequest = {
+                ...request,
+                characterId: monster.id,
+                originalActionText: originalActionText,
+                stage: stage,
+                damageDice: monster.actions[0].damageDice // Asumsi damage
+            };
+
+            // Langsung panggil handleRollComplete, lewati modal
+            // Bungkus dalam timeout kecil agar narasi muncul lebih dulu
+            setTimeout(() => {
+                handleRollComplete(simulatedRoll, fullRollRequest);
+            }, 500); // 0.5 detik
         }
         
-        const isMonsterTurn = campaign.monsters.some(m => m.id === campaign.currentPlayerId);
+        // Logika ini sekarang benar: jika giliran monster dan TIDAK ADA roll request
+        // (atau sudah ditangani di atas), akhiri giliran.
         if (isMonsterTurn && !hasRollRequest) {
             campaignActions.endTurn();
         }
 
-    }, [campaign.currentPlayerId, character.id, campaign.monsters, campaignActions, processToolCalls]);
-
+    }, [campaign.currentPlayerId, character.id, campaign.monsters, campaignActions, processToolCalls, handleRollComplete]); // Tambahkan handleRollComplete ke dependencies
 
     // Effect to start combat if it hasn't been started
     useEffect(() => {
