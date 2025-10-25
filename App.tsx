@@ -135,17 +135,27 @@ const App: React.FC = () => {
     setCampaignToJoinOrStart(null);
   }, []);
 
-  const handleSaveCampaign = async (updatedCampaign: Campaign) => {
+  // Gunakan 'any' di sini untuk sementara, karena kita tahu kita dapet state
+  // yang "kotor" dari GameScreen
+  const handleSaveCampaign = async (updatedCampaign: any) => { 
     try {
-        await dataService.saveCampaign(updatedCampaign);
+        // Destructure buat misahin data runtime dari data DB
+        const {
+            activeRollRequest,
+            thinkingState,
+            players,
+            ...campaignToSave // 'campaignToSave' sekarang jadi objek 'Campaign' bersih
+        } = updatedCampaign;
+
+        await dataService.saveCampaign(campaignToSave); // Kirim objek bersih
         setCampaigns(prev => {
-            const index = prev.findIndex(c => c.id === updatedCampaign.id);
+            const index = prev.findIndex(c => c.id === campaignToSave.id);
             if (index !== -1) {
                 const newCampaigns = [...prev];
-                newCampaigns[index] = updatedCampaign;
+                newCampaigns[index] = campaignToSave; // Simpen objek bersih di state
                 return newCampaigns;
             }
-            return [...prev, updatedCampaign]; // Fallback jika kampanye baru
+            return [...prev, campaignToSave]; 
         });
     } catch (e) {
         console.error("Gagal menyimpan kampanye:", e);

@@ -287,8 +287,8 @@ class GeminiService {
                 contents: prompt,
                 config: {
                     systemInstruction,
-                    responseMimeType: "application/json",
-                    responseSchema: MECHANICS_SCHEMA,
+                    // responseMimeType: "application/json",
+                    // responseSchema: MECHANICS_SCHEMA,
                     tools: [{ functionDeclarations: TOOLS }],
                 }
             });
