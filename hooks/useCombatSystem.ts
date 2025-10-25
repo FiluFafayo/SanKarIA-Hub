@@ -191,6 +191,13 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
     // LANGKAH 4: DEKLARASIKAN processMechanics (SEKARANG AMAN)
     // =================================================================
     const processMechanics = useCallback((turnId: string, mechanics: Omit<StructuredApiResponse, 'reaction' | 'narration'>, originalActionText: string) => {
+        if (!turnId) {
+             console.error("processMechanics dipanggil tanpa turnId aktif!");
+             return; // Jangan proses jika tidak ada giliran
+        }
+        
+        let turnShouldEnd = true; // Asumsikan giliran akan berakhir kecuali ada aksi pemain
+
         if (mechanics.tool_calls && mechanics.tool_calls.length > 0) {
             processToolCalls(turnId, mechanics.tool_calls);
         }
@@ -201,66 +208,92 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
 
         if (hasChoices) {
             campaignActions.setChoices(mechanics.choices!);
+            turnShouldEnd = false; // Ada pilihan untuk pemain, jangan akhiri giliran
         }
 
-        if (hasRollRequest && !isMonsterTurn) { // --- INI UNTUK PEMAIN ---
-            const fullRollRequest: RollRequest = {
-                ...mechanics.rollRequest!,
-                characterId: campaign.currentPlayerId || character.id,
-                originalActionText: originalActionText,
-            };
-            campaignActions.setActiveRollRequest(fullRollRequest);
-        } else if (hasRollRequest && isMonsterTurn) { // --- INI LOGIKA UNTUK MONSTER ---
-            const monster = campaign.monsters.find(m => m.id === campaign.currentPlayerId)!;
+        if (hasRollRequest) {
             const request = mechanics.rollRequest!;
-
-            let rollNotation = '1d20';
-            let modifier = 0;
-            let dc = 10;
-            let stage: 'attack' | 'damage' = 'attack';
-            let damageDice = '1d4'; // default damage
-
-            if (request.type === 'attack') {
-                const targetPlayer = players.find(p => p.id === request.target?.id) || players[0];
-                const monsterAction = monster.actions.find(a => a.name.toLowerCase().includes(request.reason.toLowerCase())) || monster.actions[0];
-
-                modifier = monsterAction.toHitBonus;
-                dc = targetPlayer.armorClass; // Serang AC pemain
-                stage = 'attack';
-                rollNotation = '1d20';
-                damageDice = monsterAction.damageDice;
-            }
-
-            const result = rollDice(rollNotation);
-            const total = result.total + modifier;
-            const success = total >= dc;
-
-            const simulatedRoll: DiceRoll = {
-                notation: rollNotation, rolls: result.rolls, modifier: modifier,
-                total: total, success: success, type: request.type,
-            };
-
             const fullRollRequest: RollRequest = {
                 ...request,
-                characterId: monster.id,
+                characterId: isMonsterTurn ? campaign.currentPlayerId! : (campaign.currentPlayerId || character.id),
                 originalActionText: originalActionText,
-                stage: stage,
-                damageDice: damageDice,
-                target: { id: request.target?.id || players[0].id, name: request.target?.name || players[0].name, ac: dc } // Pastikan target ada
             };
 
-            // Langsung panggil handleRollComplete (sekarang sudah di-deklarasikan)
-            setTimeout(() => {
-                handleRollComplete(simulatedRoll, fullRollRequest, turnId);
-            }, 500);
+            if (isMonsterTurn) {
+                // --- Logika Auto-Roll Monster ---
+                const monster = campaign.monsters.find(m => m.id === campaign.currentPlayerId)!;
+                let rollNotation = '1d20';
+                let modifier = 0;
+                let dc = 10;
+                let stage: 'attack' | 'damage' = 'attack';
+                let damageDice = '1d4';
+
+                if (request.type === 'attack') {
+                    const targetPlayer = players.find(p => p.id === request.target?.id) || players.find(p => p.currentHp > 0) || players[0]; // Target pemain hidup pertama
+                    if (!targetPlayer) {
+                        console.warn(`Monster ${monster.name} tidak punya target pemain yang valid.`);
+                        campaignActions.logEvent({ type: 'system', text: `${monster.name} tidak menemukan target.`}, turnId);
+                        // Biarkan turnShouldEnd = true
+                    } else {
+                        const monsterAction = monster.actions.find(a => request.reason.toLowerCase().includes(a.name.toLowerCase())) || monster.actions[0];
+                        modifier = monsterAction.toHitBonus;
+                        dc = targetPlayer.armorClass;
+                        stage = 'attack';
+                        damageDice = monsterAction.damageDice;
+                        fullRollRequest.stage = stage;
+                        fullRollRequest.damageDice = damageDice;
+                        fullRollRequest.target = { id: targetPlayer.id, name: targetPlayer.name, ac: dc };
+
+                        const result = rollDice(rollNotation);
+                        const total = result.total + modifier;
+                        const success = total >= dc;
+                        const simulatedRoll: DiceRoll = {
+                            notation: rollNotation, rolls: result.rolls, modifier: modifier,
+                            total: total, success: success, type: request.type,
+                        };
+
+                        // Jadwalkan penyelesaian roll
+                        setTimeout(() => {
+                           // Pastikan giliran masih valid saat timeout dieksekusi
+                           if (campaign.turnId === turnId) {
+                                handleRollComplete(simulatedRoll, fullRollRequest, turnId);
+                           } else {
+                                console.warn(`Timeout handleRollComplete untuk turn ${turnId} dibatalkan karena giliran sudah berakhir.`);
+                           }
+                        }, 500);
+                        turnShouldEnd = false; // Giliran belum selesai, menunggu roll
+                    }
+                } else {
+                    // Handle roll non-attack monster jika ada (misal saving throw)
+                    console.warn(`Jenis roll monster ${request.type} belum diimplementasikan untuk auto-roll.`);
+                    // Biarkan turnShouldEnd = true
+                }
+            } else {
+                // --- Ini Roll Request untuk Pemain ---
+                campaignActions.setActiveRollRequest(fullRollRequest);
+                turnShouldEnd = false; // Giliran belum selesai, menunggu input pemain
+            }
         }
 
-        if (isMonsterTurn && !hasRollRequest) {
-            campaignActions.endTurn();
+        // --- Logika Akhir Giliran yang Baru ---
+        if (turnShouldEnd) {
+            // Hanya akhiri giliran jika tidak ada roll request aktif (untuk pemain)
+            // atau jika itu giliran monster tapi tidak ada aksi valid yang bisa dilakukan
+            if (!campaign.activeRollRequest || isMonsterTurn) {
+                 // Tambahkan sedikit delay jika ini akhir giliran monster,
+                 // agar narasi sempat tampil sebelum giliran berikutnya
+                 const delay = isMonsterTurn ? 500 : 0;
+                 setTimeout(() => {
+                    // Cek lagi sebelum end turn
+                    if (campaign.turnId === turnId) {
+                        console.log(`Mengakhiri giliran ${turnId} dari processMechanics.`);
+                        campaignActions.endTurn();
+                    }
+                 }, delay);
+            }
         }
-
-    }, [campaign.currentPlayerId, character.id, campaign.monsters, players, campaignActions, processToolCalls, handleRollComplete]); // <-- Tambahkan handleRollComplete
-
+    // Perbarui dependensi
+    }, [campaign.currentPlayerId, character.id, campaign.monsters, players, campaignActions, processToolCalls, handleRollComplete, campaign.activeRollRequest, campaign.turnId]); // Tambahkan campaign.activeRollRequest dan campaign.turnId
 
     // Effect to start combat if it hasn't been started
     useEffect(() => {

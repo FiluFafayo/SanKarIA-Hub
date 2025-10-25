@@ -81,14 +81,22 @@ function safeJsonParse<T>(text: string, fallback: T): T {
  * @returns An object with reaction and narration.
  */
 export const parseStructuredApiResponse = (responseText: string): Omit<StructuredApiResponse, 'tool_calls' | 'choices' | 'rollRequest'> => {
-    // FIX: Add `reaction` to the fallback object to ensure `parsed` has the correct type shape.
-    const fallback = { reaction: undefined, narration: responseText || "DM terdiam sejenak..." };
-    const parsed = safeJsonParse(responseText, fallback);
-    
-    return {
-        reaction: parsed.reaction || undefined,
-        narration: parsed.narration || fallback.narration,
-    };
+    const fallbackNarration = "DM terdiam sejenak, mungkin kehilangan kata-kata...";
+    // Fallback awal jika parsing gagal total
+    const fallbackResult = { reaction: undefined, narration: fallbackNarration };
+
+    if (!responseText || typeof responseText !== 'string' || !responseText.trim()) {
+        console.warn("Menerima responseText kosong atau tidak valid dari API narasi.");
+        return fallbackResult;
+    }
+
+    const parsed = safeJsonParse(responseText, { reaction: undefined, narration: undefined }); // Coba parse tanpa fallback teks
+
+    const reaction = parsed.reaction || undefined;
+    // Pastikan narasi tidak pernah string kosong
+    const narration = parsed.narration && parsed.narration.trim() ? parsed.narration.trim() : fallbackNarration;
+
+    return { reaction, narration };
 };
 
 /**
