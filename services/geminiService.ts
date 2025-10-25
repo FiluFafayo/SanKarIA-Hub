@@ -348,7 +348,6 @@ class GeminiService {
                 contents: prompt,
                 config: {
                     systemInstruction,
-                    responseMimeType: "application/json",
                     responseSchema: RESPONSE_SCHEMA, // 1. Paksa narasi JSON
                     tools: [{ functionDeclarations: TOOLS }], // 2. Izinkan pemanggilan alat mekanik
                     temperature: 0.7,
