@@ -55,10 +55,10 @@ const App: React.FC = () => {
 
     // Ambil kredensial Supabase dari environment variable
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const supabaseKey = import.meta.env.VITE_SUPABASE_KEY || '';
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
     if (!supabaseUrl || !supabaseKey) {
-      console.error("❌ VITE_SUPABASE_URL atau VITE_SUPABASE_KEY environment variable belum disetel!");
+      console.error("❌ VITE_SUPABASE_URL atau VITE_SUPABASE_ANON_KEY environment variable belum disetel!");
       alert("Konfigurasi database belum lengkap. Aplikasi mungkin tidak berfungsi dengan benar.");
     }
     dataService.init(supabaseUrl, supabaseKey);
