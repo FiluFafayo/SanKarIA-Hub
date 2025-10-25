@@ -2,7 +2,14 @@
 export default {
   content: [
     "./index.html",
-    "./{src,components,views}/**/*.{js,ts,jsx,tsx}", // Sesuaikan path jika perlu
+    "./index.tsx", // Tambahkan index.tsx di root
+    "./App.tsx",   // Tambahkan App.tsx di root
+    "./utils.ts", // Tambahkan utils.ts di root
+    "./types.ts", // Tambahkan types.ts di root
+    "./components/**/*.{js,ts,jsx,tsx}", // Scan components di root
+    "./views/**/*.{js,ts,jsx,tsx}",      // Scan views di root
+    "./hooks/**/*.{js,ts,jsx,tsx}",       // Scan hooks di root
+    // Tambahkan path lain jika perlu
   ],
   theme: {
     extend: {
