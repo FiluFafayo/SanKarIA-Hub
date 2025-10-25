@@ -103,8 +103,55 @@ const REQUEST_ROLL_TOOL: FunctionDeclaration = {
     }
 };
 
+// Skema untuk spawn monster
+const SPAWN_MONSTERS_TOOL: FunctionDeclaration = {
+    name: 'spawn_monsters',
+    description: "Memulai mode pertarungan dengan memunculkan satu atau lebih musuh.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            monsters: {
+                type: Type.ARRAY,
+                description: "Daftar monster yang akan muncul.",
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        name: { type: Type.STRING, description: "Nama monster. HARUS cocok dengan nama dari daftar default (misal 'Goblin', 'Penduduk Desa') jika ada." },
+                        quantity: { type: Type.INTEGER },
+                        stats: {
+                            type: Type.OBJECT,
+                            description: "HANYA digunakan jika monster TIDAK ADA di daftar default (misal 'Rubah', 'Kapten Penjaga').",
+                            nullable: true,
+                            properties: {
+                                maxHp: { type: Type.INTEGER },
+                                armorClass: { type: Type.INTEGER },
+                                dexterity: { type: Type.INTEGER },
+                                actions: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            name: { type: Type.STRING },
+                                            toHitBonus: { type: Type.INTEGER },
+                                            damageDice: { type: Type.STRING, description: "Contoh: '1d8+2'" }
+                                        },
+                                        required: ['name', 'toHitBonus', 'damageDice']
+                                    }
+                                }
+                            },
+                        }
+                    },
+                    required: ['name', 'quantity']
+                }
+            }
+        },
+        required: ['monsters']
+    }
+};
+
 
 const TOOLS: FunctionDeclaration[] = [
+    SPAWN_MONSTERS_TOOL,  // <-- TAMBAHKAN INI
     PROPOSE_CHOICES_TOOL, // <-- BARU
     REQUEST_ROLL_TOOL,    // <-- BARU
     {
@@ -319,13 +366,15 @@ class GeminiService {
     
         ATURAN UTAMA:
         1.  HANYA GUNAKAN FUNGSI: Respons Anda HARUS berupa satu atau lebih pemanggilan fungsi. JANGAN berikan teks biasa.
-        2.  PILIH MEKANIKA UTAMA: Anda HARUS memanggil TEPAT SATU dari 'propose_choices' ATAU 'request_roll'. JANGAN panggil keduanya.
-        3.  LEMPARAN DADU WAJIB: Jika aksi memiliki hasil yang tidak pasti (menyerang, membujuk, menyelidiki), Anda HARUS memanggil 'request_roll'.
-        4.  GUNAKAN ALAT TAMBAHAN: Jika aksi dan narasi menyiratkan perubahan pada inventaris (misalnya menemukan loot), misi, atau NPC, Anda HARUS memanggil alat yang sesuai ('add_items_to_inventory', 'update_quest_log', 'log_npc_interaction') BERSAMAAN DENGAN mekanika utama.
-        5.  KONTEKS NPC & MISI: Periksa konteks NPC dan Misi yang ada dari prompt sebelum membuat alat baru untuk menghindari duplikasi. Gunakan ID yang ada untuk memperbarui 'update_quest_log' atau 'log_npc_interaction' jika NPC/misi itu sudah ada.`;
+        2.  PILIH MEKANIKA UTAMA: Anda HARUS memanggil TEPAT SATU dari 'propose_choices' ATAU 'request_roll' ATAU 'spawn_monsters'. JANGAN panggil lebih dari satu dari grup ini.
+        3.  MULAI PERTARUNGAN: Jika pemain menyatakan niat untuk menyerang, atau jika narasi dengan jelas memicu pertarungan (misal 'Goblin melompat keluar!'), Anda HARUS memanggil 'spawn_monsters'.
+        4.  LEMPARAN DADU: Jika aksi memiliki hasil tidak pasti (membujuk, menyelidiki) DAN BUKAN pertarungan, panggil 'request_roll'.
+        5.  GUNAKAN ALAT TAMBAHAN: Jika diperlukan, Anda DAPAT memanggil alat lain ('add_items_to_inventory', 'update_quest_log') BERSAMAAN DENGAN mekanika utama.
+        6.  KONTEKS NPC & MISI: Periksa konteks NPC dan Misi yang ada dari prompt sebelum membuat alat baru untuk menghindari duplikasi.
+        7.  STAT MONSTER: Saat memanggil 'spawn_monsters', HANYA berikan 'stats' jika monster itu (seperti 'Rubah') tidak ada dalam daftar monster default. Untuk monster umum (seperti 'Goblin', 'Penduduk Desa'), cukup berikan 'name' dan 'quantity'.`;
 
         const prompt = `${this.buildPrompt(campaign, players, playerAction)}\nNarasi yang Baru Dihasilkan: "${newNarration}"\n\nTentukan langkah mekanis selanjutnya dengan memanggil fungsi yang sesuai.`;
-        
+
          const call = async () => {
             const ai = this.getClient();
             const response = await ai.models.generateContent({
@@ -351,6 +400,12 @@ class GeminiService {
                             break;
                         case 'request_roll':
                             rollRequest = fc.args as any;
+                            break;
+                        case 'spawn_monsters':
+                            tool_calls.push({
+                                functionName: fc.name,
+                                args: fc.args
+                            });
                             break;
                         case 'add_items_to_inventory':
                         case 'update_quest_log':
