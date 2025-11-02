@@ -87,17 +87,6 @@ const REQUEST_ROLL_TOOL: FunctionDeclaration = {
         type: Type.OBJECT,
         properties: {
             type: { type: Type.STRING, enum: ['skill', 'savingThrow', 'attack'] },
-            // TAMBAHAN BARU UNTUK FASE 1
-            isAdvantage: { 
-                type: Type.BOOLEAN, 
-                description: "Setel ke true jika pemain memiliki keunggulan (misal: menyerang dari sembunyi, target prone, dibantu 'Help').",
-                nullable: true 
-            },
-            isDisadvantage: { 
-                type: Type.BOOLEAN, 
-                description: "Setel ke true jika pemain memiliki kelemahan (misal: menembak saat di-melee, target tidak terlihat, kondisi 'poisoned').",
-                nullable: true 
-            },
             reason: { type: Type.STRING },
             skill: { type: Type.STRING, nullable: true },
             ability: { type: Type.STRING, enum: ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'], nullable: true },
@@ -404,13 +393,7 @@ class GeminiService {
         2.  Anda HARUS memanggil TEPAT SATU dari ('propose_choices', 'request_roll', 'spawn_monsters') JIKA diperlukan oleh konteks.
         3.  Anda DAPAT memanggil alat tambahan ('add_items_to_inventory', 'update_quest_log') jika dibenarkan oleh konteks.
         4.  JANGAN HASILKAN TEKS NARASI/REAKSI. Fokus hanya pada pemanggilan fungsi.
-        5.  WAJIB LANJUTAN EKSPLORASI: Jika status game 'exploration' DAN aksi pemain/narasi tidak memicu 'request_roll' atau 'spawn_monsters', Anda WAJIB memanggil 'propose_choices'.
-        
-        ATURAN (DIS)ADVANTAGE (PENTING!):
-        - Saat memanggil 'request_roll', Anda HARUS mengevaluasi konteks.
-        - Gunakan 'isAdvantage: true' jika pemain memiliki keunggulan (misal: menyerang target yang 'prone'/'restrained', menyerang dari 'stealth'/sembunyi, atau ada kawan yang 'Help').
-        - Gunakan 'isDisadvantage: true' jika pemain memiliki kelemahan (misal: menembak (ranged attack) saat ada musuh di melee (5ft), menyerang target yang tidak terlihat, atau saat pemain punya kondisi 'poisoned'/'frightened').
-        - Jika ada keduanya, JANGAN set keduanya (biarkan null).`;
+        5.  WAJIB LANJUTAN EKSPLORASI: Jika status game 'exploration' DAN aksi pemain/narasi tidak memicu 'request_roll' atau 'spawn_monsters', Anda WAJIB memanggil 'propose_choices'.`;
 
         // Prompt untuk mekanik sedikit berbeda, lebih fokus pada "setelah ini, lalu apa"
         const prompt = `KONTEKS KAMPANYE:

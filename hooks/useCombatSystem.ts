@@ -231,10 +231,6 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
             const request = mechanics.rollRequest!;
             const fullRollRequest: RollRequest = {
                 ...request,
-                // TAMBAHAN BARU: Meneruskan flag dari AI
-                isAdvantage: request.isAdvantage,
-                isDisadvantage: request.isDisadvantage,
-                // ---
                 characterId: isMonsterTurn ? campaign.currentPlayerId! : (campaign.currentPlayerId || character.id),
                 originalActionText: originalActionText,
             };
@@ -424,7 +420,7 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
     const handlePlayerAttack = useCallback((targetId: string, item: InventoryItem) => {
         // PERBAIKAN KRITIS: Logika aksi pemain diubah total
         // Cek BARU: Hanya izinkan jika giliran aktif DAN itu giliran kita
-        if (character.current_hp <= 0 || !campaign.turnId || campaign.currentPlayerId !== character.id) { // Ganti ke current_hp
+        if (character.currentHp <= 0 || !campaign.turnId || campaign.currentPlayerId !== character.id) {
             return;
         }
 
@@ -433,40 +429,10 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
 
         const turnId = campaign.turnId;
 
-        // --- LOGIKA (DIS)ADVANTAGE BARU (DARI PLAYER) ---
-        // Ini adalah implementasi awal. Akan diperluas di Fase 1.2 (Kondisi)
-        let isAdv = false;
-        let isDisadv = false;
-
-        // Cek kondisi target
-        if (target.conditions.includes('prone') || target.conditions.includes('restrained')) {
-            isAdv = true;
-        }
-        
-        // Cek kondisi player
-        if (character.conditions.includes('poisoned') || character.conditions.includes('frightened') || character.conditions.includes('restrained')) {
-            isDisadv = true;
-        }
-
-        // Cek aturan Ranged in Melee (Kesenjangan #4)
-        const isRanged = item.type === 'weapon' && (item.name.toLowerCase().includes('bow') || item.name.toLowerCase().includes('crossbow'));
-        if (isRanged) {
-            // Cek apakah ada monster di melee (5ft)
-            const inMelee = campaign.monsters.some(m => {
-                // TODO: Ini butuh data POSISI. Untuk sekarang, kita asumsikan
-                // jika ada monster hidup, player dianggap in melee.
-                // Ini adalah placeholder yang akan kita perbaiki di P1.2 (Gerakan)
-                return m.currentHp > 0; // Placeholder sederhana
-            });
-            // if (inMelee) isDisadv = true; // TODO: Aktifkan ini setelah P1.2
-        }
-        
         const attackRollRequest: RollRequest = {
             type: 'attack', characterId: character.id, reason: `Menyerang ${target.name} dengan ${item.name}`,
             target: { id: target.id, name: target.name, ac: target.armorClass },
             item, stage: 'attack', damageDice: item.damageDice,
-            isAdvantage: isAdv && !isDisadv, // (Dis)adv saling meniadakan
-            isDisadvantage: isDisadv && !isAdv,
         };
         campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: `Menyerang ${target.name} dengan ${item.name}.` }, turnId);
         campaignActions.setActiveRollRequest(attackRollRequest);

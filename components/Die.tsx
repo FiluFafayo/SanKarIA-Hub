@@ -4,12 +4,12 @@ interface DieProps {
   sides: 4 | 6 | 8 | 10 | 12 | 20;
   value: number | string;
   isRolling?: boolean;
-  isDiscarded?: boolean; // MENGGANTIKAN isLowest
+  isLowest?: boolean;
   size?: 'sm' | 'md' | 'lg';
   status?: 'success' | 'failure' | 'neutral';
 }
 
-export const Die: React.FC<DieProps> = ({ sides, value, isRolling, isDiscarded, size = 'md', status = 'neutral' }) => {
+export const Die: React.FC<DieProps> = ({ sides, value, isRolling, isLowest, size = 'md', status = 'neutral' }) => {
     const sizeClasses = {
         sm: 'w-12 h-12 text-xl',
         md: 'w-16 h-16 text-2xl',
@@ -18,7 +18,7 @@ export const Die: React.FC<DieProps> = ({ sides, value, isRolling, isDiscarded, 
 
     const baseClasses = `relative flex items-center justify-center font-bold font-mono transition-all duration-300 ${sizeClasses}`;
     const rollingClasses = isRolling ? 'animate-pulse' : '';
-    const discardedClasses = isDiscarded ? 'opacity-40 grayscale-[50%]' : ''; // MENGGANTIKAN lowestClasses
+    const lowestClasses = isLowest ? 'opacity-40 grayscale-[50%]' : '';
 
     const statusStyles = {
         success: { color: '#48bb78', shadow: 'rgba(72, 187, 120, 0.9)' }, // green-400
@@ -31,8 +31,8 @@ export const Die: React.FC<DieProps> = ({ sides, value, isRolling, isDiscarded, 
         <span 
             className="relative z-10 transition-colors duration-500" 
             style={{ 
-                color: isDiscarded ? '#a0aec0' : currentStatus.color, // MENGGANTIKAN isLowest
-                textShadow: `0 0 8px ${isDiscarded ? 'rgba(100,100,100,0.4)' : currentStatus.shadow}` // MENGGANTIKAN isLowest
+                color: isLowest ? '#a0aec0' : currentStatus.color,
+                textShadow: `0 0 8px ${isLowest ? 'rgba(255,100,100,0.6)' : currentStatus.shadow}` 
             }}
         >
             {value}
@@ -49,14 +49,14 @@ export const Die: React.FC<DieProps> = ({ sides, value, isRolling, isDiscarded, 
         `,
     };
 
-    const discardedFaceStyle: React.CSSProperties = {
+    const lowestFaceStyle: React.CSSProperties = {
         ...faceStyle,
         background: 'linear-gradient(145deg, #2d3748, #1a202c)', // gray-800 to gray-900
         border: '2px solid #4a5568', // gray-600
         textDecoration: 'line-through',
     };
 
-    const finalFaceStyle = isDiscarded ? discardedFaceStyle : faceStyle; // MENGGANTIKAN isLowest
+    const finalFaceStyle = isLowest ? lowestFaceStyle : faceStyle;
 
     const shapes = {
         4: { clipPath: 'polygon(50% 0%, 100% 87%, 0% 87%)' },
@@ -70,7 +70,7 @@ export const Die: React.FC<DieProps> = ({ sides, value, isRolling, isDiscarded, 
     const shapeStyle = shapes[sides];
 
     return (
-        <div className={`${baseClasses} ${rollingClasses} ${discardedClasses}`}>
+        <div className={`${baseClasses} ${rollingClasses} ${lowestClasses}`}>
             <div className="absolute w-full h-full" style={{...finalFaceStyle, ...shapeStyle}}></div>
             {valueElement}
         </div>

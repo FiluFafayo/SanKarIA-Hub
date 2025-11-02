@@ -59,10 +59,6 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         } else if (hasRollRequest) {
             const fullRollRequest: RollRequest = {
                 ...mechanics.rollRequest!,
-                // TAMBAHAN BARU: Meneruskan flag dari AI
-                isAdvantage: mechanics.rollRequest!.isAdvantage,
-                isDisadvantage: mechanics.rollRequest!.isDisadvantage,
-                // ---
                 characterId: character.id,
                 originalActionText: originalActionText,
             };

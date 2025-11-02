@@ -1,9 +1,4 @@
-// =================================================================
-// 
-//       FILE: GameScreen.tsx (VERSI BARU - POST-REFAKTOR DB)
-// 
-// =================================================================
-import React, { useState, useEffect, useCallback, MouseEvent, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, MouseEvent } from 'react';
 import { Campaign, Character, DiceRoll, RollRequest, Skill } from '../types';
 import { useCampaign } from '../hooks/useCampaign';
 import { useCombatSystem } from '../hooks/useCombatSystem';
@@ -21,11 +16,10 @@ import { RollModal } from './game/RollModal';
 
 interface GameScreenProps {
     initialCampaign: Campaign;
-    initialCharacter: Character;      // Karakter GLOBAL milik user ini
-    allPlayersInCampaign: Character[]; // Daftar SEMUA karakter global di sesi ini
-    onExitGame: (finalCampaignState: Campaign) => void;
-    onSaveCampaign: (campaign: Campaign) => Promise<void>;
-    onSaveCharacter: (character: Character) => Promise<void>; // (MANDAT "KARAKTER GLOBAL")
+    character: Character;
+    players: Character[];
+    onExit: (finalCampaignState: Campaign) => void;
+    updateCharacter: (character: Character) => Promise<void>;
     userId: string;
 }
 
@@ -36,31 +30,13 @@ interface ContextMenuState {
     objectId: string;
 }
 
-export const GameScreen: React.FC<GameScreenProps> = ({ 
-    initialCampaign, 
-    initialCharacter, 
-    allPlayersInCampaign, 
-    onExitGame, 
-    onSaveCampaign, 
-    onSaveCharacter, 
-    userId 
-}) => {
-    
-    // --- STATE MANAJEMEN BARU ---
-    // 'useCampaign' HANYA mengelola state Sesi (Kampanye)
-    const { campaign, campaignActions } = useCampaign(initialCampaign);
-    
-    // Kita butuh state LOKAL untuk melacak state karakter SELAMA SESI INI
-    // Ini adalah implementasi mandat "Karakter Global (SSOT)"
-    const [activeCharacter, setActiveCharacter] = useState<Character>(initialCharacter);
-    const [playerList, setPlayerList] = useState<Character[]>(allPlayersInCampaign);
-    // ---
-    
+export const GameScreen: React.FC<GameScreenProps> = ({ initialCampaign, character, players, onExit, updateCharacter, userId }) => {
+    const { campaign, campaignActions } = useCampaign(initialCampaign, players);
     const [activeMobileTab, setActiveMobileTab] = useState<'chat' | 'character' | 'info'>('chat');
     const [pendingSkill, setPendingSkill] = useState<Skill | null>(null);
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
-    const isMyTurn = campaign.currentPlayerId === activeCharacter.id;
+    const isMyTurn = campaign.currentPlayerId === character.id;
 
     useEffect(() => {
         const isReadyForPlayerAction = campaign.gameState === 'combat'
@@ -80,48 +56,40 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         campaign.activeRollRequest,
     ]);
 
-    /**
-     * (MANDAT "KARAKTER GLOBAL")
-     * Fungsi callback ini akan dipanggil oleh combat/exploration system.
-     * Ini akan meng-update state LOKAL (di GameScreen) DAN
-     * memanggil handler SSOT di App.tsx (onSaveCharacter).
-     */
-    const handleCharacterUpdate = useCallback(async (updatedChar: Character) => {
-        // 1. Update state lokal untuk UI responsif
-        if (updatedChar.id === activeCharacter.id) {
-            setActiveCharacter(updatedChar);
-        }
-        setPlayerList(prev => prev.map(p => p.id === updatedChar.id ? updatedChar : p));
-        
-        // 2. Panggil handler SSOT untuk menyimpan ke DB
-        // Kita tidak 'await' agar UI tidak ter-block
-        onSaveCharacter(updatedChar);
-    }, [activeCharacter.id, onSaveCharacter]);
-
-    
-    // Memo-kan daftar pemain untuk sistem kombat/eksplorasi
-    const memoizedPlayerList = useMemo(() => playerList, [playerList]);
+    const memoizedUpdateCharacter = useCallback(async (updatedChar: Character) => {
+        await updateCharacter(updatedChar);
+        campaignActions.updateCharacterInCampaign(updatedChar);
+    }, [updateCharacter, campaignActions]);
 
     const combatSystem = useCombatSystem({
         campaign,
-        character: activeCharacter, // Selalu gunakan karakter aktif
-        players: memoizedPlayerList, // Gunakan daftar pemain sesi
+        character,
+        players,
         campaignActions,
-        updateCharacter: handleCharacterUpdate // Gunakan handler SSOT
+        updateCharacter: memoizedUpdateCharacter
     });
 
     const explorationSystem = useExplorationSystem({
         campaign,
-        character: activeCharacter,
-        players: memoizedPlayerList,
+        character,
+        players,
         campaignActions
     });
 
-    // Logika isDisabled tidak berubah, tapi sekarang lebih akurat
+    // PERBAIKAN KRITIS: Logika `isDisabled` diubah total
+    // GANTI DENGAN LOGIKA BARU:
     const isCombat = campaign.gameState === 'combat';
+    // Giliran kombat kita adalah saat: mode kombat, giliran kita, DAN ada turnId aktif
     const isMyCombatTurn = isCombat && isMyTurn && !!campaign.turnId;
+    // Mode eksplorasi adalah saat: BUKAN kombat, DAN TIDAK ada turnId aktif (game sedang menunggu input)
     const isExploration = !isCombat && !campaign.turnId;
-    
+
+    // Tombol Aksi di-disable JIKA:
+    // 1. AI sedang berpikir (selalu)
+    // 2. Ada RollModal aktif (selalu)
+    // 3. Kita lagi kombat, TAPI BUKAN giliran kita (isMyCombatTurn false)
+    // 4. Kita lagi eksplorasi, TAPI AI sedang memproses aksi (isExploration false)
+    // Jadi, kita aktif HANYA jika (AI tidak berpikir) DAN (tidak ada modal) DAN (ini giliran kombat kita ATAU ini mode eksplorasi)
     const isDisabled = campaign.thinkingState !== 'idle'
                      || !!campaign.activeRollRequest
                      || (!isMyCombatTurn && !isExploration);
@@ -129,8 +97,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const handleActionSubmit = (actionText: string) => {
         campaignActions.clearChoices();
         if (campaign.gameState === 'exploration') {
-            // TODO: explorationSystem perlu di-refaktor untuk mengembalikan
-            // ToolCall yang butuh update karakter.
             explorationSystem.handlePlayerAction(actionText, pendingSkill);
         }
         setPendingSkill(null);
@@ -143,16 +109,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     };
 
     const handleRollComplete = (roll: DiceRoll, request: RollRequest) => {
-        const currentTurnId = campaign.turnId; 
+        const currentTurnId = campaign.turnId; // Ambil turnId yang sedang aktif
         if (!currentTurnId) {
+            // Ini seharusnya tidak pernah terjadi jika modalnya muncul
             console.error("RollModal selesai tetapi tidak ada turnId aktif!");
             return;
         }
 
         if (campaign.gameState === 'combat') {
-            combatSystem.handleRollComplete(roll, request, currentTurnId); 
+            combatSystem.handleRollComplete(roll, request, currentTurnId); // Lewatkan ID-nya
         } else {
-            explorationSystem.handleRollComplete(roll, request, currentTurnId);
+            explorationSystem.handleRollComplete(roll, request, currentTurnId); // Lewatkan ID-nya
         }
     };
 
@@ -165,27 +132,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         });
     };
 
-    // Auto-save state kampanye setiap 30 detik jika ada perubahan
-    // (Ini adalah PENGGANTI untuk "save on exit" yang lebih aman)
-    useEffect(() => {
-        const interval = setInterval(() => {
-            // Cek apakah state 'campaign' berbeda dari 'initialCampaign'
-            // (Perbandingan JSON sederhana, tidak sempurna tapi cukup baik)
-            if (JSON.stringify(campaign) !== JSON.stringify(initialCampaign)) {
-                console.log("Auto-saving campaign state...");
-                onSaveCampaign(campaign);
-            }
-        }, 30000); // Simpan setiap 30 detik
-
-        return () => clearInterval(interval);
-    }, [campaign, initialCampaign, onSaveCampaign]);
-
     const hasChoices = campaign.choices && campaign.choices.length > 0;
-    const shouldShowChoices = hasChoices && (campaign.gameState === 'exploration' || (isMyTurn && activeCharacter.currentHp > 0));
+    const shouldShowChoices = hasChoices && (campaign.gameState === 'exploration' || (isMyTurn && character.currentHp > 0));
+
 
     const ChatPanel = () => (
         <main className="flex-grow flex flex-col h-full overflow-hidden">
-            <ChatLog events={campaign.eventLog} players={playerList} characterId={activeCharacter.id} thinkingState={campaign.thinkingState} onObjectClick={handleObjectClick} />
+            <ChatLog events={campaign.eventLog} players={players} characterId={character.id} thinkingState={campaign.thinkingState} onObjectClick={handleObjectClick} />
             <div className="flex-shrink-0">
                 {shouldShowChoices && <ChoiceButtons choices={campaign.choices} onChoiceSelect={handleActionSubmit} />}
                 <ActionBar disabled={isDisabled} onActionSubmit={handleActionSubmit} pendingSkill={pendingSkill} />
@@ -196,28 +149,20 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     const RightPanel = () => (
         <aside className="w-full md:w-80 lg:w-96 flex-shrink-0 bg-gray-800 md:border-l-2 border-gray-700 p-4 overflow-y-auto flex flex-col gap-4">
             <CombatTracker
-                players={playerList}
+                players={players}
                 monsters={campaign.monsters}
                 initiativeOrder={campaign.initiativeOrder}
                 currentPlayerId={campaign.currentPlayerId}
             />
             <CharacterPanel
-                character={activeCharacter}
+                character={character}
                 monsters={campaign.monsters}
                 isMyTurn={isMyTurn}
                 combatSystem={combatSystem}
-                updateCharacter={handleCharacterUpdate} // Pass-through handler SSOT
+                updateCharacter={updateCharacter}
                 gameState={campaign.gameState}
                 onSkillSelect={handleSkillSelect}
             />
-        </aside>
-    );
-    
-    const InfoPanelComponent = () => (
-         <aside className="hidden lg:block w-80 xl:w-96 flex-shrink-0 bg-gray-800 border-r-2 border-gray-700">
-            <div className="h-full overflow-y-auto">
-                <InfoPanel campaign={campaign} players={playerList} />
-            </div>
         </aside>
     );
 
@@ -225,15 +170,18 @@ export const GameScreen: React.FC<GameScreenProps> = ({
         <div className="w-screen h-screen bg-gray-900 text-gray-200 flex flex-col font-sans" onClick={() => setContextMenu(null)}>
             <header className="flex-shrink-0 bg-gray-800 p-3 flex items-center justify-between border-b-2 border-gray-700 z-20">
                 <h1 className="font-cinzel text-xl text-purple-300 truncate pr-4">{campaign.title}</h1>
-                {/* Tombol Exit sekarang HANYA memanggil onExitGame */}
-                <button onClick={() => onExitGame(campaign)} className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded flex-shrink-0">Keluar</button>
+                <button onClick={() => onExit(campaign)} className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded flex-shrink-0">Keluar</button>
             </header>
 
             <div className="flex flex-grow overflow-hidden relative">
-                {/* Desktop Layout */}
+                {/* Desktop Layout: Three columns for large screens, two for medium */}
                 <div className="hidden md:flex flex-grow h-full">
-                    {/* Left Panel (Info) */}
-                    <InfoPanelComponent />
+                    {/* Left Panel (Info) - shows only on large screens */}
+                    <aside className="hidden lg:block w-80 xl:w-96 flex-shrink-0 bg-gray-800 border-r-2 border-gray-700">
+                        <div className="h-full overflow-y-auto">
+                            <InfoPanel campaign={campaign} players={players} />
+                        </div>
+                    </aside>
 
                     {/* Center Panel (Chat) */}
                     <ChatPanel />
@@ -242,22 +190,21 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                     <RightPanel />
                 </div>
 
-                {/* Mobile Layout */}
+                {/* Mobile Layout (unchanged) */}
                 <div className="md:hidden w-full h-full pb-16">
                     {activeMobileTab === 'chat' && <ChatPanel />}
                     {activeMobileTab === 'character' && <RightPanel />}
-                    {activeMobileTab === 'info' && <InfoPanel campaign={campaign} players={playerList} />}
+                    {activeMobileTab === 'info' && <InfoPanel campaign={campaign} players={players} />}
                 </div>
             </div>
 
             <MobileNavBar activeTab={activeMobileTab} setActiveTab={setActiveMobileTab} />
 
-            {/* Roll Modal sekarang merujuk ke activeCharacter.id */}
-            {campaign.activeRollRequest && campaign.activeRollRequest.characterId === activeCharacter.id && (
+            {campaign.activeRollRequest && campaign.activeRollRequest.characterId === character.id && (
                 <RollModal
                     key={`${campaign.activeRollRequest.type}-${campaign.activeRollRequest.reason}`}
                     request={campaign.activeRollRequest}
-                    character={activeCharacter}
+                    character={character}
                     onComplete={handleRollComplete}
                 />
             )}

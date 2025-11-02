@@ -1,30 +1,29 @@
-// =================================================================
-// 
-//      FILE: useCampaign.ts (VERSI BARU - POST-REFAKTOR DB)
-// 
-// =================================================================
-
 import { useReducer, useMemo } from 'react';
-import { 
-    Campaign, GameEvent, Monster, RollRequest, MonsterAction, 
-    ThinkingState, Quest, NPC, QuestStatus, PlayerActionEvent, 
-    DmNarrationEvent, SystemMessageEvent, RollResultEvent, 
-    DmReactionEvent, WorldTime, WorldWeather, ToolCall 
-} from '../types';
+import { Campaign, GameEvent, Monster, RollRequest, InventoryItem, MonsterAction, Character, ThinkingState, Quest, NPC, QuestStatus, PlayerActionEvent, DmNarrationEvent, SystemMessageEvent, RollResultEvent, DmReactionEvent, WorldTime, WorldWeather } from '../types';
 import { generateId } from '../utils';
 import { DEFAULT_MONSTERS } from '../data/monsters';
 
-// State yang dikelola hook ini HANYA state sesi kampanye + state UI sementara
 export interface CampaignState extends Campaign {
     thinkingState: ThinkingState;
     activeRollRequest: RollRequest | null;
+    players: Character[]; // Add players to the campaign state for easy access
 }
 
-// Payload untuk Tool Call
-// Kita HARUS mengeksposnya agar App.tsx bisa menangani update karakter global
+// Definisikan tipe untuk payload monster yang lebih fleksibel
+interface MonsterSpawnPayload {
+    name: string;
+    quantity: number;
+    stats?: {
+        maxHp: number;
+        armorClass: number;
+        dexterity: number;
+        actions: MonsterAction[];
+    }
+}
+
 interface AddItemsPayload {
     characterId: string;
-    items: any[]; // Tipe item disederhanakan di sini
+    items: Omit<InventoryItem, 'description' | 'isEquipped' | 'toHitBonus' | 'damageDice' | 'effect'>[];
 }
 
 interface UpdateQuestPayload {
@@ -45,18 +44,7 @@ interface LogNpcInteractionPayload {
     disposition?: 'Friendly' | 'Neutral' | 'Hostile' | 'Unknown';
 }
 
-interface SpawnMonstersPayload {
-    name: string;
-    quantity: number;
-    stats?: {
-        maxHp: number;
-        armorClass: number;
-        dexterity: number;
-        actions: MonsterAction[];
-    }
-}
-
-// Tipe event yang bisa di-log
+// FIX: Create a discriminated union of Omitted event types to help TypeScript's type inference.
 type LoggableGameEvent =
     | Omit<PlayerActionEvent, 'id' | 'timestamp' | 'turnId'>
     | Omit<DmNarrationEvent, 'id' | 'timestamp' | 'turnId'>
@@ -76,34 +64,16 @@ export interface CampaignActions {
     setGameState: (state: 'exploration' | 'combat') => void;
     setThinkingState: (state: ThinkingState) => void;
     setActiveRollRequest: (request: RollRequest | null) => void;
+    spawnMonsters: (monstersToSpawn: MonsterSpawnPayload[], prebuiltMonsters?: Monster[]) => void;
     clearChoices: () => void;
     setChoices: (choices: string[]) => void;
-    
-    // --- AKSI YANG DIUBAH ---
-    // Aksi ini sekarang HANYA mengubah state Sesi Kampanye.
-    // Mereka TIDAK LAGI mengubah state karakter.
+    updateCharacterInCampaign: (character: Character) => void;
+    addItemsToInventory: (payload: AddItemsPayload) => void;
     updateQuestLog: (payload: UpdateQuestPayload) => void;
     logNpcInteraction: (payload: LogNpcInteractionPayload) => void;
     updateWorldState: (time: WorldTime, weather: WorldWeather) => void;
-    
-    // Ini adalah perubahan arsitektur BESAR.
-    // Hook ini tidak lagi memproses tool call, tapi hanya mem-dispatch-nya
-    // ke komponen induk (GameScreen/App.tsx) untuk ditangani.
-    // Tapi itu akan memecah hook combat/exploration.
-    
-    // === REVISI RENCANA ARSITEKTUR ===
-    // Hook 'useCampaign' HARUS menangani semua update state SESI.
-    // Hook 'useCombatSystem' dan 'useExplorationSystem' akan memanggil aksi ini.
-    // Pemanggilan 'ToolCall' yang berdampak pada KARAKTER (seperti add_items)
-    // HARUS ditangani di level yang lebih tinggi (App.tsx).
-    
-    // MARI KITA TETAPKAN: Hook ini HANYA mengelola state 'Campaign' (sesi).
-    // Kita akan hapus semua yang terkait 'Character' dari hook ini.
-    
-    spawnMonsters: (monstersToSpawn: SpawnMonstersPayload[]) => void;
 }
 
-// Reducer HANYA mengelola CampaignState
 type Action =
   | { type: 'SET_STATE'; payload: Partial<CampaignState> }
   | { type: 'ADD_EVENT'; payload: GameEvent }
@@ -113,7 +83,9 @@ type Action =
   | { type: 'REMOVE_MONSTER'; payload: string } // id
   | { type: 'ADD_MONSTERS'; payload: Monster[] }
   | { type: 'SET_CHOICES'; payload: string[] }
+  | { type: 'UPDATE_CHARACTER'; payload: Character }
   | { type: 'SET_THINKING_STATE'; payload: ThinkingState }
+  | { type: 'ADD_ITEMS_TO_INVENTORY'; payload: AddItemsPayload }
   | { type: 'UPDATE_QUEST_LOG'; payload: UpdateQuestPayload }
   | { type: 'LOG_NPC_INTERACTION'; payload: LogNpcInteractionPayload }
   | { type: 'UPDATE_WORLD_STATE', payload: { time: WorldTime, weather: WorldWeather } };
@@ -124,6 +96,7 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
     case 'SET_STATE':
       return { ...state, ...action.payload };
     case 'ADD_EVENT':
+      // Increment world event counter on player action
       const worldEventCounter = action.payload.type === 'player_action'
         ? state.worldEventCounter + 1
         : state.worldEventCounter;
@@ -140,21 +113,43 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
     case 'REMOVE_MONSTER': {
       const newMonsters = state.monsters.filter(m => m.id !== action.payload);
       const newInitiativeOrder = state.initiativeOrder.filter(id => id !== action.payload);
-      // Jika monster yang mati adalah giliran saat ini, geser ke null (akan di-handle advanceTurn)
-      const currentPlayerId = state.currentPlayerId === action.payload ? null : state.currentPlayerId;
-      return { ...state, monsters: newMonsters, initiativeOrder: newInitiativeOrder, currentPlayerId };
+      return { ...state, monsters: newMonsters, initiativeOrder: newInitiativeOrder };
     }
     case 'ADD_MONSTERS':
       return { ...state, monsters: [...state.monsters, ...action.payload] };
     case 'SET_CHOICES':
         return { ...state, choices: action.payload };
+     case 'UPDATE_CHARACTER':
+        return {
+            ...state,
+            players: state.players.map(p => p.id === action.payload.id ? action.payload : p),
+        };
     case 'SET_THINKING_STATE':
         return { ...state, thinkingState: action.payload };
+    case 'ADD_ITEMS_TO_INVENTORY': {
+        const { characterId, items } = action.payload;
+        const newPlayers = state.players.map(p => {
+            if (p.id === characterId) {
+                const newInventory = [...p.inventory];
+                items.forEach(itemToAdd => {
+                    const existingItemIndex = newInventory.findIndex(i => i.name === itemToAdd.name);
+                    if (existingItemIndex > -1) {
+                        newInventory[existingItemIndex].quantity += itemToAdd.quantity;
+                    } else {
+                        newInventory.push({ ...itemToAdd, description: '', isEquipped: false });
+                    }
+                });
+                return { ...p, inventory: newInventory };
+            }
+            return p;
+        });
+        return { ...state, players: newPlayers };
+    }
     case 'UPDATE_QUEST_LOG': {
         const { id, title, description, status, isMainQuest, reward } = action.payload;
         const quests = [...state.quests];
         const existingQuestIndex = quests.findIndex(q => q.id === id);
-        const newQuestData = { id, title, description, status, isMainQuest: isMainQuest || false, reward: reward || '' };
+        const newQuestData = { id, title, description, status, isMainQuest: isMainQuest || false, reward };
         
         if (existingQuestIndex > -1) {
             quests[existingQuestIndex] = { ...quests[existingQuestIndex], ...newQuestData };
@@ -181,7 +176,7 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
             
             const lastNote = existingNpc.interactionHistory[existingNpc.interactionHistory.length - 1];
             if (lastNote === payload.summary) {
-                return state; // Abort update jika duplikat
+                return state; // Abort update if it's a duplicate
             }
 
             existingNpc.interactionHistory = [...existingNpc.interactionHistory, payload.summary];
@@ -210,7 +205,7 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
             ...state,
             currentTime: action.payload.time,
             currentWeather: action.payload.weather,
-            worldEventCounter: 0 // Reset counter
+            worldEventCounter: 0 // Reset counter after an event
         };
     }
     default:
@@ -218,17 +213,13 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
   }
 };
 
-/**
- * Hook ini sekarang HANYA mengelola state sesi 'Campaign'
- * State 'Character' (players) dikelola di level atas (App.tsx / GameScreen.tsx)
- * dan harus di-passing ke hook lain (useCombatSystem, useExplorationSystem)
- */
-export const useCampaign = (initialCampaign: Campaign) => {
+export const useCampaign = (initialCampaign: Campaign, initialPlayers: Character[]) => {
     const [campaign, dispatch] = useReducer(reducer, {
         ...initialCampaign,
         thinkingState: 'idle',
         activeRollRequest: null,
-        turnId: null, // Selalu mulai turnId dari null
+        players: initialPlayers,
+        turnId: null,
     });
 
     const actions: CampaignActions = useMemo(() => {
@@ -236,15 +227,7 @@ export const useCampaign = (initialCampaign: Campaign) => {
             if (state === 'combat' && campaign.gameState === 'exploration') {
                  dispatch({ type: 'SET_STATE', payload: { gameState: state, initiativeOrder: [] } });
             } else if (state === 'exploration') {
-                 dispatch({ type: 'SET_STATE', payload: { 
-                    gameState: state, 
-                    initiativeOrder: [], 
-                    monsters: [], 
-                    currentPlayerId: null,
-                    turnId: null,
-                    activeRollRequest: null,
-                    choices: []
-                } });
+                 dispatch({ type: 'SET_STATE', payload: { gameState: state, initiativeOrder: [], monsters: [], currentPlayerId: null } });
             } else {
                  dispatch({ type: 'SET_STATE', payload: { gameState: state } });
             }
@@ -270,10 +253,13 @@ export const useCampaign = (initialCampaign: Campaign) => {
         const setActiveRollRequest = (request: RollRequest | null) => dispatch({ type: 'SET_STATE', payload: { activeRollRequest: request } });
         const clearChoices = () => dispatch({ type: 'SET_CHOICES', payload: [] });
         const setChoices = (choices: string[]) => dispatch({ type: 'SET_CHOICES', payload: choices });
+        const updateCharacterInCampaign = (character: Character) => dispatch({ type: 'UPDATE_CHARACTER', payload: character });
         const setThinkingState = (state: ThinkingState) => dispatch({ type: 'SET_THINKING_STATE', payload: state });
+        const addItemsToInventory = (payload: AddItemsPayload) => dispatch({ type: 'ADD_ITEMS_TO_INVENTORY', payload });
         const updateQuestLog = (payload: UpdateQuestPayload) => dispatch({ type: 'UPDATE_QUEST_LOG', payload });
         const logNpcInteraction = (payload: LogNpcInteractionPayload) => dispatch({ type: 'LOG_NPC_INTERACTION', payload });
         const updateWorldState = (time: WorldTime, weather: WorldWeather) => dispatch({ type: 'UPDATE_WORLD_STATE', payload: { time, weather } });
+
 
         return {
             logEvent,
@@ -281,6 +267,8 @@ export const useCampaign = (initialCampaign: Campaign) => {
             endTurn,
             clearChoices,
             setChoices,
+            updateCharacterInCampaign,
+            addItemsToInventory,
             updateQuestLog,
             logNpcInteraction,
             updateWorldState,
@@ -291,30 +279,30 @@ export const useCampaign = (initialCampaign: Campaign) => {
             setGameState,
             setThinkingState,
             setActiveRollRequest,
-            spawnMonsters: (monstersToSpawn) => {
-                let newMonsters: Monster[] = [];
+            spawnMonsters: (monstersToSpawn, prebuiltMonsters) => {
+                let newMonsters: Monster[] = prebuiltMonsters ? [...prebuiltMonsters] : [];
                 
                 monstersToSpawn.forEach(m => {
+                    if (prebuiltMonsters && prebuiltMonsters.some(pm => pm.name === m.name)) return;
+                    
                     for (let i = 0; i < m.quantity; i++) {
                         const uniqueName = m.quantity > 1 ? `${m.name} ${i + 1}` : m.name;
                         
+                        // PERBAIKAN DATA: Prioritaskan template default
                         let monsterData: Omit<Monster, 'id' | 'currentHp' | 'initiative' | 'conditions'> | null = null;
                         
+                        // 1. Cari template default
                         const template = DEFAULT_MONSTERS.find(dm => dm.name.toLowerCase() === m.name.toLowerCase());
                         
                         if (template) {
+                            // 2. Jika template ada, SELALU gunakan template. Abaikan stats dari AI.
                             monsterData = template;
                         } 
                         else if (m.stats) {
-                            // Ini adalah monster kustom dari AI
-                            // Kita harus 'melengkapi' data yang mungkin kurang
-                            const baseStats = DEFAULT_MONSTERS[0]; // Ambil goblin sebagai base
-                            monsterData = {
-                                ...baseStats,
-                                name: m.name,
-                                ...m.stats
-                            };
+                            // 3. Jika tidak ada template, BARU gunakan stats kustom dari AI.
+                            monsterData = { name: m.name, ...m.stats };
                         } 
+                        // (Logika lama ada di bawah, dibalik)
 
                         if (monsterData) {
                             newMonsters.push({
@@ -331,13 +319,16 @@ export const useCampaign = (initialCampaign: Campaign) => {
 
                 if (newMonsters.length > 0) {
                     dispatch({ type: 'ADD_MONSTERS', payload: newMonsters });
-                    setGameState('combat'); // Otomatis masuk mode combat
+                    setGameState('combat');
                 }
             },
         };
-    // Kita hanya perlu 'campaign.gameState' sebagai dependensi
     }, [campaign.gameState]);
 
-    // Kembalikan state sesi kampanye yang sudah di-dispatch
-    return { campaign, campaignActions: actions };
+    const fullCampaignState = useMemo(() => ({
+        ...campaign,
+        players: campaign.players,
+    }), [campaign]);
+
+    return { campaign: fullCampaignState, campaignActions: actions };
 };
