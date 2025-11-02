@@ -1,4 +1,8 @@
-
+// =================================================================
+// 
+//          FILE: App.tsx (VERSI BARU - POST-REFAKTOR DB)
+// 
+// =================================================================
 import React, { useState, useCallback, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { NexusSanctum } from './components/NexusSanctum';
@@ -23,27 +27,36 @@ type View = Location | 'nexus' | 'character-selection';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('nexus');
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [characters, setCharacters] = useState<Character[]>([]);
   const [theme, setTheme] = useLocalStorage<string>('sankaria-hub-theme', 'theme-sanc');
   const [isLoading, setIsLoading] = useState(true);
 
-  // State Otentikasi
+  // === State Otentikasi ===
   const [session, setSession] = useState<Session | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  
+  // === State Data Global (SSOT) ===
+  // State ini berisi SEMUA data yang dimiliki user, dimuat sekali saat login
+  const [allCampaigns, setAllCampaigns] = useState<Campaign[]>([]);
+  const [allMyCharacters, setAllMyCharacters] = useState<Character[]>([]);
+
+  // === State Sesi Permainan Aktif ===
+  // State ini diisi HANYA saat user memilih untuk "Main"
+  const [playingCampaign, setPlayingCampaign] = useState<Campaign | null>(null);
+  const [playingCharacter, setPlayingCharacter] = useState<Character | null>(null);
+  const [playersInGame, setPlayersInGame] = useState<Character[]>([]); // Daftar semua karakter di sesi game
+
+  // State untuk alur join/mulai
+  const [campaignToJoinOrStart, setCampaignToJoinOrStart] = useState<Campaign | null>(null);
 
   // Sumber kebenaran tunggal untuk ID pengguna
   const userId = session?.user?.id;
 
-  // State untuk sesi permainan
-  const [playingCampaign, setPlayingCampaign] = useState<Campaign | null>(null);
-  const [playingCharacter, setPlayingCharacter] = useState<Character | null>(null);
-  
-  // Efek Inisialisasi Layanan
+  // --- EFEK INISIALISASI & OTENTIKASI ---
+
+  // Efek Inisialisasi Layanan (Hanya sekali saat App mount)
   useEffect(() => {
     // Ambil kunci Gemini dari environment variable
     const geminiKeysString = import.meta.env.VITE_GEMINI_API_KEYS || '';
-    // Pisahkan string kunci menjadi array, hilangkan spasi, dan filter kunci kosong
     const geminiKeys = geminiKeysString.split(',')
       .map(key => key.trim())
       .filter(key => key);
@@ -79,115 +92,148 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-
+  // Efek Memuat Data Global (saat Sesi berubah)
   useEffect(() => {
     // Hanya muat data saat ada sesi
-    if (!session) {
+    if (!session || !userId) {
         setIsLoading(false);
-        setCampaigns([]);
-        setCharacters([]);
+        setAllCampaigns([]);
+        setAllMyCharacters([]);
         return;
     }
     
-    const loadData = async () => {
+    const loadGlobalData = async () => {
         setIsLoading(true);
         try {
+            // 1. Ambil semua karakter MILIK user ini (RLS 'Allow owner SELECT' bekerja)
+            let fetchedCharacters = await dataService.getMyCharacters();
+            
+            // 2. Ambil semua kampanye yang BISA DIAKSES user ini (RLS 'Allow participants SELECT' bekerja)
             let fetchedCampaigns = await dataService.getCampaigns();
-            let fetchedCharacters = await dataService.getCharacters();
 
-            // Seed data jika database kosong
-            if (fetchedCampaigns.length === 0) {
-                await dataService.saveCampaigns(DEFAULT_CAMPAIGNS);
-                fetchedCampaigns = DEFAULT_CAMPAIGNS;
-            }
-            if (fetchedCharacters.length === 0 && userId) {
-                const userCharacters = DEFAULT_CHARACTERS.map(char => ({
+            // 3. Seed data jika user baru (DB-nya kosong)
+            if (fetchedCampaigns.length === 0 && fetchedCharacters.length === 0) {
+                console.log("User baru terdeteksi, melakukan seeding data default...");
+                // Seed Kampanye Default (ini akan dimiliki oleh user ini)
+                // Kita harus generate join code baru agar unik
+                const campaignsToSeed = DEFAULT_CAMPAIGNS.map(c => ({
+                  ...c,
+                  owner_id: userId, // User ini jadi DM kampanye default
+                  join_code: generateJoinCode() // Pastikan unik
+                }));
+                await dataService.saveCampaigns(campaignsToSeed);
+                fetchedCampaigns = await dataService.getCampaigns(); // Ambil lagi
+
+                // Seed Karakter Default (ini akan dimiliki oleh user ini)
+                const charactersToSeed = DEFAULT_CHARACTERS.map(char => ({
                     ...char,
                     id: generateId('char'),
-                    ownerId: userId,
+                    owner_id: userId,
                 }));
-                await dataService.saveCharacters(userCharacters);
-                fetchedCharacters = userCharacters;
+                await dataService.saveCharacters(charactersToSeed);
+                fetchedCharacters = await dataService.getMyCharacters(); // Ambil lagi
             }
             
-            setCampaigns(fetchedCampaigns);
-            setCharacters(fetchedCharacters);
+            setAllCampaigns(fetchedCampaigns);
+            setAllMyCharacters(fetchedCharacters);
+
         } catch (error) {
-            console.error("Gagal memuat data:", error);
+            console.error("Gagal memuat data global:", error);
             alert("Gagal memuat data dari Supabase. Periksa koneksi internet Anda atau coba lagi nanti.");
         } finally {
             setIsLoading(false);
         }
     };
 
-    loadData();
+    loadGlobalData();
   }, [session, userId]);
 
-  const myCharacters = characters.filter(c => c.ownerId === userId);
-  const [campaignToJoinOrStart, setCampaignToJoinOrStart] = useState<Campaign | null>(null);
-  
-  const handleLocationClick = useCallback((location: Location) => {
-    setCurrentView(location);
-  }, []);
+
+  // --- HANDLER SIMPAN DATA (SSOT) ---
+
+  /**
+   * (MANDAT "KARAKTER GLOBAL")
+   * Menyimpan SATU karakter global ke DB dan me-refresh state lokal.
+   * Ini adalah fungsi inti untuk menyimpan progres HP, inventory, dll.
+   */
+  const handleUpdateCharacter = useCallback(async (updatedCharacter: Character) => {
+    if (!userId) return;
+
+    try {
+        const savedChar = await dataService.saveCharacter(updatedCharacter);
+        
+        // Update state lokal 'allMyCharacters'
+        setAllMyCharacters(prev => prev.map(c => c.id === savedChar.id ? savedChar : c));
+        
+        // Update state 'playingCharacter' jika itu yang sedang dimainkan
+        if (playingCharacter && playingCharacter.id === savedChar.id) {
+            setPlayingCharacter(savedChar);
+        }
+    } catch(e) {
+         console.error("Gagal menyimpan karakter (global):", e);
+         alert("Gagal menyimpan progres karakter Anda. Periksa koneksi Anda.");
+    }
+  }, [userId, playingCharacter]);
+
+  /**
+   * (MANDAT "KARAKTER GLOBAL")
+   * Menyimpan BANYAK karakter global ke DB (untuk ProfileView/Pembuatan Karakter).
+   */
+  const handleUpdateCharactersBatch = useCallback(async (updatedCharacters: Character[]) => {
+      if (!userId) return;
+      try {
+          const savedChars = await dataService.saveCharacters(updatedCharacters);
+          // Refresh state lokal 'allMyCharacters'
+          setAllMyCharacters(savedChars);
+      } catch (e) {
+           console.error("Gagal menyimpan karakter (batch):", e);
+           alert("Gagal menyimpan perubahan karakter. Periksa koneksi Anda.");
+      }
+  }, [userId]);
+
+
+  /**
+   * Menyimpan SATU state sesi kampanye ke DB dan me-refresh state lokal.
+   */
+  const handleSaveCampaign = useCallback(async (updatedCampaign: Campaign) => { 
+    try {
+        // 'updatedCampaign' di sini adalah tipe 'Campaign' bersih,
+        // karena state UI (thinkingState, dll) ada di 'CampaignState' (di dalam useCampaign hook)
+        // tapi tidak ada di tipe 'Campaign' (dari types.ts)
+        const savedCampaign = await dataService.saveCampaign(updatedCampaign);
+        
+        // Update state lokal 'allCampaigns'
+        setAllCampaigns(prev => prev.map(c => c.id === savedCampaign.id ? savedCampaign : c));
+
+        // Update state 'playingCampaign' jika itu yang sedang dimainkan
+        if (playingCampaign && playingCampaign.id === savedCampaign.id) {
+            setPlayingCampaign(savedCampaign);
+        }
+    } catch (e) {
+        console.error("Gagal menyimpan kampanye (sesi):", e);
+        alert("Gagal menyimpan progres kampanye. Periksa koneksi Anda.");
+    }
+  }, [playingCampaign]);
+
+  // --- HANDLER ALUR NAVIGASI & GAME ---
 
   const handleReturnToNexus = useCallback(() => {
     setCurrentView('nexus');
     setCampaignToJoinOrStart(null);
   }, []);
-
-  // Gunakan 'any' di sini untuk sementara, karena kita tahu kita dapet state
-  // yang "kotor" dari GameScreen
-  const handleSaveCampaign = async (updatedCampaign: any) => { 
-    try {
-        // Destructure buat misahin data runtime dari data DB
-        const {
-            activeRollRequest,
-            thinkingState,
-            players,
-            ...campaignToSave // 'campaignToSave' sekarang jadi objek 'Campaign' bersih
-        } = updatedCampaign;
-
-        await dataService.saveCampaign(campaignToSave); // Kirim objek bersih
-        setCampaigns(prev => {
-            const index = prev.findIndex(c => c.id === campaignToSave.id);
-            if (index !== -1) {
-                const newCampaigns = [...prev];
-                newCampaigns[index] = campaignToSave; // Simpen objek bersih di state
-                return newCampaigns;
-            }
-            return [...prev, campaignToSave]; 
-        });
-    } catch (e) {
-        console.error("Gagal menyimpan kampanye:", e);
-        alert("Gagal menyimpan progres kampanye. Periksa koneksi Anda.");
-    }
-  };
-
-  const handleUpdateCharacter = async (updatedCharacter: Character) => {
-    try {
-        await dataService.saveCharacter(updatedCharacter);
-        setCharacters(prev => {
-            const index = prev.findIndex(c => c.id === updatedCharacter.id);
-            if (index !== -1) {
-                const newCharacters = [...prev];
-                newCharacters[index] = updatedCharacter;
-                return newCharacters;
-            }
-            return prev;
-        });
-        if (playingCharacter && playingCharacter.id === updatedCharacter.id) {
-            setPlayingCharacter(updatedCharacter);
-        }
-    } catch(e) {
-         console.error("Gagal menyimpan karakter:", e);
-         alert("Gagal menyimpan progres karakter. Periksa koneksi Anda.");
-    }
-  };
-
+  
+  /**
+   * Membuat kampanye baru, menyimpannya, dan kembali ke Nexus.
+   */
   const handleCreateCampaign = async (newCampaign: Campaign) => {
+    if (!userId) return;
+    
+    // Setel owner_id sebelum menyimpan
+    const campaignWithOwner = { ...newCampaign, owner_id: userId };
+
     try {
-      const openingScene = await geminiService.generateOpeningScene(newCampaign);
-       newCampaign.eventLog.push({
+      const openingScene = await geminiService.generateOpeningScene(campaignWithOwner);
+       campaignWithOwner.event_log.push({
          id: generateId('event'),
          type: 'dm_narration',
          text: openingScene,
@@ -196,7 +242,7 @@ const App: React.FC = () => {
        });
     } catch (e) {
       console.error("Gagal menghasilkan adegan pembuka:", e);
-      newCampaign.eventLog.push({
+      campaignWithOwner.event_log.push({
          id: generateId('event'),
          type: 'system',
          text: "Gagal menghasilkan adegan pembuka. Silakan mulai petualangan Anda.",
@@ -204,73 +250,121 @@ const App: React.FC = () => {
          turnId: 'turn-0'
       });
     }
-    const savedCampaign = await dataService.saveCampaign(newCampaign);
-    setCampaigns(prev => [...prev, savedCampaign]);
+    
+    const savedCampaign = await dataService.saveCampaign(campaignWithOwner);
+    setAllCampaigns(prev => [...prev, savedCampaign]);
     handleReturnToNexus();
   };
   
-  const handleSelectCampaign = (campaign: Campaign) => {
+  /**
+   * Dipanggil dari HallOfEchoes atau Marketplace.
+   * Memeriksa apakah user sudah ada di kampanye; jika ya, mainkan. Jika tidak, buka seleksi karakter.
+   */
+  const handleSelectCampaign = useCallback(async (campaign: Campaign) => {
     if (!userId) return;
 
-    const playerCharacterInCampaign = characters.find(c => campaign.playerIds.includes(c.id));
-    
-    if (playerCharacterInCampaign && playerCharacterInCampaign.ownerId === userId) {
-        setPlayingCampaign(campaign);
-        setPlayingCharacter(playerCharacterInCampaign);
-    } else {
-      if (campaign.playerIds.length >= campaign.maxPlayers) {
-        alert("Maaf, kampanye ini sudah penuh.");
-        return;
-      }
-      setCampaignToJoinOrStart(campaign);
-      setCurrentView('character-selection');
+    setIsLoading(true);
+    setCampaignToJoinOrStart(campaign); // Simpan kampanye yang dituju
+
+    try {
+        // Ambil daftar karakter yang SUDAH ADA di kampanye ini
+        const playersInCampaign = await dataService.getCharactersForCampaign(campaign.id);
+        
+        // Cek apakah salah satu karakter itu milik kita
+        const myCharacterInCampaign = playersInCampaign.find(c => c.owner_id === userId);
+
+        if (myCharacterInCampaign) {
+            // --- ALUR: LANJUTKAN GAME ---
+            // Kita sudah punya karakter di game ini. Langsung main.
+            setPlayersInGame(playersInCampaign);
+            setPlayingCharacter(myCharacterInCampaign);
+            setPlayingCampaign(campaign);
+            setCurrentView('nexus'); // Ini akan memicu render GameScreen
+        } else {
+            // --- ALUR: JOIN GAME BARU ---
+            // Kita belum punya karakter di game ini.
+            if (playersInCampaign.length >= campaign.max_players) {
+                alert("Maaf, kampanye ini sudah penuh.");
+                setIsLoading(false);
+                return;
+            }
+            // Buka modal seleksi karakter
+            setCurrentView('character-selection');
+        }
+    } catch (e) {
+        console.error("Gagal memproses pemilihan kampanye:", e);
+        alert("Gagal memuat data kampanye.");
+    } finally {
+        setIsLoading(false);
     }
-  };
+  }, [userId]);
   
-  const handleCharacterSelection = (character: Character) => {
+  /**
+   * Dipanggil dari CharacterSelectionView setelah user memilih karakter untuk join.
+   */
+  const handleCharacterSelection = useCallback(async (character: Character) => {
     if (!campaignToJoinOrStart || !userId) return;
 
     const campaign = campaignToJoinOrStart;
-    const isPlayerAlreadyInCampaign = campaign.playerIds.includes(character.id);
 
-    let updatedCampaign = { ...campaign };
-    if (!isPlayerAlreadyInCampaign) {
-      updatedCampaign.playerIds = [...campaign.playerIds, character.id];
-      if (updatedCampaign.playerIds.length === 1 && !updatedCampaign.currentPlayerId) {
-        updatedCampaign.currentPlayerId = character.id;
-      }
-      handleSaveCampaign(updatedCampaign);
+    try {
+      // 1. Daftarkan karakter ke kampanye (tambahkan ke tabel campaign_players)
+      await dataService.joinCampaign(campaign.id, character.id);
+
+      // 2. Ambil ulang daftar pemain (sekarang termasuk kita)
+      const playersInCampaign = await dataService.getCharactersForCampaign(campaign.id);
+      
+      // 3. Set state permainan aktif
+      setPlayersInGame(playersInCampaign);
+      setPlayingCampaign(campaign);
+      setPlayingCharacter(character);
+      
+      // 4. Reset alur dan kembali ke nexus (untuk render GameScreen)
+      setCampaignToJoinOrStart(null);
+      setCurrentView('nexus');
+
+    } catch (e) {
+      console.error("Gagal join kampanye dengan karakter:", e);
+      alert("Gagal bergabung ke kampanye.");
     }
+  }, [campaignToJoinOrStart, userId]);
 
-    setPlayingCampaign(updatedCampaign);
-    setPlayingCharacter(character);
-    setCampaignToJoinOrStart(null);
-    setCurrentView('nexus');
-  };
-
-  const handleExitGame = (finalCampaignState: Campaign) => {
-    handleSaveCampaign(finalCampaignState);
-    setPlayingCampaign(null);
-    setPlayingCharacter(null);
-    setCurrentView('nexus');
-  };
-  
+  /**
+   * Dipanggil dari JoinCampaignView.
+   */
   const handleFoundCampaignToJoin = (campaign: Campaign) => {
+      // Cukup panggil alur normal, seolah user mengklik dari Hall of Echoes
       handleSelectCampaign(campaign);
   }
 
+  /**
+   * Dipanggil dari GameScreen.
+   * Hanya menyimpan state SESI KAMPANYE.
+   */
+  const handleExitGame = (finalCampaignState: Campaign) => {
+    // Note: handleUpdateCharacter dipanggil terpisah dari dalam GameScreen
+    // Jadi di sini kita HANYA perlu save state kampanye.
+    handleSaveCampaign(finalCampaignState); 
+    
+    // Reset state permainan aktif
+    setPlayingCampaign(null);
+    setPlayingCharacter(null);
+    setPlayersInGame([]);
+    setCurrentView('nexus');
+  };
+  
+  // --- FUNGSI RENDER ---
+
   const renderView = () => {
-    if (!userId) return null;
+    if (!userId) return null; // Seharusnya tidak terjadi jika sudah login
 
     if (currentView === 'character-selection' && campaignToJoinOrStart) {
       return (
         <CharacterSelectionView
-          characters={myCharacters}
-          onSelect={(characterId) => {
-            const character = characters.find(c => c.id === characterId);
-            if(character) {
+          // Kirim HANYA karakter milik user ini
+          characters={allMyCharacters}
+          onSelect={(character) => {
               handleCharacterSelection(character);
-            }
           }}
           onClose={handleReturnToNexus}
         />
@@ -281,11 +375,33 @@ const App: React.FC = () => {
       case Location.StorytellersSpire:
         return <CreateCampaignView onClose={handleReturnToNexus} onCreateCampaign={handleCreateCampaign} />;
       case Location.HallOfEchoes:
-        return <HallOfEchoesView onClose={handleReturnToNexus} campaigns={campaigns} onSelectCampaign={handleSelectCampaign} myCharacters={myCharacters} onUpdateCampaign={handleSaveCampaign} />;
+        return (
+            <HallOfEchoesView 
+                onClose={handleReturnToNexus} 
+                campaigns={allCampaigns} // Kirim semua kampanye yang bisa diakses
+                onSelectCampaign={handleSelectCampaign} // Alur baru
+            />
+        );
       case Location.WanderersTavern:
-        return <JoinCampaignView onClose={handleReturnToNexus} campaigns={campaigns} onCampaignFound={handleFoundCampaignToJoin} />;
+        // JoinCampaignView tidak perlu diubah, karena 'allCampaigns'
+        // sudah difilter oleh RLS. Jika dia bisa 'find' kodenya,
+        // berarti dia bisa join (atau sudah join).
+        return <JoinCampaignView 
+                    onClose={handleReturnToNexus} 
+                    campaigns={allCampaigns} // Kirim semua kampanye yang bisa diakses
+                    onCampaignFound={handleFoundCampaignToJoin} 
+                />;
       case Location.MarketOfAThousandTales:
-        return <MarketplaceView onClose={handleReturnToNexus} allCampaigns={campaigns} setCampaigns={setCampaigns} userId={userId} />;
+         // MarketplaceView perlu refaktor di masa depan untuk memisahkan
+         // 'allCampaigns' (milikku) dari 'publishedCampaigns' (milik orang lain)
+         // Untuk saat ini, kita anggap 'allCampaigns' adalah semua yang ada di DB.
+         // Perlu query khusus untuk "getPublishedCampaigns()"
+        return <MarketplaceView 
+                    onClose={handleReturnToNexus} 
+                    allCampaigns={allCampaigns} // TODO: Ini harusnya query terpisah
+                    setCampaigns={setAllCampaigns} // Ini juga berbahaya
+                    userId={userId} 
+                />;
       case Location.TinkerersWorkshop:
         return <SettingsView 
                     onClose={handleReturnToNexus} 
@@ -295,7 +411,12 @@ const App: React.FC = () => {
                     onSignOut={() => dataService.signOut()}
                 />;
       case Location.MirrorOfSouls:
-        return <ProfileView onClose={handleReturnToNexus} characters={characters} setCharacters={setCharacters} userId={userId} />;
+        return <ProfileView 
+                    onClose={handleReturnToNexus} 
+                    characters={allMyCharacters} // Kirim HANYA karakter global milik user
+                    setCharacters={handleUpdateCharactersBatch} // Gunakan handler batch
+                    userId={userId} 
+                />;
       default:
         return null;
     }
@@ -308,6 +429,8 @@ const App: React.FC = () => {
     </div>
   );
 
+  // --- RENDER UTAMA ---
+
   if (isAuthLoading) {
     return <LoadingScreen />;
   }
@@ -317,26 +440,31 @@ const App: React.FC = () => {
     return <div className={theme}><LoginView /></div>;
   }
 
+  // Jika state permainan aktif, TAMPILKAN GAME
+  // (Ini dipindah ke atas 'isLoading' agar game tetap jalan meski loading data lain)
   if (playingCampaign && playingCharacter && userId) {
-    const campaignPlayers = characters.filter(c => playingCampaign.playerIds.includes(c.id));
     return (
       <div className={theme}>
         <GameScreen 
+          key={playingCampaign.id} // Paksa re-mount jika kampanye berubah
           initialCampaign={playingCampaign} 
-          character={playingCharacter} 
-          players={campaignPlayers}
-          onExit={handleExitGame}
-          updateCharacter={handleUpdateCharacter}
+          initialCharacter={playingCharacter} 
+          allPlayersInCampaign={playersInGame}
+          onExitGame={handleExitGame}
+          onSaveCampaign={handleSaveCampaign} // Kirim handler sesi
+          onSaveCharacter={handleUpdateCharacter} // Kirim handler karakter global
           userId={userId}
         />
       </div>
     );
   }
 
+  // Jika tidak sedang main, tapi masih memuat data global...
   if (isLoading) {
     return <LoadingScreen />;
   }
 
+  // Jika tidak main & tidak loading, tampilkan Nexus/View
   return (
     <div className={`w-screen h-screen bg-black overflow-hidden ${theme}`}>
       {currentView === 'nexus' && <NexusSanctum onLocationClick={handleLocationClick} userEmail={session?.user?.email} />}

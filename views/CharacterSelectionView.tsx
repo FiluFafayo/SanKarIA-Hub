@@ -3,8 +3,8 @@ import { ViewWrapper } from '../components/ViewWrapper';
 import { Character } from '../types';
 
 interface CharacterSelectionViewProps {
-  characters: Character[];
-  onSelect: (characterId: string) => void;
+  characters: Character[]; // HANYA karakter milik user
+  onSelect: (character: Character) => void; // Kirim objek utuh
   onClose: () => void;
 }
 
@@ -23,10 +23,10 @@ export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ 
                     {characters.map(char => (
                     <div
                         key={char.id}
-                        onClick={() => onSelect(char.id)}
+                        onClick={() => onSelect(char)} // Kirim objek utuh
                         className="flex flex-col items-center p-4 bg-black/30 rounded-lg cursor-pointer border-2 border-transparent hover:border-amber-400 transition-colors transform hover:scale-105"
                     >
-                        <img src={char.image} alt={char.name} className="w-24 h-24 rounded-full border-2 border-gray-500 mb-2" />
+                        <img src={char.image_url || `https://picsum.photos/seed/${char.id}/100`} alt={char.name} className="w-24 h-24 rounded-full border-2 border-gray-500 mb-2" />
                         <h3 className="font-cinzel text-center">{char.name}</h3>
                         <p className="text-xs text-gray-400">{char.class} - Lvl {char.level}</p>
                     </div>

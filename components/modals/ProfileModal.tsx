@@ -8,7 +8,7 @@ import { Die } from '../Die';
 interface ProfileModalProps {
   onClose: () => void;
   characters: Character[];
-  setCharacters: React.Dispatch<React.SetStateAction<Character[]>>;
+  setCharacters: (characters: Character[]) => Promise<void>; // Prop ini sekarang batch update
   userId: string;
   createClassLoadout: (charClass: string, finalScores: AbilityScores) => {
     maxHp: number;
@@ -70,13 +70,13 @@ const AbilityRoller: React.FC<{ ability: Ability; onRoll: (score: number) => voi
                     ))}
                 </div>
             ) : (
-                 <div className="my-6 h-20 flex flex-col items-center">
+                <div className="my-6 h-20 flex flex-col items-center">
                     <div className="flex gap-4">
                         {sortedRolls.map((r, i) => (
-                            <Die key={i} sides={6} value={r} isLowest={i === 0} size="md" />
+                            <Die key={i} sides={6} value={r} isDiscarded={i === 0} size="md" />
                         ))}
                     </div>
-                    <p className="text-sm text-gray-400 mt-1">Nilai terendah ({sortedRolls[0]}) dibuang.</p>
+                    <p className="text-sm text-gray-400 mt-1">Nilai terbuang ({sortedRolls[0]}) dibuang.</p>
                 </div>
             )}
 
@@ -98,20 +98,26 @@ const AbilityRoller: React.FC<{ ability: Ability; onRoll: (score: number) => voi
 }
 
 
-const CreateCharacterWizard: React.FC<{ onSave: (char: Omit<Character, 'id' | 'ownerId' | 'image'>) => void, onCancel: () => void, createClassLoadout: ProfileModalProps['createClassLoadout'] }> = ({ onSave, onCancel, createClassLoadout }) => {
+const CreateCharacterWizard: React.FC<{ 
+    onSave: (char: Omit<Character, 'id' | 'owner_id' | 'created_at' | 'image_url'>, image_url: string) => void, 
+    onCancel: () => void, 
+    createClassLoadout: ProfileModalProps['createClassLoadout'] 
+}> = ({ onSave, onCancel, createClassLoadout }) => {
     const [step, setStep] = useState(1);
     const [name, setName] = useState('');
     const [charClass, setCharClass] = useState('Fighter');
     const [charRace, setCharRace] = useState<RaceData>(RACES[0]);
     const [abilityScores, setAbilityScores] = useState<Partial<AbilityScores>>({});
     
+    // (BARU) Siapkan URL gambar acak
+    const [imageUrl] = useState(`https://picsum.photos/seed/${generateId('charimg')}/400`);
+
     const abilitiesToRoll = useMemo(() => ALL_ABILITIES, []);
     const currentAbilityIndex = Object.keys(abilityScores).length;
 
     const handleRollComplete = (score: number) => {
         const ability = abilitiesToRoll[currentAbilityIndex];
         setAbilityScores(prev => ({...prev, [ability]: score}));
-        // If it's the last ability, move to review step
         if (currentAbilityIndex === abilitiesToRoll.length - 1) {
             setStep(3);
         }
@@ -126,7 +132,6 @@ const CreateCharacterWizard: React.FC<{ onSave: (char: Omit<Character, 'id' | 'o
         const baseScores = abilityScores as AbilityScores;
         const finalScores = { ...baseScores };
 
-        // Apply racial bonuses
         for (const [ability, bonus] of Object.entries(charRace.abilityScoreBonuses)) {
             if (typeof bonus === 'number') {
                 finalScores[ability as Ability] += bonus;
@@ -135,21 +140,32 @@ const CreateCharacterWizard: React.FC<{ onSave: (char: Omit<Character, 'id' | 'o
         
         const loadout = createClassLoadout(charClass, finalScores);
 
-        const newCharData: Omit<Character, 'id' | 'ownerId' | 'image'> = {
-            name, class: charClass, race: charRace.name, level: 1, 
-            background: '',
-            personalityTrait: '',
+        const newCharData: Omit<Character, 'id' | 'owner_id' | 'created_at' | 'image_url'> = {
+            name, 
+            class: charClass, 
+            race: charRace.name, 
+            level: 1, 
+            background: '', // Di-hardcode (sesuai kode lama, akan diubah di Fase 1)
+            personality_trait: '',
             ideal: '',
             bond: '',
             flaw: '',
-            abilityScores: finalScores,
-            maxHp: Math.max(1, loadout.maxHp), currentHp: Math.max(1, loadout.maxHp),
-            armorClass: loadout.armorClass, speed: 30, hitDice: loadout.hitDice, hitDiceSpent: 0,
-            proficientSkills: loadout.proficientSkills, proficientSavingThrows: loadout.proficientSavingThrows, 
-            inventory: loadout.inventory, spellSlots: loadout.spellSlots, knownSpells: loadout.knownSpells,
-            deathSaves: { successes: 0, failures: 0}, conditions: [],
+            ability_scores: finalScores,
+            max_hp: Math.max(1, loadout.maxHp), 
+            current_hp: Math.max(1, loadout.maxHp), // Mulai dengan HP penuh
+            armor_class: loadout.armorClass, 
+            speed: 30, // TODO: Harus dinamis berdasarkan Ras
+            hit_dice: loadout.hitDice, 
+            hit_dice_spent: 0,
+            proficient_skills: loadout.proficientSkills, 
+            proficient_saving_throws: loadout.proficientSavingThrows, 
+            inventory: loadout.inventory, 
+            spell_slots: loadout.spellSlots, 
+            known_spells: loadout.knownSpells,
+            death_saves: { successes: 0, failures: 0}, 
+            conditions: [],
         };
-        onSave(newCharData);
+        onSave(newCharData, imageUrl); // Kirim data karakter DAN URL gambar
     };
     
     const handleBack = () => {
@@ -188,6 +204,13 @@ const CreateCharacterWizard: React.FC<{ onSave: (char: Omit<Character, 'id' | 'o
                     <select value={charClass} onChange={e => setCharClass(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-6">
                        {['Fighter', 'Ranger', 'Barbarian', 'Cleric', 'Wizard', 'Rogue'].map(c => <option key={c}>{c}</option>)}
                     </select>
+                    
+                    {/* Tampilkan potret yang akan di-generate */}
+                    <div className="flex flex-col items-center">
+                        <label className="block mb-2 font-cinzel text-sm">Potret Takdir</label>
+                        <img src={imageUrl} alt="Potret Karakter" className="w-24 h-24 rounded-full border-2 border-blue-400/50" />
+                    </div>
+
                     <div className="flex-grow"></div>
                     <div className="flex justify-between">
                         <button onClick={onCancel} className="font-cinzel text-gray-300 hover:text-white">Batal</button>
@@ -198,7 +221,7 @@ const CreateCharacterWizard: React.FC<{ onSave: (char: Omit<Character, 'id' | 'o
 
             {step === 2 && currentAbilityIndex < abilitiesToRoll.length && (
                <AbilityRoller 
-                    key={abilitiesToRoll[currentAbilityIndex]} // FIX: Add key to force re-mount and reset state
+                    key={abilitiesToRoll[currentAbilityIndex]}
                     ability={abilitiesToRoll[currentAbilityIndex]}
                     onRoll={handleRollComplete}
                 />
@@ -235,7 +258,9 @@ const CreateCharacterWizard: React.FC<{ onSave: (char: Omit<Character, 'id' | 'o
 };
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters, setCharacters, userId, createClassLoadout }) => {
-  const myCharacters = characters.filter(c => c.ownerId === userId);
+  // 'myCharacters' sekarang difilter dari prop 'characters' yang sudah
+  // difilter di App.tsx (hanya milik user ini)
+  const myCharacters = characters; 
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -246,20 +271,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
     if (myCharacters.length === 0) {
       setSelectedChar(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [characters, userId, isCreating]);
+  }, [myCharacters, isCreating, selectedChar]);
 
-  const handleCreateCharacter = (charData: Omit<Character, 'id' | 'ownerId' | 'image'>) => {
+  const handleCreateCharacter = async (charData: Omit<Character, 'id' | 'owner_id' | 'created_at' | 'image_url'>, image_url: string) => {
     const newChar: Character = {
         ...charData,
-        id: generateId('char'),
-        ownerId: userId,
-        image: `https://picsum.photos/seed/${generateId('charimg')}/100`,
+        id: generateId('char-uuid'), // Hanya placeholder, DB akan generate UUID asli
+        owner_id: userId,
+        created_at: new Date().toISOString(),
+        image_url: image_url, // Gunakan URL gambar baru
     };
-    setCharacters(prev => [...prev, newChar]);
-    setSelectedChar(newChar);
+    
+    // Gunakan handler batch update dari App.tsx
+    await setCharacters([...myCharacters, newChar]);
+    
+    // Set karakter yang baru dibuat sebagai yang terpilih
+    // Kita perlu 'menemukan' karakter yang baru disimpan
+    // Tapi untuk UI, kita bisa asumsikan 'newChar' cukup
+    setSelectedChar(newChar); 
     setIsCreating(false);
   };
+  
+  const getSafeImageUrl = (url: string | null | undefined) => {
+      if (url) return url;
+      return `https://picsum.photos/seed/default/400`;
+  }
 
   return (
     <ModalWrapper onClose={onClose} title="Cermin Jiwa">
@@ -269,17 +305,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
             <h2 className="font-cinzel text-3xl mb-4">Cermin Jiwa</h2>
             <div className="w-full h-full bg-black/30 border-2 border-blue-300/50 rounded-lg p-4 flex flex-col">
                 {isCreating ? (
-                    <CreateCharacterWizard onSave={handleCreateCharacter} onCancel={() => setIsCreating(false)} createClassLoadout={createClassLoadout}/>
+                    <CreateCharacterWizard 
+                        onSave={handleCreateCharacter} 
+                        onCancel={() => setIsCreating(false)} 
+                        createClassLoadout={createClassLoadout}
+                    />
                 ) : selectedChar ? (
                     <>
                     <div className="flex shrink-0">
                       <div className="w-1/3 flex flex-col items-center pt-4">
-                          <img src={selectedChar.image.replace('/100','/400')} alt={selectedChar.name} className="w-40 h-40 rounded-full border-4 border-blue-400 shadow-lg shadow-blue-500/50" />
+                          <img src={getSafeImageUrl(selectedChar.image_url)} alt={selectedChar.name} className="w-40 h-40 rounded-full border-4 border-blue-400 shadow-lg shadow-blue-500/50" />
                           <h3 className="font-cinzel text-2xl text-blue-200 mt-4">{selectedChar.name}</h3>
                           <p className="text-lg text-gray-300">{selectedChar.race} {selectedChar.class} - Level {selectedChar.level}</p>
                           <div className="flex gap-4 mt-4 text-center">
-                              <div><div className="font-bold text-xl">{selectedChar.armorClass}</div><div className="text-xs">AC</div></div>
-                              <div><div className="font-bold text-xl">{selectedChar.maxHp}</div><div className="text-xs">HP</div></div>
+                              <div><div className="font-bold text-xl">{selectedChar.armor_class}</div><div className="text-xs">AC</div></div>
+                              <div><div className="font-bold text-xl">{selectedChar.max_hp}</div><div className="text-xs">HP</div></div>
                               <div><div className="font-bold text-xl">{selectedChar.speed}</div><div className="text-xs">Speed</div></div>
                           </div>
                       </div>
@@ -287,7 +327,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
                           <h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">Ability Scores</h4>
                           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                               {ALL_ABILITIES.map(ability => {
-                                  const score = selectedChar.abilityScores[ability];
+                                  const score = selectedChar.ability_scores[ability];
                                   const modifier = getAbilityModifier(score);
                                   return (
                                   <p key={ability}>
@@ -299,7 +339,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
                           <h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2 mt-4">Skills</h4>
                           <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs h-28 overflow-y-auto">
                               {Object.values(Skill).map(skill => {
-                                  const isProficient = selectedChar.proficientSkills.includes(skill);
+                                  const isProficient = selectedChar.proficient_skills.includes(skill);
                                   return <li key={skill} className={isProficient ? 'text-blue-300 font-bold' : 'text-gray-400'}>{skill}</li>
                               })}
                           </ul>
@@ -308,13 +348,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
                     <div className="flex-grow mt-4 overflow-y-auto pr-2 grid grid-cols-2 gap-4">
                         <div>
                             <h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">Spells</h4>
-                            {selectedChar.knownSpells.length > 0 ? (
+                            {selectedChar.known_spells.length > 0 ? (
                                 <>
-                                {selectedChar.spellSlots.map(slot => (
+                                {selectedChar.spell_slots.map(slot => (
                                     <p key={slot.level} className="text-sm">Lvl {slot.level} Slots: {slot.max - slot.used}/{slot.max}</p>
                                 ))}
                                 <ul className="text-xs list-disc list-inside mt-2">
-                                    {selectedChar.knownSpells.map(spell => <li key={spell.name}>{spell.name}</li>)}
+                                    {selectedChar.known_spells.map(spell => <li key={spell.name}>{spell.name}</li>)}
                                 </ul>
                                 </>
                             ) : <p className="text-xs text-gray-400">Tidak memiliki kemampuan sihir.</p>}
@@ -323,7 +363,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
                              <h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">Inventory</h4>
                              {selectedChar.inventory.length > 0 ? (
                                 <ul className="text-xs">
-                                    {selectedChar.inventory.map(item => <li key={item.name}>{item.name} (x{item.quantity})</li>)}
+                                    {selectedChar.inventory.map(item => <li key={item.id}>{item.name} (x{item.quantity})</li>)}
                                 </ul>
                             ) : <p className="text-xs text-gray-400">Inventaris kosong.</p>}
                         </div>
@@ -343,7 +383,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
             <div className="flex flex-wrap justify-center gap-4 mb-6 overflow-y-auto">
                 {myCharacters.map(char => (
                     <div key={char.id} onClick={() => { setSelectedChar(char); setIsCreating(false); }} className={`flex flex-col items-center cursor-pointer transition-all duration-300 transform ${selectedChar?.id === char.id && !isCreating ? 'scale-110' : 'opacity-60 hover:opacity-100 hover:scale-105'}`}>
-                        <img src={char.image} alt={char.name} className="w-16 h-16 rounded-full border-2 border-blue-400/50"/>
+                        <img src={getSafeImageUrl(char.image_url)} alt={char.name} className="w-16 h-16 rounded-full border-2 border-blue-400/50"/>
                         <p className="text-xs text-center mt-1 w-20 truncate">{char.name}</p>
                     </div>
                 ))}
