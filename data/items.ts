@@ -186,6 +186,15 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         damageType: 'piercing',
     },
     {
+        name: 'Shortbow',
+        type: 'weapon',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+        damageDice: '1d6',
+        damageType: 'piercing',
+    },
+    {
         name: 'Longbow',
         type: 'weapon',
         rarity: 'common',
