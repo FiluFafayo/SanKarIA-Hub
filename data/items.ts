@@ -273,4 +273,31 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
     },
+    // (HOTFIX 1.E) Item untuk Sage Background
+    {
+        name: 'Bottle of Black Ink',
+        type: 'tool',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+        description: 'Satu botol tinta hitam standar.'
+    },
+    {
+        name: 'Quill',
+        type: 'tool',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+        description: 'Pena bulu untuk menulis.'
+    },
+    {
+        name: 'Small Knife',
+        type: 'weapon', // (Secara teknis ini senjata sederhana)
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+        damageDice: '1d4',
+        damageType: 'piercing',
+        description: 'Pisau kecil serbaguna.'
+    },
 ];
