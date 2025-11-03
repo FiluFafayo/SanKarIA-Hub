@@ -1,32 +1,44 @@
 import React, { useState } from 'react';
 import { ViewWrapper } from '../components/ViewWrapper';
 import { Campaign } from '../types';
+import { dataService } from '../services/dataService'; // Import dataService
 
 interface JoinCampaignViewProps {
   onClose: () => void;
-  campaigns: Campaign[];
+  // 'campaigns' prop dihapus
   onCampaignFound: (campaign: Campaign) => void;
 }
 
-export const JoinCampaignView: React.FC<JoinCampaignViewProps> = ({ onClose, campaigns, onCampaignFound }) => {
+export const JoinCampaignView: React.FC<JoinCampaignViewProps> = ({ onClose, onCampaignFound }) => {
   const [code, setCode] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFeedback('');
     if (code.length < 6) {
         setFeedback("Kode harus 6 karakter.");
         return;
     }
-    const campaign = campaigns.find(c => c.joinCode.toLowerCase() === code.toLowerCase());
-    if (campaign) {
-        setFeedback("Selamat datang, petualang! Pintu pun terbuka...");
-        setTimeout(() => {
-          onCampaignFound(campaign);
-        }, 1000);
-    } else {
-        setFeedback("Maaf kawan, kata sandinya salah. Si penjaga kedai menggelengkan kepala.");
+
+    setIsLoading(true);
+    try {
+        const campaign = await dataService.getCampaignByJoinCode(code); // Gunakan dataService
+        
+        if (campaign) {
+            setFeedback("Selamat datang, petualang! Pintu pun terbuka...");
+            setTimeout(() => {
+              onCampaignFound(campaign);
+            }, 1000);
+        } else {
+            setFeedback("Maaf kawan, kata sandinya salah. Si penjaga kedai menggelengkan kepala.");
+        }
+    } catch (error) {
+        console.error("Gagal mencari campaign:", error);
+        setFeedback("Terjadi kesalahan saat mencari campaign. Coba lagi.");
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -50,8 +62,15 @@ export const JoinCampaignView: React.FC<JoinCampaignViewProps> = ({ onClose, cam
                     placeholder="MASUKKAN KODE GABUNG"
                     className="w-full bg-amber-950/50 border-2 border-amber-700 rounded px-4 py-3 text-white placeholder-amber-200/50 focus:outline-none focus:border-amber-500 transition-colors text-center tracking-widest font-mono text-2xl"
                     maxLength={6}
+                    disabled={isLoading}
                 />
-                <button type="submit" className="w-full mt-4 bg-amber-600 hover:bg-amber-500 font-cinzel text-xl py-3 rounded transition-colors">Gabung Kampanye</button>
+                <button 
+                    type="submit" 
+                    className="w-full mt-4 bg-amber-600 hover:bg-amber-500 font-cinzel text-xl py-3 rounded transition-colors disabled:bg-gray-600"
+                    disabled={isLoading}
+                >
+                    {isLoading ? "Mencari..." : "Gabung Kampanye"}
+                </button>
             </form>
             {feedback && <p className="mt-4 text-center text-amber-200 transition-opacity duration-300 h-6">{feedback}</p>}
         </div>

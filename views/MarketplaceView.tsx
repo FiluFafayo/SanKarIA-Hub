@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Import useEffect
 import { ViewWrapper } from '../components/ViewWrapper';
 import { Campaign } from '../types';
 import { generateId, generateJoinCode } from '../utils';
+import { dataService } from '../services/dataService'; // Import dataService
 
 interface MarketplaceViewProps {
   onClose: () => void;
-  allCampaigns: Campaign[];
-  setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>>;
+  // 'allCampaigns' prop dihapus
+  setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>>; // Ini untuk menambah ke state 'App'
   userId: string;
 }
 
@@ -24,37 +25,60 @@ const AdventurePoster: React.FC<{ campaign: Campaign; onCopy: () => void }> = ({
     </div>
 );
 
-export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onClose, allCampaigns, setCampaigns, userId }) => {
+export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onClose, setCampaigns, userId }) => {
   const [filter, setFilter] = useState('Semua');
+  const [publishedCampaigns, setPublishedCampaigns] = useState<Campaign[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleCopyCampaign = (originalCampaign: Campaign) => {
-    const newCampaign: Campaign = {
+  // Load data mandiri
+  useEffect(() => {
+    const loadPublishedCampaigns = async () => {
+        setIsLoading(true);
+        try {
+            const campaigns = await dataService.getPublishedCampaigns();
+            setPublishedCampaigns(campaigns);
+        } catch (error) {
+            console.error("Gagal memuat marketplace:", error);
+            alert("Gagal memuat Pasar Seribu Kisah. Coba lagi nanti.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    loadPublishedCampaigns();
+  }, []);
+
+  const handleCopyCampaign = async (originalCampaign: Campaign) => {
+    // Sesuai Tipe baru, 'ownerId' harus di-set
+    const newCampaign: Omit<Campaign, 'id' | 'eventLog' | 'monsters' | 'players' | 'playerIds' | 'choices' | 'turnId' | 'initiativeOrder'> = {
         ...originalCampaign,
-        id: generateId('campaign'),
         joinCode: generateJoinCode(),
-        playerIds: [], // Reset players for the new copy
+        playerIds: [], // Reset players
         currentPlayerId: null,
-        eventLog: [], // Reset event log
-        turnId: null, // Reset turn state
-        isPublished: false, // Not published by default
-        monsters: [], // Reset monsters
+        turnId: null,
+        isPublished: false, // Salinan tidak di-publish
+        monsters: [],
         initiativeOrder: [],
         gameState: 'exploration',
-        quests: [],
-        npcs: [],
-        // Reset dynamic world and map state
+        quests: originalCampaign.quests, // Salin quests & npcs
+        npcs: originalCampaign.npcs,
         worldEventCounter: 0,
         currentTime: 'Siang',
         currentWeather: 'Cerah',
-        mapImageUrl: originalCampaign.mapImageUrl,
-        mapMarkers: originalCampaign.mapMarkers,
-        currentPlayerLocation: originalCampaign.currentPlayerLocation
+        // (ownerId akan di-set oleh dataService.createCampaign)
     };
-    setCampaigns(prev => [...prev, newCampaign]);
-    alert(`Kampanye "${originalCampaign.title}" telah disalin ke Aula Gema Anda!`);
+
+    try {
+        // Buat campaign baru di DB
+        const createdCampaign = await dataService.createCampaign(newCampaign, userId);
+        // Update state 'App'
+        setCampaigns(prev => [...prev, createdCampaign]);
+        alert(`Kampanye "${originalCampaign.title}" telah disalin ke Aula Gema Anda!`);
+    } catch (error) {
+        console.error("Gagal menyalin campaign:", error);
+        alert("Gagal menyalin campaign.");
+    }
   }
 
-  const publishedCampaigns = allCampaigns.filter(c => c.isPublished);
   const filteredCampaigns = publishedCampaigns.filter(c => filter === 'Semua' || c.mainGenre === filter);
 
   return (
@@ -69,7 +93,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onClose, allCa
             <button onClick={() => setFilter('Horor')} className={`px-4 py-2 font-cinzel rounded transition-colors ${filter === 'Horor' ? 'bg-amber-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>Horor</button>
         </div>
         
-        {filteredCampaigns.length > 0 ? (
+        {isLoading ? (
+            <div className="text-amber-200/80">Memuat petualangan...</div>
+        ) : filteredCampaigns.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {filteredCampaigns.map(campaign => <AdventurePoster key={campaign.id} campaign={campaign} onCopy={() => handleCopyCampaign(campaign)} />)}
             </div>

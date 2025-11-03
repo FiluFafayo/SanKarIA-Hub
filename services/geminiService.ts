@@ -160,17 +160,16 @@ const TOOLS: FunctionDeclaration[] = [
         parameters: {
             type: Type.OBJECT,
             properties: {
-                characterId: { type: Type.STRING, description: "ID karakter yang menerima item." },
+                characterId: { type: Type.STRING, description: "ID karakter yang menerima item. (Gunakan ID karakter yang sedang beraksi atau yang paling relevan)." },
                 items: {
                     type: Type.ARRAY,
                     items: {
                         type: Type.OBJECT,
                         properties: {
-                            name: { type: Type.STRING },
-                            quantity: { type: Type.INTEGER },
-                            type: { type: Type.STRING, enum: ['weapon', 'armor', 'consumable', 'tool', 'other'] }
+                            name: { type: Type.STRING, description: "Nama item. Contoh: 'Potion of Healing', 'Longsword', 'Gold Coins'." },
+                            quantity: { type: Type.INTEGER }
                         },
-                        required: ['name', 'quantity', 'type']
+                        required: ['name', 'quantity'] // REFAKTOR: Hanya butuh nama & kuantitas
                     }
                 }
             },

@@ -4,7 +4,7 @@ import { Character } from '../types';
 
 interface CharacterSelectionViewProps {
   characters: Character[];
-  onSelect: (characterId: string) => void;
+  onSelect: (character: Character) => void; // REFAKTOR: Kirim objek penuh
   onClose: () => void;
 }
 
@@ -23,7 +23,7 @@ export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ 
                     {characters.map(char => (
                     <div
                         key={char.id}
-                        onClick={() => onSelect(char.id)}
+                        onClick={() => onSelect(char)} // REFAKTOR: Kirim objek char penuh
                         className="flex flex-col items-center p-4 bg-black/30 rounded-lg cursor-pointer border-2 border-transparent hover:border-amber-400 transition-colors transform hover:scale-105"
                     >
                         <img src={char.image} alt={char.name} className="w-24 h-24 rounded-full border-2 border-gray-500 mb-2" />
