@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
 import { CampaignState, CampaignActions } from './useCampaign';
-import { Character, DiceRoll, RollRequest, Skill, StructuredApiResponse, ToolCall, GameEvent, PlayerActionEvent, DmNarrationEvent, DmReactionEvent, NPC } from '../types';
+import { Character, DiceRoll, RollRequest, Skill, StructuredApiResponse, ToolCall, GameEvent, PlayerActionEvent, DmNarrationEvent, DmReactionEvent, NPC, ItemDefinition } from '../types';
 import { geminiService } from '../services/geminiService';
+// (Kita tidak butuh ITEM_DEFINITIONS di sini, 'add_items_to_inventory' hanya meneruskan nama)
 
-const WORLD_EVENT_THRESHOLD = 5; // Trigger event every 5 player turns
-// MAX_AI_ATTEMPTS sekarang bisa kita turunkan karena tugas AI lebih simpel
-const MAX_AI_ATTEMPTS = 2; // Coba 2x untuk Narasi, 2x untuk Mekanik
+const WORLD_EVENT_THRESHOLD = 5;
+const MAX_AI_ATTEMPTS = 2; 
 
 interface ExplorationSystemProps {
     campaign: CampaignState;
@@ -16,13 +16,14 @@ interface ExplorationSystemProps {
 
 export function useExplorationSystem({ campaign, character, players, campaignActions }: ExplorationSystemProps) {
 
-    // Fungsi processToolCalls tetap sama
+    // REFAKTOR: processToolCalls sekarang harus menangani payload 'add_items_to_inventory' yang baru
     const processToolCalls = useCallback((turnId: string, toolCalls: ToolCall[]) => {
         toolCalls.forEach(call => {
             let message = '';
             switch (call.functionName) {
                 case 'add_items_to_inventory':
-                    campaignActions.addItemsToInventory(call.args);
+                    // Payload dari AI adalah { characterId, items: [{ name, quantity }] }
+                    campaignActions.addItemsToInventory(call.args); // useCampaign akan menangani ini
                     message = `Inventaris diperbarui: ${call.args.items.map((i: any) => `${i.name} (x${i.quantity})`).join(', ')}`;
                     break;
                 case 'update_quest_log':
@@ -44,7 +45,6 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         });
     }, [campaignActions]);
 
-    // Fungsi processMechanics tetap sama
     const processMechanics = useCallback(async (turnId: string, mechanics: Omit<StructuredApiResponse, 'reaction' | 'narration'>, originalActionText: string) => {
         const hasTools = mechanics.tool_calls && mechanics.tool_calls.length > 0;
         if (hasTools) {
@@ -53,6 +53,17 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
 
         const hasChoices = mechanics.choices && mechanics.choices.length > 0;
         const hasRollRequest = !!mechanics.rollRequest;
+        
+        // REFAKTOR: Cek spawn monsters dari tool call, bukan properti 'didSpawnMonsters'
+        const didSpawnMonsters = mechanics.tool_calls?.some(c => c.functionName === 'spawn_monsters') || false;
+
+        if (didSpawnMonsters) {
+            // Jika monster muncul, game state akan diubah oleh spawnMonsters.
+            // Kita tidak perlu set choices atau roll request.
+            // Kita juga *tidak* panggil endTurn() di sini.
+            // 'useCombatSystem' akan mengambil alih.
+            return; 
+        }
 
         if (hasChoices) {
             campaignActions.setChoices(mechanics.choices!);
@@ -65,9 +76,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             campaignActions.setActiveRollRequest(fullRollRequest);
         }
 
-        // Akhiri giliran HANYA jika TIDAK ada roll request yang perlu ditunggu pemain
         if (!hasRollRequest) {
-            // Kita panggil endTurn() di sini untuk alur yang tidak butuh input pemain
             campaignActions.endTurn();
         }
     }, [character.id, campaignActions, processToolCalls]);
@@ -110,9 +119,6 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
     }, [campaign.npcs]);
 
 
-    // =================================================================
-    // LOGIKA INTI BARU: handlePlayerAction (Menggunakan 2 Panggilan AI)
-    // =================================================================
     const handlePlayerAction = useCallback(async (actionText: string, pendingSkill: Skill | null) => {
         if (campaign.turnId) return; 
 
@@ -124,7 +130,6 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         let mechanicsResult: Omit<StructuredApiResponse, 'reaction' | 'narration'> | null = null;
 
         try {
-            // Cek World Event (jika perlu)
             if (campaign.worldEventCounter >= WORLD_EVENT_THRESHOLD) {
                 const worldEventResult = await geminiService.generateWorldEvent(campaign);
                 campaignActions.logEvent({ type: 'system', text: worldEventResult.event }, turnId);
@@ -132,7 +137,6 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             }
 
             // ================== PANGGILAN 1: NARASI ==================
-            // (Retry loop simpel untuk narasi)
             for (let i = 0; i < MAX_AI_ATTEMPTS; i++) {
                 narrationResult = await geminiService.generateNarration(
                     campaign,
@@ -140,7 +144,6 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                     actionText,
                     campaignActions.setThinkingState
                 );
-                // Jika narasi valid (bukan fallback error), kita lanjut
                 if (narrationResult && !narrationResult.narration.includes("Error: Gagal generateNarration")) {
                     break;
                 }
@@ -149,7 +152,6 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             
             if (!narrationResult) throw new Error("Gagal total mendapatkan narasi dari AI.");
 
-            // Log narasi SEKARANG, biar pemain bisa baca
             if (narrationResult.reaction) {
                 campaignActions.logEvent({ type: 'dm_reaction', text: narrationResult.reaction }, turnId);
             }
@@ -157,24 +159,23 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
             }
             
-            // Narasi konteks untuk panggilan kedua
             const contextNarration = narrationResult.narration || narrationResult.reaction || "Tindakan itu terjadi.";
 
             // ================== PANGGILAN 2: MEKANIK ==================
-            // (Retry loop simpel untuk mekanik)
             for (let i = 0; i < MAX_AI_ATTEMPTS; i++) {
                  mechanicsResult = await geminiService.determineNextStep(
                     campaign,
                     players,
                     actionText,
-                    contextNarration, // Berikan narasi baru sebagai konteks
+                    contextNarration,
                     campaignActions.setThinkingState
                 );
-                // Cek apakah mekanik utama ada
-                // @ts-ignore (kita tambahkan properti ini di geminiService)
-                const hasPrimaryMechanic = !!(mechanicsResult.choices || mechanicsResult.rollRequest || mechanicsResult.didSpawnMonsters);
+
+                const didSpawnMonsters = mechanicsResult.tool_calls?.some(c => c.functionName === 'spawn_monsters') || false;
+                const hasPrimaryMechanic = !!(mechanicsResult.choices || mechanicsResult.rollRequest || didSpawnMonsters);
+                
                 if (hasPrimaryMechanic || campaign.gameState !== 'exploration') {
-                    break; // Berhasil, atau kita dalam kombat (tak perlu mekanik)
+                    break;
                 }
                  console.warn(`Panggilan Mekanik gagal (Percobaan ${i + 1}/${MAX_AI_ATTEMPTS})...`);
             }
@@ -182,8 +183,8 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             if (!mechanicsResult) throw new Error("Gagal total mendapatkan mekanik dari AI.");
 
             // ================== FALLBACK CERDAS (Untuk Panggilan 2) ==================
-            // @ts-ignore
-            const hasPrimaryMechanic = !!(mechanicsResult.choices || mechanicsResult.rollRequest || mechanicsResult.didSpawnMonsters);
+            const didSpawnMonsters = mechanicsResult.tool_calls?.some(c => c.functionName === 'spawn_monsters') || false;
+            const hasPrimaryMechanic = !!(mechanicsResult.choices || mechanicsResult.rollRequest || didSpawnMonsters);
             
             if (!hasPrimaryMechanic && campaign.gameState === 'exploration') {
                 console.error(`Semua ${MAX_AI_ATTEMPTS} percobaan AI Mekanik gagal. Memanggil generateExplorationChoices sebagai fallback...`);
@@ -207,7 +208,6 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             }
             // ================== Akhir Fallback Cerdas ==================
 
-            // Proses mekanik yang sudah didapat (atau di-fallback)
             await processMechanics(turnId, mechanicsResult, actionText);
 
         } catch (error) {
@@ -216,14 +216,11 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 type: 'system',
                 text: "Terjadi kesalahan kritis saat menghubungi AI. Silakan coba lagi nanti atau segarkan halaman."
             }, turnId);
-            campaignActions.endTurn(); // Selalu end turn jika error parah
+            campaignActions.endTurn();
         }
     }, [campaign, character.id, players, campaignActions, processMechanics, generateContextualFallbackChoices]);
 
 
-    // =================================================================
-    // LOGIKA INTI BARU: handleRollComplete (Menggunakan 2 Panggilan AI)
-    // =================================================================
     const handleRollComplete = useCallback(async (roll: DiceRoll, request: RollRequest, turnId: string) => {
         if (!turnId) {
              console.error("Mencoba mencatat peristiwa eksplorasi setelah roll tanpa turnId eksplisit.");
@@ -244,7 +241,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 narrationResult = await geminiService.generateNarration(
                     campaign,
                     players,
-                    actionText, // Inputnya sekarang adalah hasil roll
+                    actionText, 
                     campaignActions.setThinkingState
                 );
                 if (narrationResult && !narrationResult.narration.includes("Error: Gagal generateNarration")) {
@@ -269,8 +266,9 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                     contextNarration, 
                     campaignActions.setThinkingState
                 );
-                // @ts-ignore
-                const hasPrimaryMechanic = !!(mechanicsResult.choices || mechanicsResult.rollRequest || mechanicsResult.didSpawnMonsters);
+                const didSpawnMonsters = mechanicsResult.tool_calls?.some(c => c.functionName === 'spawn_monsters') || false;
+                const hasPrimaryMechanic = !!(mechanicsResult.choices || mechanicsResult.rollRequest || didSpawnMonsters);
+                
                 if (hasPrimaryMechanic || campaign.gameState !== 'exploration') {
                     break; 
                 }
@@ -280,8 +278,8 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             if (!mechanicsResult) throw new Error("Gagal total mendapatkan mekanik dari AI setelah roll.");
 
             // ================== FALLBACK CERDAS (Untuk Panggilan 2) ==================
-            // @ts-ignore
-            const hasPrimaryMechanic = !!(mechanicsResult.choices || mechanicsResult.rollRequest || mechanicsResult.didSpawnMonsters);
+            const didSpawnMonsters = mechanicsResult.tool_calls?.some(c => c.functionName === 'spawn_monsters') || false;
+            const hasPrimaryMechanic = !!(mechanicsResult.choices || mechanicsResult.rollRequest || didSpawnMonsters);
             
             if (!hasPrimaryMechanic && campaign.gameState === 'exploration') {
                 console.error(`Semua ${MAX_AI_ATTEMPTS} percobaan AI Mekanik (setelah roll) gagal. Memanggil fallback cerdas...`);

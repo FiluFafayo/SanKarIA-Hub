@@ -1,9 +1,9 @@
 import React from 'react';
-import { Character, Monster } from '../../types';
+import { Character, MonsterInstance } from '../../types'; // REFAKTOR: Monster -> MonsterInstance
 
 interface CombatTrackerProps {
   players: Character[];
-  monsters: Monster[];
+  monsters: MonsterInstance[]; // REFAKTOR: Monster -> MonsterInstance
   initiativeOrder: string[];
   currentPlayerId: string | null;
 }
@@ -20,12 +20,18 @@ const HealthBar: React.FC<{ current: number, max: number }> = ({ current, max })
 
 export const CombatTracker: React.FC<CombatTrackerProps> = ({ players, monsters, initiativeOrder, currentPlayerId }) => {
   if (initiativeOrder.length === 0) {
-    return null; // Don't render if not in combat or initiative not set
+    return null;
   }
 
-  const combatants = [...players, ...monsters]
-    .filter(c => initiativeOrder.includes(c.id))
-    .sort((a, b) => initiativeOrder.indexOf(a.id) - initiativeOrder.indexOf(b.id));
+  // REFAKTOR: Gabungkan Character dan MonsterInstance
+  const combatants: (Character | MonsterInstance)[] = [...players, ...monsters]
+    // REFAKTOR: Cek ID berdasarkan tipe
+    .filter(c => initiativeOrder.includes('ownerId' in c ? c.id : c.instanceId))
+    .sort((a, b) => {
+        const aId = 'ownerId' in a ? a.id : a.instanceId;
+        const bId = 'ownerId' in b ? b.id : b.instanceId;
+        return initiativeOrder.indexOf(aId) - initiativeOrder.indexOf(bId);
+    });
 
   return (
     <div className="bg-gray-900/50 p-3 rounded-lg">
@@ -33,14 +39,18 @@ export const CombatTracker: React.FC<CombatTrackerProps> = ({ players, monsters,
       <div className="space-y-2 max-h-48 overflow-y-auto">
         {combatants.map(c => {
           const isPlayer = 'ownerId' in c;
-          const isActive = c.id === currentPlayerId;
+          const id = isPlayer ? c.id : c.instanceId;
+          const isActive = id === currentPlayerId;
+          // REFAKTOR: maxHp sekarang bisa di c.maxHp atau c.definition.maxHp
+          const maxHp = isPlayer ? c.maxHp : c.definition.maxHp;
+
           return (
-            <div key={c.id} className={`p-2 rounded transition-colors ${isActive ? 'bg-amber-600/30' : 'bg-gray-800/50'}`}>
+            <div key={id} className={`p-2 rounded transition-colors ${isActive ? 'bg-amber-600/30' : 'bg-gray-800/50'}`}>
               <div className="flex justify-between items-center text-sm">
                 <span className={`font-bold ${isPlayer ? 'text-blue-300' : 'text-red-300'}`}>{c.name}</span>
-                <span className="text-xs text-gray-400">HP: {c.currentHp}/{c.maxHp}</span>
+                <span className="text-xs text-gray-400">HP: {c.currentHp}/{maxHp}</span>
               </div>
-              <HealthBar current={c.currentHp} max={c.maxHp} />
+              <HealthBar current={c.currentHp} max={maxHp} />
             </div>
           );
         })}

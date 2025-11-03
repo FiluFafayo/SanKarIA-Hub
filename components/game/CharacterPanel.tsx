@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { Character, Monster, InventoryItem, Spell, Skill, SKILL_ABILITY_MAP } from '../../types';
+import { Character, MonsterInstance, CharacterInventoryItem, SpellDefinition, Skill, SKILL_ABILITY_MAP } from '../../types';
 import { useCombatSystem } from '../../hooks/useCombatSystem';
 import { DeathSaveTracker } from './DeathSaveTracker';
 import { getAbilityModifier, getProficiencyBonus } from '../../utils';
 
 interface CharacterPanelProps {
   character: Character;
-  monsters: Monster[];
+  monsters: MonsterInstance[]; // REFAKTOR: MonsterInstance
   isMyTurn: boolean;
   combatSystem: ReturnType<typeof useCombatSystem>;
-  updateCharacter: (character: Character) => Promise<void>;
+  updateCharacter: (character: Character) => Promise<void>; // (Tidak dipakai di sini, tapi combatSystem memakainya)
   gameState: 'exploration' | 'combat';
   onSkillSelect: (skill: Skill) => void;
 }
@@ -22,11 +22,13 @@ const TabButton: React.FC<{ label: string, isActive: boolean, onClick: () => voi
 
 export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monsters, isMyTurn, combatSystem, gameState, onSkillSelect }) => {
     const [activeTab, setActiveTab] = useState<'actions' | 'skills' | 'inventory' | 'spells'>('actions');
-    const [targetId, setTargetId] = useState<string | null>(null);
+    const [targetId, setTargetId] = useState<string | null>(null); // Ini akan menjadi monster.instanceId
 
-    const equippedWeapon = character.inventory.find(i => i.type === 'weapon' && i.isEquipped) || character.inventory.find(i => i.type === 'weapon');
+    // REFAKTOR: Cari item dari inventory baru
+    const equippedWeapon = character.inventory.find(i => i.item.type === 'weapon' && i.isEquipped) || character.inventory.find(i => i.item.type === 'weapon');
 
     const handleAttack = () => {
+        // REFAKTOR: Kirim targetInstanceId dan CharacterInventoryItem
         if (targetId && equippedWeapon) {
             combatSystem.handlePlayerAttack(targetId, equippedWeapon);
             setTargetId(null);
@@ -76,14 +78,16 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
                                     disabled={!isMyTurn || monsters.length === 0}
                                 >
                                     <option value="">-- Pilih Target --</option>
-                                    {monsters.map(m => <option key={m.id} value={m.id}>{m.name} (HP: {m.currentHp})</option>)}
+                                    {/* REFAKTOR: Gunakan monster.instanceId dan monster.name */}
+                                    {monsters.map(m => <option key={m.instanceId} value={m.instanceId}>{m.name} (HP: {m.currentHp})</option>)}
                                 </select>
                                 <button 
                                     onClick={handleAttack} 
                                     disabled={!isMyTurn || !targetId || !equippedWeapon}
                                     className="w-full bg-red-600 hover:bg-red-500 text-white font-bold p-2 rounded disabled:bg-gray-600 disabled:cursor-not-allowed"
                                 >
-                                   Serang dengan {equippedWeapon?.name || 'Senjata'}
+                                   {/* REFAKTOR: Akses nama dari item.item.name */}
+                                   Serang dengan {equippedWeapon?.item.name || 'Senjata'}
                                 </button>
                             </>
                         ) : (
@@ -109,13 +113,15 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
                 )}
                 {activeTab === 'inventory' && (
                     <div className="space-y-1 text-sm">
-                        {character.inventory.map((item, i) => (
-                             <div key={i} className="flex justify-between items-center bg-gray-800/50 p-2 rounded">
-                                 <span>{item.name} (x{item.quantity})</span>
-                                 {item.type === 'consumable' && (
+                        {/* REFAKTOR: Gunakan CharacterInventoryItem */}
+                        {character.inventory.map((item) => (
+                             <div key={item.instanceId} className="flex justify-between items-center bg-gray-800/50 p-2 rounded">
+                                 <span>{item.item.name} (x{item.quantity})</span>
+                                 {/* REFAKTOR: Cek tipe dari item.item.type */}
+                                 {item.item.type === 'consumable' && (
                                      <button 
                                         onClick={() => combatSystem.handleItemUse(item)} 
-                                        disabled={gameState !== 'combat' || !isMyTurn}
+                                        disabled={(gameState !== 'combat' && item.item.effect?.type === 'heal') || !isMyTurn} // (Logika disable disempurnakan)
                                         className="text-xs bg-green-600 hover:bg-green-500 px-2 py-1 rounded disabled:bg-gray-600 disabled:cursor-not-allowed"
                                     >
                                         Gunakan
@@ -127,17 +133,18 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
                 )}
                  {activeTab === 'spells' && (
                     <div className="space-y-1 text-sm">
+                         {/* REFAKTOR: Gunakan CharacterSpellSlot */}
                          {character.spellSlots.map(slot => (
-                            <p key={slot.level} className="text-xs text-gray-400">Slot Lvl {slot.level}: {slot.max - slot.used}/{slot.max}</p>
+                            <p key={slot.level} className="text-xs text-gray-400">Slot Lvl {slot.level}: {slot.max - slot.spent}/{slot.max}</p>
                         ))}
-                        {character.knownSpells.map((spell, i) => {
+                        {/* REFAKTOR: Gunakan SpellDefinition */}
+                        {character.knownSpells.map((spell) => {
                              const relevantSlot = character.spellSlots.find(s => s.level === spell.level);
-                             // Cantrips (level 0) are always castable. Others need a slot.
-                             const hasSlots = spell.level === 0 || (relevantSlot ? relevantSlot.used < relevantSlot.max : false);
+                             const hasSlots = spell.level === 0 || (relevantSlot ? relevantSlot.spent < relevantSlot.max : false);
                              const isDisabled = (gameState !== 'combat' || !isMyTurn) || !hasSlots;
 
                              return (
-                                <div key={i} className="flex justify-between items-center bg-gray-800/50 p-2 rounded">
+                                <div key={spell.id} className="flex justify-between items-center bg-gray-800/50 p-2 rounded">
                                      <span>{spell.name} (Lvl {spell.level})</span>
                                      <button 
                                         onClick={() => combatSystem.handleSpellCast(spell)}

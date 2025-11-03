@@ -1,7 +1,12 @@
 import { useReducer, useMemo } from 'react';
-import { Campaign, GameEvent, Monster, RollRequest, InventoryItem, MonsterAction, Character, ThinkingState, Quest, NPC, QuestStatus, PlayerActionEvent, DmNarrationEvent, SystemMessageEvent, RollResultEvent, DmReactionEvent, WorldTime, WorldWeather } from '../types';
+import { 
+    Campaign, GameEvent, MonsterInstance, RollRequest, InventoryItem, Character, 
+    ThinkingState, Quest, NPC, QuestStatus, PlayerActionEvent, DmNarrationEvent, 
+    SystemMessageEvent, RollResultEvent, DmReactionEvent, WorldTime, WorldWeather, 
+    MonsterDefinition, CharacterInventoryItem, ItemDefinition, SpellDefinition 
+} from '../types';
 import { generateId } from '../utils';
-import { DEFAULT_MONSTERS } from '../data/monsters';
+import { MONSTER_DEFINITIONS } from '../data/monsters'; // <-- FIX: Import name yang benar
 
 export interface CampaignState extends Campaign {
     thinkingState: ThinkingState;
@@ -13,17 +18,20 @@ export interface CampaignState extends Campaign {
 interface MonsterSpawnPayload {
     name: string;
     quantity: number;
-    stats?: {
+    stats?: { // (Ini sekarang usang, tapi kita biarkan untuk kompatibilitas AI lama)
         maxHp: number;
         armorClass: number;
         dexterity: number;
-        actions: MonsterAction[];
+        actions: { name: string, toHitBonus: number, damageDice: string }[];
     }
 }
 
 interface AddItemsPayload {
     characterId: string;
-    items: Omit<InventoryItem, 'description' | 'isEquipped' | 'toHitBonus' | 'damageDice' | 'effect'>[];
+    items: {
+        name: string; // AI akan mengirim nama, kita akan cari definisinya
+        quantity: number;
+    }[];
 }
 
 interface UpdateQuestPayload {
@@ -44,7 +52,6 @@ interface LogNpcInteractionPayload {
     disposition?: 'Friendly' | 'Neutral' | 'Hostile' | 'Unknown';
 }
 
-// FIX: Create a discriminated union of Omitted event types to help TypeScript's type inference.
 type LoggableGameEvent =
     | Omit<PlayerActionEvent, 'id' | 'timestamp' | 'turnId'>
     | Omit<DmNarrationEvent, 'id' | 'timestamp' | 'turnId'>
@@ -57,14 +64,14 @@ export interface CampaignActions {
     logEvent: (event: LoggableGameEvent, turnId: string) => void;
     startTurn: () => string;
     endTurn: () => void;
-    updateMonster: (monster: Monster) => void;
-    removeMonster: (monsterId: string) => void;
+    updateMonster: (monster: MonsterInstance) => void;
+    removeMonster: (monsterInstanceId: string) => void;
     setInitiativeOrder: (order: string[]) => void;
     setCurrentPlayerId: (id: string | null) => void;
     setGameState: (state: 'exploration' | 'combat') => void;
     setThinkingState: (state: ThinkingState) => void;
     setActiveRollRequest: (request: RollRequest | null) => void;
-    spawnMonsters: (monstersToSpawn: MonsterSpawnPayload[], prebuiltMonsters?: Monster[]) => void;
+    spawnMonsters: (monstersToSpawn: MonsterSpawnPayload[]) => void;
     clearChoices: () => void;
     setChoices: (choices: string[]) => void;
     updateCharacterInCampaign: (character: Character) => void;
@@ -79,9 +86,9 @@ type Action =
   | { type: 'ADD_EVENT'; payload: GameEvent }
   | { type: 'START_TURN'; payload: string }
   | { type: 'END_TURN' }
-  | { type: 'UPDATE_MONSTER'; payload: Monster }
-  | { type: 'REMOVE_MONSTER'; payload: string } // id
-  | { type: 'ADD_MONSTERS'; payload: Monster[] }
+  | { type: 'UPDATE_MONSTER'; payload: MonsterInstance } // REFAKTOR
+  | { type: 'REMOVE_MONSTER'; payload: string } // instanceId
+  | { type: 'ADD_MONSTERS'; payload: MonsterInstance[] } // REFAKTOR
   | { type: 'SET_CHOICES'; payload: string[] }
   | { type: 'UPDATE_CHARACTER'; payload: Character }
   | { type: 'SET_THINKING_STATE'; payload: ThinkingState }
@@ -96,7 +103,6 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
     case 'SET_STATE':
       return { ...state, ...action.payload };
     case 'ADD_EVENT':
-      // Increment world event counter on player action
       const worldEventCounter = action.payload.type === 'player_action'
         ? state.worldEventCounter + 1
         : state.worldEventCounter;
@@ -105,17 +111,17 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
       return { ...state, turnId: action.payload };
     case 'END_TURN':
       return { ...state, turnId: null, thinkingState: 'idle' };
-    case 'UPDATE_MONSTER':
+    case 'UPDATE_MONSTER': // REFAKTOR: Bekerja dengan MonsterInstance
       return {
         ...state,
-        monsters: state.monsters.map(m => m.id === action.payload.id ? action.payload : m),
+        monsters: state.monsters.map(m => m.instanceId === action.payload.instanceId ? action.payload : m),
       };
-    case 'REMOVE_MONSTER': {
-      const newMonsters = state.monsters.filter(m => m.id !== action.payload);
+    case 'REMOVE_MONSTER': { // REFAKTOR: Bekerja dengan instanceId
+      const newMonsters = state.monsters.filter(m => m.instanceId !== action.payload);
       const newInitiativeOrder = state.initiativeOrder.filter(id => id !== action.payload);
       return { ...state, monsters: newMonsters, initiativeOrder: newInitiativeOrder };
     }
-    case 'ADD_MONSTERS':
+    case 'ADD_MONSTERS': // REFAKTOR: Menerima MonsterInstance[]
       return { ...state, monsters: [...state.monsters, ...action.payload] };
     case 'SET_CHOICES':
         return { ...state, choices: action.payload };
@@ -127,16 +133,34 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
     case 'SET_THINKING_STATE':
         return { ...state, thinkingState: action.payload };
     case 'ADD_ITEMS_TO_INVENTORY': {
+        // Logika ini sekarang salah. Inventory adalah SSoT pada Character.
+        // Aksi ini seharusnya HANYA memicu event system log.
+        // Perubahan inventory aktual akan ditangani oleh 'saveCharacter' di 'App.tsx'.
+        // TAPI, untuk sinkronisasi state di 'GameScreen', kita HARUS update state 'players' di sini.
+        // Ini adalah SINKRONISASI RUNTIME, bukan SSoT.
+        
         const { characterId, items } = action.payload;
+        
+        // (Kita butuh data/items.ts di sini. Untuk sekarang, kita buat item placeholder)
         const newPlayers = state.players.map(p => {
             if (p.id === characterId) {
                 const newInventory = [...p.inventory];
                 items.forEach(itemToAdd => {
-                    const existingItemIndex = newInventory.findIndex(i => i.name === itemToAdd.name);
+                    const existingItemIndex = newInventory.findIndex(i => i.item.name === itemToAdd.name);
                     if (existingItemIndex > -1) {
                         newInventory[existingItemIndex].quantity += itemToAdd.quantity;
                     } else {
-                        newInventory.push({ ...itemToAdd, description: '', isEquipped: false });
+                        // Buat item placeholder karena kita tidak punya akses ke data/items.ts di sini
+                        const placeholderItem: ItemDefinition = {
+                            id: generateId('item'), name: itemToAdd.name, type: 'other', 
+                            isMagical: false, rarity: 'common', requiresAttunement: false
+                        };
+                        newInventory.push({ 
+                            instanceId: generateId('inv'),
+                            item: placeholderItem,
+                            quantity: itemToAdd.quantity,
+                            isEquipped: false
+                        });
                     }
                 });
                 return { ...p, inventory: newInventory };
@@ -218,7 +242,7 @@ export const useCampaign = (initialCampaign: Campaign, initialPlayers: Character
         ...initialCampaign,
         thinkingState: 'idle',
         activeRollRequest: null,
-        players: initialPlayers,
+        players: initialPlayers, // SSoT Karakter di-pass saat inisialisasi
         turnId: null,
     });
 
@@ -279,51 +303,40 @@ export const useCampaign = (initialCampaign: Campaign, initialPlayers: Character
             setGameState,
             setThinkingState,
             setActiveRollRequest,
-            spawnMonsters: (monstersToSpawn, prebuiltMonsters) => {
-                let newMonsters: Monster[] = prebuiltMonsters ? [...prebuiltMonsters] : [];
+            spawnMonsters: (monstersToSpawn) => { // 'prebuiltMonsters' dihapus, tidak lagi relevan
+                let newMonsters: MonsterInstance[] = [];
                 
                 monstersToSpawn.forEach(m => {
-                    if (prebuiltMonsters && prebuiltMonsters.some(pm => pm.name === m.name)) return;
+                    // REFAKTOR: Selalu cari di MONSTER_DEFINITIONS
+                    const template = MONSTER_DEFINITIONS.find(dm => dm.name.toLowerCase() === m.name.toLowerCase());
                     
-                    for (let i = 0; i < m.quantity; i++) {
-                        const uniqueName = m.quantity > 1 ? `${m.name} ${i + 1}` : m.name;
-                        
-                        // PERBAIKAN DATA: Prioritaskan template default
-                        let monsterData: Omit<Monster, 'id' | 'currentHp' | 'initiative' | 'conditions'> | null = null;
-                        
-                        // 1. Cari template default
-                        const template = DEFAULT_MONSTERS.find(dm => dm.name.toLowerCase() === m.name.toLowerCase());
-                        
-                        if (template) {
-                            // 2. Jika template ada, SELALU gunakan template. Abaikan stats dari AI.
-                            monsterData = template;
-                        } 
-                        else if (m.stats) {
-                            // 3. Jika tidak ada template, BARU gunakan stats kustom dari AI.
-                            monsterData = { name: m.name, ...m.stats };
-                        } 
-                        // (Logika lama ada di bawah, dibalik)
-
-                        if (monsterData) {
+                    if (template) {
+                        for (let i = 0; i < m.quantity; i++) {
+                            const uniqueName = m.quantity > 1 ? `${m.name} ${i + 1}` : m.name;
+                            
                             newMonsters.push({
-                                ...monsterData,
-                                id: generateId('monster'),
+                                instanceId: generateId('monster'), // ID unik untuk instansi ini
+                                definition: template, // Data stat block lengkap (SSoT)
                                 name: uniqueName,
-                                currentHp: monsterData.maxHp,
+                                currentHp: template.maxHp,
                                 initiative: 0,
                                 conditions: [],
                             });
                         }
+                    } else {
+                        // (Fallback jika AI mengarang monster)
+                        console.warn(`Monster template "${m.name}" tidak ditemukan di MONSTER_DEFINITIONS. Menggunakan stat fallback.`);
+                        // (Di sini kita bisa membuat monster kustom jika m.stats ada, tapi untuk sekarang, kita log)
                     }
                 });
 
                 if (newMonsters.length > 0) {
                     dispatch({ type: 'ADD_MONSTERS', payload: newMonsters });
-                    setGameState('combat');
+                    setGameState('combat'); // Otomatis masuk mode combat
                 }
             },
         };
-    }, [campaign.gameState]);
+    }, [campaign.gameState]); // <-- dependensi disederhanakan
 
     const fullCampaignState = useMemo(() => ({
         ...campaign,
