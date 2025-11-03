@@ -967,14 +967,16 @@ class DataService {
     async logGameEvent(event: Omit<GameEvent, 'id' | 'timestamp'> & { campaignId: string }) {
         const supabase = this.ensureSupabase();
         
-        const { campaignId, characterId, roll, reason, ...eventData } = event as any;
+        // PERBAIKAN: Tangkap 'turnId' secara manual dari 'event'
+        const { campaignId, characterId, roll, reason, turnId, ...eventData } = event as any;
         
         const dbEvent: Omit<DbGameEvent, 'id' | 'timestamp'> = {
-            ...eventData,
+            ...eventData, // (eventData sekarang tidak lagi berisi 'turnId')
             campaign_id: campaignId,
             character_id: characterId || null,
             roll: roll || null,
-            reason: reason || null
+            reason: reason || null,
+            turn_id: turnId // Petakan manual ke snake_case
         }
         
         const { error } = await supabase.from('game_events').insert(dbEvent);

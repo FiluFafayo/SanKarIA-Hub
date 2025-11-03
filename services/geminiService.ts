@@ -558,7 +558,7 @@ class GeminiService {
         const call = async () => {
             const ai = this.getClient();
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-image',
+                model: 'gemini-pro-vision',
                 contents: { parts: [{ text: prompt }] },
                 config: { responseModalities: [Modality.IMAGE] },
             });
