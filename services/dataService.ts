@@ -231,7 +231,7 @@ class DataService {
                     save_on_success: spell.saveOnSuccess,
                     condition_applied: spell.conditionApplied
                 }));
-                const { error }_ = await supabase.from('spells').insert(spellsToSeed);
+                const { error } = await supabase.from('spells').insert(spellsToSeed);
                 if (error) throw new Error(`Seeding spells gagal: ${error.message}`);
             }
 
@@ -246,7 +246,7 @@ class DataService {
                     ability_scores: monster.abilityScores,
                     challenge_rating: monster.challengeRating
                 }));
-                const { error }_ = await supabase.from('monsters').insert(monstersToSeed);
+                const { error } = await supabase.from('monsters').insert(monstersToSeed);
                 if (error) throw new Error(`Seeding monsters gagal: ${error.message}`);
             }
             
@@ -561,8 +561,8 @@ class DataService {
         }
 
         // 7. Ambil kembali data lengkap untuk SSoT
-        const { data: finalInventory }_ = await supabase.from('character_inventory').select('*, item:item_id(*)').eq('character_id', newCharacterId);
-        const { data: finalSpells }_ = await supabase.from('character_spells').select('*, spell:spell_id(*)').eq('character_id', newCharacterId);
+        const { data: finalInventory } = await supabase.from('character_inventory').select('*, item:item_id(*)').eq('character_id', newCharacterId);
+        const { data: finalSpells } = await supabase.from('character_spells').select('*, spell:spell_id(*)').eq('character_id', newCharacterId);
 
         return this.mapDbCharacter(newDbCharacter as DbCharacter, finalInventory as DbCharacterInventoryJoined[], finalSpells as DbCharacterSpellJoined[]);
     }
