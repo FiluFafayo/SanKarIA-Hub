@@ -47,6 +47,18 @@ const App: React.FC = () => {
   // State untuk alur "Join"
   const [campaignToJoinOrStart, setCampaignToJoinOrStart] = useState<Campaign | null>(null);
 
+  // =================================================================
+  // REFAKTORISASI FUNGSI NAVIGASI (YANG HILANG)
+  // =================================================================
+  const handleLocationClick = useCallback((location: Location) => {
+    setCurrentView(location);
+  }, []);
+
+  const handleReturnToNexus = useCallback(() => {
+    setCurrentView('nexus');
+    setCampaignToJoinOrStart(null);
+  }, []);
+  
   // Efek Inisialisasi Layanan (Tidak berubah)
   useEffect(() => {
     const geminiKeysString = import.meta.env.VITE_GEMINI_API_KEYS || '';
