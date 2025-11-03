@@ -5,7 +5,6 @@ import { ItemDefinition } from '../types';
 // Kita akan menggunakan 'name' sebagai ID unik sementara sebelum seeding ke DB.
 export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
     // === Armor ===
-    // Light
     {
         name: 'Padded Armor',
         type: 'armor',
@@ -39,7 +38,6 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         stealthDisadvantage: false,
         strengthRequirement: 0
     },
-    // Medium
     {
         name: 'Hide Armor',
         type: 'armor',
@@ -73,7 +71,6 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         stealthDisadvantage: true,
         strengthRequirement: 0
     },
-    // Heavy
     {
         name: 'Chain Mail',
         type: 'armor',
@@ -96,7 +93,6 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         stealthDisadvantage: true,
         strengthRequirement: 15
     },
-    // Shield
     {
         name: 'Shield',
         type: 'armor',
@@ -110,7 +106,6 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
     },
 
     // === Weapons ===
-    // Simple
     {
         name: 'Dagger',
         type: 'weapon',
@@ -119,7 +114,6 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         requiresAttunement: false,
         damageDice: '1d4',
         damageType: 'piercing',
-        // Properti Finesse & Thrown akan di-handle oleh logika game (Fase 2)
     },
     {
         name: 'Mace',
@@ -148,7 +142,6 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         damageDice: '1d8',
         damageType: 'piercing',
     },
-    // Martial
     {
         name: 'Longsword',
         type: 'weapon',
@@ -203,6 +196,16 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         damageDice: '1d8',
         damageType: 'piercing',
     },
+    {
+        name: 'Small Knife',
+        type: 'weapon',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+        damageDice: '1d4',
+        damageType: 'piercing',
+        description: 'Pisau kecil serbaguna.'
+    },
     
     // === Amunisi ===
     {
@@ -230,12 +233,12 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         effect: { type: 'heal', dice: '2d4+2' }
     },
     
-    // === Lain-lain / Focus ===
+    // === Lain-lain / Focus / Tools ===
     {
         name: 'Holy Symbol',
         type: 'other',
         rarity: 'common',
-        isMagical: false, // (Bisa jadi magical, tapi anggap non-magical untuk focus)
+        isMagical: false,
         requiresAttunement: false,
     },
     {
@@ -273,7 +276,6 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
     },
-    // (HOTFIX 1.E) Item untuk Sage Background
     {
         name: 'Bottle of Black Ink',
         type: 'tool',
@@ -290,14 +292,89 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         requiresAttunement: false,
         description: 'Pena bulu untuk menulis.'
     },
+    // (PERBAIKAN DATA ENTRY - SEMUA ITEM BACKGROUND YANG HILANG)
     {
-        name: 'Small Knife',
-        type: 'weapon', // (Secara teknis ini senjata sederhana)
+        name: 'Crowbar',
+        type: 'tool',
         rarity: 'common',
         isMagical: false,
         requiresAttunement: false,
-        damageDice: '1d4',
-        damageType: 'piercing',
-        description: 'Pisau kecil serbaguna.'
     },
+    {
+        name: 'Common Clothes (Dark)',
+        type: 'other',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    },
+    {
+        name: "Artisan's Tools (Tinker's Tools)",
+        type: 'tool',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    },
+    {
+        name: 'Shovel',
+        type: 'tool',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    },
+    {
+        name: 'Iron Pot',
+        type: 'tool',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    },
+    {
+        name: 'Fine Clothes',
+        type: 'other',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    },
+    {
+        name: 'Signet Ring',
+        type: 'other',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    },
+    {
+        name: 'Scroll of Pedigree',
+        type: 'other',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    },
+    {
+        name: 'Insignia of Rank',
+        type: 'other',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    },
+    {
+        name: 'Trophy (Dagger)',
+        type: 'other', // Ini adalah 'other' (trofi), BUKAN 'weapon'
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    },
+    {
+        name: 'Gaming Set (Dice)',
+        type: 'tool',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    },
+    {
+        name: 'Gaming Set (Chess)',
+        type: 'tool',
+        rarity: 'common',
+        isMagical: false,
+        requiresAttunement: false,
+    }
 ];
