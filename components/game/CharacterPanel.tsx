@@ -87,8 +87,19 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
                                     className="w-full bg-red-600 hover:bg-red-500 text-white font-bold p-2 rounded disabled:bg-gray-600 disabled:cursor-not-allowed"
                                 >
                                    {/* REFAKTOR: Akses nama dari item.item.name */}
-                                   Serang dengan {equippedWeapon?.item.name || 'Senjata'}
+                                   Serang dengan {equippedWeapon?.item.name || 'Senjata'} (Aksi)
                                 </button>
+
+                                {/* FITUR KELAS: Fighter - Second Wind (Kesenjangan #4) */}
+                                {character.class === 'Fighter' && (
+                                    <button
+                                        onClick={combatSystem.handleSecondWind}
+                                        disabled={!isMyTurn || character.usedBonusAction || character.currentHp === character.maxHp}
+                                        className="w-full bg-green-600 hover:bg-green-500 text-white font-bold p-2 rounded disabled:bg-gray-600 disabled:cursor-not-allowed"
+                                    >
+                                        Gunakan Second Wind (Bonus)
+                                    </button>
+                                )}
                             </>
                         ) : (
                             <div className="text-center text-gray-400 italic p-4 rounded-lg bg-gray-800/50">
@@ -141,7 +152,20 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
                         {character.knownSpells.map((spell) => {
                              const relevantSlot = character.spellSlots.find(s => s.level === spell.level);
                              const hasSlots = spell.level === 0 || (relevantSlot ? relevantSlot.spent < relevantSlot.max : false);
-                             const isDisabled = (gameState !== 'combat' || !isMyTurn) || !hasSlots;
+                             
+                             // Logika Disable BARU (Kesenjangan #7)
+                             let isDisabled = !hasSlots || !isMyTurn; // Disable jika tidak ada slot atau bukan giliran
+                             if (!isDisabled && gameState === 'combat') {
+                                 if (spell.castingTime === 'bonus_action' && character.usedBonusAction) {
+                                     isDisabled = true; // Disable jika bonus action sudah dipakai
+                                 } else if (spell.castingTime === 'reaction') {
+                                     isDisabled = true; // Reaksi tidak bisa di-cast dari panel
+                                 }
+                                 // Jika castingTime 'action', isDisabled tetap false (jika isMyTurn)
+                             } else if (gameState !== 'combat') {
+                                 // Izinkan spell utility non-kombat (jika bukan bonus/reaksi)
+                                 isDisabled = spell.castingTime === 'bonus_action' || spell.castingTime === 'reaction';
+                             }
 
                              return (
                                 <div key={spell.id} className="flex justify-between items-center bg-gray-800/50 p-2 rounded">

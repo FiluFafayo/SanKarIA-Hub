@@ -114,7 +114,7 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
         if (request.stage === 'attack') {
             const targetAC = ('ownerId' in target) ? target.armorClass : target.definition.armorClass;
             const successText = roll.success ? `mengenai (Total ${roll.total} vs AC ${targetAC})` : `gagal mengenai (Total ${roll.total} vs AC ${targetAC})`;
-            
+
             const attacker = [...players, ...campaign.monsters].find(c => ('ownerId' in c ? c.id : c.instanceId) === request.characterId);
             const attackerName = attacker?.name || 'Seseorang';
             
@@ -123,10 +123,28 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
             campaignActions.logEvent({ type: 'system', text: rollMessage }, turnId);
 
             if (roll.success) {
+                const attacker = [...players, ...campaign.monsters].find(c => ('ownerId' in c ? c.id : c.instanceId) === request.characterId);
+                let finalDamageDice = request.damageDice;
+
+                // FITUR KELAS: Rogue - Sneak Attack (Kesenjangan #4)
+                if (attacker && 'ownerId' in attacker && attacker.class === 'Rogue') {
+                    // Cek Kondisi A: Advantage (Kesenjangan #5)
+                    // Cek Kondisi B: Sekutu (Kesenjangan #6 - Belum ada posisi, TAPI kita bisa cek jika ada player lain di kombat)
+                    const isAdvantage = request.isAdvantage || false;
+                    const hasAllyNearby = players.some(p => p.id !== attacker.id && p.currentHp > 0 && campaign.initiativeOrder.includes(p.id));
+
+                    if (isAdvantage || hasAllyNearby) {
+                        const sneakAttackDice = `${Math.floor((attacker.level + 1) / 2)}d6`;
+                        finalDamageDice = finalDamageDice ? `${finalDamageDice}+${sneakAttackDice}` : sneakAttackDice;
+                        const reason = isAdvantage ? "(via Advantage)" : "(via Sekutu)";
+                        campaignActions.logEvent({ type: 'system', text: `${attacker.name} menambahkan ${sneakAttackDice} Sneak Attack! ${reason}` }, turnId);
+                    }
+                }
+                
                 const damageRollRequest: RollRequest = {
                     type: 'damage', characterId: request.characterId, reason: `Menentukan kerusakan terhadap ${target.name}`,
                     target: { id: ('ownerId' in target ? target.id : target.instanceId), name: target.name, ac: targetAC },
-                    stage: 'damage', damageDice: request.damageDice,
+                    stage: 'damage', damageDice: finalDamageDice, // Gunakan finalDamageDice
                 };
                 
                 // Jika ini monster, auto-roll damage
@@ -476,16 +494,88 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
         }
     }, [character, campaign.turnId, campaign.currentPlayerId, updateCharacter, campaignActions]);
 
-    const handleSpellCast = useCallback((spell: SpellDefinition) => {
-        if (character.currentHp <= 0 || !campaign.turnId || campaign.currentPlayerId !== character.id) {
+    // FITUR KELAS: Fighter - Second Wind (Kesenjangan #4)
+    const handleSecondWind = useCallback(async () => {
+        if (character.currentHp <= 0 || !campaign.turnId || campaign.currentPlayerId !== character.id || character.class !== 'Fighter') {
             return;
         }
         const turnId = campaign.turnId;
 
-        campaignActions.logEvent({ type: 'system', text: `${character.name} merapal ${spell.name}!` }, turnId);
-        // TODO (Fase 2): Terapkan logika spell (roll, damage, heal) di sini
-        campaignActions.endTurn(); 
-    }, [character, campaign.turnId, campaign.currentPlayerId, campaignActions]);
+        if (character.usedBonusAction) {
+            campaignActions.logEvent({ type: 'system', text: `${character.name} sudah menggunakan Bonus Action.` }, turnId);
+            return;
+        }
+
+        const roll = rollDice(`1d10`);
+        const healing = roll.total + character.level;
+        const newHp = Math.min(character.maxHp, character.currentHp + healing);
+        const healedAmount = newHp - character.currentHp;
+
+        if (healedAmount <= 0) {
+             campaignActions.logEvent({ type: 'system', text: `${character.name} mencoba menggunakan Second Wind, tapi HP sudah penuh.` }, turnId);
+             return;
+        }
+
+        campaignActions.logEvent({ type: 'system', text: `${character.name} menggunakan Second Wind (Bonus Action) dan memulihkan ${healedAmount} HP (Total Roll: ${healing})!` }, turnId);
+
+        // Update SSoT Runtime (HP dan Status Bonus Action)
+        await updateCharacter({ ...character, currentHp: newHp, usedBonusAction: true });
+        
+        // (Tidak panggil endTurn() karena ini Bonus Action)
+
+    }, [character, campaign.turnId, campaign.currentPlayerId, updateCharacter, campaignActions]);
+
+
+    const handleSpellCast = useCallback(async (spell: SpellDefinition) => {
+        if (character.currentHp <= 0 || !campaign.turnId || campaign.currentPlayerId !== character.id) {
+            return;
+        }
+        const turnId = campaign.turnId;
+        let isTurnEndingAction = false;
+        let usedAction = false;
+
+        // Cek Tipe Aksi
+        if (spell.castingTime === 'bonus_action') {
+            if (character.usedBonusAction) {
+                campaignActions.logEvent({ type: 'system', text: `${character.name} sudah menggunakan Bonus Action.` }, turnId);
+                return; // Gagal, sudah dipakai
+            }
+            // Tandai Bonus Action sebagai terpakai (Update SSoT Runtime)
+            await updateCharacter({ ...character, usedBonusAction: true });
+            campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: `Merapal ${spell.name} (Bonus Action).` }, turnId);
+            usedAction = true; // (Secara teknis, Bonus Action sudah dipakai)
+
+        } else if (spell.castingTime === 'reaction') {
+            // Logika reaksi harus dipicu, bukan dari tombol panel
+            campaignActions.logEvent({ type: 'system', text: `Spell reaksi seperti ${spell.name} tidak bisa dirapal dari panel aksi.` }, turnId);
+            return;
+
+        } else { // Asumsikan 'action'
+            campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: `Merapal ${spell.name} (Aksi).` }, turnId);
+            isTurnEndingAction = true;
+            usedAction = true;
+        }
+        
+        if (usedAction) {
+            // TODO (Fase 2): Terapkan logika spell (roll, damage, heal) di sini
+            
+            // Habiskan Spell Slot (Contoh untuk Lvl 1)
+            if (spell.level > 0) {
+                const slotIndex = character.spellSlots.findIndex(s => s.level === spell.level);
+                if (slotIndex > -1) {
+                    const newSlots = [...character.spellSlots];
+                    newSlots[slotIndex] = { ...newSlots[slotIndex], spent: newSlots[slotIndex].spent + 1 };
+                    // Update SSoT (Mandat 3.4)
+                    await updateCharacter({ ...character, spellSlots: newSlots, usedBonusAction: spell.castingTime === 'bonus_action' ? true : character.usedBonusAction });
+                }
+            }
+        }
+
+        // Hanya Aksi (bukan Bonus Aksi) yang (biasanya) mengakhiri giliran
+        if (isTurnEndingAction) {
+            campaignActions.endTurn(); 
+        }
+    }, [character, campaign.turnId, campaign.currentPlayerId, campaignActions, updateCharacter]);
 
     // (useEffect untuk death save dipindahkan ke advanceTurn)
     
@@ -494,5 +584,6 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
         handleRollComplete,
         handleItemUse,
         handleSpellCast,
+        handleSecondWind, // Ekspor fungsi baru
     };
 }

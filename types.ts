@@ -209,6 +209,10 @@ export interface Character {
     // Data Relasional (digabungkan saat loading)
     inventory: CharacterInventoryItem[]; // STATE PERSISTEN
     knownSpells: SpellDefinition[];
+
+    // Status Runtime (Non-Persisten) untuk kombat
+    usedBonusAction?: boolean;
+    usedReaction?: boolean;
 }
 
 
@@ -379,9 +383,8 @@ export interface RollRequest {
     originalActionText?: string;
     stage?: 'attack' | 'damage';
     damageDice?: string;
-    // (Akan ditambah di Fase 2)
-    // isAdvantage?: boolean;
-    // isDisadvantage?: boolean;
+    isAdvantage?: boolean;
+    isDisadvantage?: boolean;
 }
 
 export interface ToolCall {

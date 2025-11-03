@@ -498,7 +498,12 @@ class DataService {
 
     async saveCharacter(character: Character): Promise<Character> {
         const supabase = this.ensureSupabase();
-        const { inventory, knownSpells, ownerId, id, ...coreData } = character;
+        // Saring properti runtime sebelum mengirim ke DB
+        const { 
+            inventory, knownSpells, ownerId, id, 
+            usedBonusAction, usedReaction, // <- KELUARKAN INI
+            ...coreData 
+        } = character as any;
         
         // =================================================================
         // PERBAIKAN BUG CAMELCASE (saveCharacter)
