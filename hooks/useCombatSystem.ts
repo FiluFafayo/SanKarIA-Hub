@@ -4,7 +4,7 @@ import {
     Character, DiceRoll, RollRequest, CharacterInventoryItem, SpellDefinition, MonsterInstance, 
     StructuredApiResponse, ToolCall, Ability
 } from '../types';
-import { rollInitiative, rollDice, getAbilityModifier, getProficiencyBonus } from '../../utils';
+import { rollInitiative, rollDice, getAbilityModifier, getProficiencyBonus } from '../utils';
 import { geminiService } from '../services/geminiService';
 
 interface CombatSystemProps {
