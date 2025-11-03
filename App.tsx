@@ -17,6 +17,14 @@ import { generateId } from './utils';
 // DEFAULT_CAMPAIGNS dan DEFAULT_CHARACTERS tidak lagi di-seed dari sini
 import { LoginView } from './views/LoginView';
 
+// (Fase 1.E Hotfix) Muat data definisi ke global scope agar ProfileModal bisa akses
+import { RACES } from './data/races';
+import { CLASS_DEFINITIONS } from './data/classes';
+import { BACKGROUNDS } from './data/backgrounds';
+(window as any).RACES_DATA = RACES;
+(window as any).CLASS_DEFINITIONS_DATA = CLASS_DEFINITIONS;
+(window as any).BACKGROUNDS_DATA = BACKGROUNDS;
+
 type View = Location | 'nexus' | 'character-selection';
 
 const App: React.FC = () => {
@@ -111,9 +119,9 @@ const App: React.FC = () => {
     const loadDataAndSeed = async () => {
         setIsLoading(true);
         try {
-            // 1. Mulai seeding data global (items, spells, dll)
-            // Ini hanya akan berjalan 1x dan akan mengisi cache di dataService
-            await dataService.seedGlobalData();
+            // 1. Muat dan cache data definisi global (items, spells, dll)
+            // Ini aman dipanggil setiap saat, RLS SELECT mengizinkannya.
+            await dataService.cacheGlobalData();
 
             // 2. Muat SSoT Karakter (Mandat 3.4)
             const fetchedCharacters = await dataService.getMyCharacters(userId);

@@ -6,18 +6,24 @@ import {
     SpellDefinition, CharacterSpellSlot, CharacterFeature, ItemDefinition 
 } from '../../types';
 import { generateId, getAbilityModifier, rollOneAbilityScore } from '../../utils';
-import { RACES, RaceData } from '../../data/races';
-import { CLASS_DEFINITIONS, ClassData } from '../../data/classes';
-import { BACKGROUNDS, BackgroundData } from '../../data/backgrounds';
-import { ITEM_DEFINITIONS } from '../../data/items';
-import { SPELL_DEFINITIONS } from '../../data/spells';
+// HAPUS IMPORT DATA STATIS
+// import { RACES, RaceData } from '../../data/races';
+// import { CLASS_DEFINITIONS, ClassData } from '../../data/classes';
+// import { BACKGROUNDS, BackgroundData } from '../../data/backgrounds';
+// import { ITEM_DEFINITIONS } from '../../data/items';
+// import { SPELL_DEFINITIONS } from '../../data/spells';
+import { dataService } from '../../services/dataService'; // GANTI DENGAN dataService
 import { Die } from '../Die';
 
-// Helper untuk mengambil definisi item berdasarkan nama
+// Helper untuk mengambil definisi item berdasarkan nama dari cache dataService
 const getItemDef = (name: string): ItemDefinition => {
-    const definition = ITEM_DEFINITIONS.find(i => i.name === name);
-    if (!definition) throw new Error(`ItemDefinition not found: ${name}`);
-    return { ...definition, id: definition.name }; // Gunakan nama sebagai ID sementara
+    const definition = dataService.findItemDefinition(name);
+    if (!definition) {
+        console.error(`ItemDefinition not found in cache: ${name}`);
+        // Buat fallback agar UI tidak crash, meskipun DB insert akan gagal
+        return { id: name, name, type: 'other', isMagical: false, rarity: 'common', requiresAttunement: false };
+    }
+    return definition;
 };
 
 // Helper untuk membuat item inventory
@@ -141,6 +147,12 @@ const CreateCharacterWizard: React.FC<{
     userId: string
 }> = ({ onSave, onCancel, userId }) => {
     const [step, setStep] = useState(1);
+
+    // Ambil data definisi dari file data statis (ini masih oke untuk UI wizard)
+    // Kita akan gunakan cache dataService untuk helper `getItemDef` saat menyimpan
+    const RACES: RaceData[] = useMemo(() => (window as any).RACES_DATA || [], []);
+    const CLASS_DEFINITIONS: Record<string, ClassData> = useMemo(() => (window as any).CLASS_DEFINITIONS_DATA || {}, []);
+    const BACKGROUNDS: BackgroundData[] = useMemo(() => (window as any).BACKGROUNDS_DATA || [], []);
     
     // Step 1: Info Dasar
     const [name, setName] = useState('');
@@ -315,12 +327,12 @@ const CreateCharacterWizard: React.FC<{
                     
                     <label className="block mb-1 font-cinzel text-sm">Ras</label>
                     <select value={selectedRace.name} onChange={e => setSelectedRace(RACES.find(r => r.name === e.target.value) || RACES[0])} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
-                        {RACES.map(r => <option key={r.name}>{r.name}</option>)}
+                        {RACES.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
                     </select>
 
                     <label className="block mb-1 font-cinzel text-sm">Kelas</label>
                     <select value={selectedClass.name} onChange={e => setSelectedClass(CLASS_DEFINITIONS[e.target.value] || CLASS_DEFINITIONS['Fighter'])} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-6">
-                       {Object.keys(CLASS_DEFINITIONS).map(c => <option key={c}>{c}</option>)}
+                       {Object.keys(CLASS_DEFINITIONS).map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     
                     {/* Tampilkan Info Pilihan */}
@@ -363,7 +375,7 @@ const CreateCharacterWizard: React.FC<{
                 <div className="flex flex-col flex-grow animate-fade-in-fast">
                     <label className="block mb-1 font-cinzel text-sm">Background</label>
                     <select value={selectedBackground.name} onChange={e => setSelectedBackground(BACKGROUNDS.find(b => b.name === e.target.value) || BACKGROUNDS[0])} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
-                        {BACKGROUNDS.map(b => <option key={b.name}>{b.name}</option>)}
+                        {BACKGROUNDS.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
                     </select>
 
                     <div className="bg-black/20 p-3 rounded text-sm space-y-2">
