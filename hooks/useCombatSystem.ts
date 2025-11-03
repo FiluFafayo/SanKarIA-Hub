@@ -44,6 +44,7 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
         });
     }, [campaignActions]);
 
+
     // =================================================================
     // FUNGSI INTI 1: handleRollComplete (HANYA menangani hasil roll)
     // =================================================================
@@ -55,19 +56,17 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
 
         campaignActions.setActiveRollRequest(null);
 
-        // ==================================
-        // HANDLE DEATH SAVE (Mandat 3.4 SSoT)
-        // ==================================
+        // --- HANDLE DEATH SAVE ---
         if (request.type === 'deathSave') {
             const playerToSave = players.find(p => p.id === request.characterId);
-            if (!playerToSave) return;
+            if (!playerToSave) return; 
 
             const newSaves = { ...playerToSave.deathSaves };
             let message = `${playerToSave.name} membuat lemparan penyelamatan kematian... `;
             
             if (roll.total >= 10) { // Sukses
                 newSaves.successes++;
-                if (roll.total === 20) { // Kritis sukses
+                if (roll.total === 20) {
                     message += ` LEMPARAN KRITIS! Dia sadar dengan 1 HP!`;
                     const updatedChar = { ...playerToSave, currentHp: 1, deathSaves: { successes: 0, failures: 0 } };
                     await updateCharacter(updatedChar); 
@@ -78,7 +77,7 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
                 message += `dan berhasil! (Sukses: ${newSaves.successes}, Gagal: ${newSaves.failures})`;
             } else { // Gagal
                 newSaves.failures++;
-                 if (roll.total === 1) { // Kritis gagal
+                 if (roll.total === 1) {
                     newSaves.failures++;
                     message += " LEMPARAN KRITIS! Dihitung sebagai 2 kegagalan.";
                  }
@@ -99,9 +98,7 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
             return;
         }
 
-        // ==================================
-        // HANDLE ATTACK & DAMAGE
-        // ==================================
+        // --- HANDLE ATTACK & DAMAGE ---
         let target: MonsterInstance | Character | undefined = [...campaign.monsters, ...players].find(c => ('ownerId' in c ? c.id : c.instanceId) === request.target?.id);
 
         if (!target) {
@@ -143,7 +140,7 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
                     stage: 'damage', damageDice: finalDamageDice,
                 };
                 
-                if ('definition' in attacker) { // Ini MonsterInstance
+                if (attacker && 'definition' in attacker) { // Ini MonsterInstance
                     const damageResult = rollDice(damageRollRequest.damageDice || '1d4');
                     const simulatedDamageRoll: DiceRoll = {
                         notation: damageRollRequest.damageDice || '1d4',
@@ -185,54 +182,17 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
                 if (!('ownerId' in target)) {
                     campaignActions.removeMonster(target.instanceId);
                 }
-                
-                const remainingMonsters = campaign.monsters.filter(m => m.instanceId !== (target as MonsterInstance).instanceId && m.currentHp > 0);
-
-                // ==================================
-                // LOGIKA AKHIR KOMBAT (DIPINDAH KE SINI)
-                // ==================================
-                if (remainingMonsters.length === 0) {
-                    campaignActions.logEvent({ type: 'system', text: 'Semua musuh telah dikalahkan! Pertarungan berakhir.' }, turnId);
-                    campaignActions.setGameState('exploration');
-                    try {
-                        const actionText = "Pertarungan telah berakhir. Apa yang terjadi selanjutnya?";
-                        
-                        // PANGGILAN 1: Dapatkan Narasi Akhir Kombat
-                        const narrationResult = await geminiService.generateNarration(campaign, players, actionText, campaignActions.setThinkingState);
-                        if (narrationResult.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: narrationResult.reaction }, turnId);
-                        if (narrationResult.narration) campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
-                        
-                        const contextNarration = narrationResult.narration || narrationResult.reaction || "Pertarungan berakhir.";
-
-                        // PANGGILAN 2: Dapatkan Mekanik (loot, quest, dll)
-                        const mechanicsResult = await geminiService.determineNextStep(
-                            campaign, 
-                            players, 
-                            actionText, 
-                            contextNarration, 
-                            campaignActions.setThinkingState
-                        );
-
-                        if (mechanicsResult.tool_calls && mechanicsResult.tool_calls.length > 0) {
-                            processToolCalls(turnId, mechanicsResult.tool_calls);
-                        }
-                        if (mechanicsResult.choices && mechanicsResult.choices.length > 0) {
-                            campaignActions.setChoices(mechanicsResult.choices!);
-                        }
-                    } finally {
-                        campaignActions.endTurn();
-                    }
-                    return;
-                }
+                // (Logika akhir kombat DIHAPUS dari sini)
             }
             campaignActions.endTurn();
         } else {
             campaignActions.endTurn();
         }
-    }, [campaign, players, campaignActions, updateCharacter, processToolCalls]);
+    }, [campaign, players, campaignActions, updateCharacter]); // <-- processToolCalls dihapus dari dependensi
+
 
     // =================================================================
-    // FUNGSI INTI 2: processMechanics (HANYA menentukan aksi berikutnya)
+    // FUNGSI INTI 2: processMechanics (Menentukan aksi)
     // =================================================================
     const processMechanics = useCallback((turnId: string, mechanics: Omit<StructuredApiResponse, 'reaction' | 'narration'>, originalActionText: string) => {
         if (!turnId) {
@@ -244,9 +204,8 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
 
         if (mechanics.tool_calls && mechanics.tool_calls.length > 0) {
             processToolCalls(turnId, mechanics.tool_calls);
-            // Jika monster baru di-spawn, jangan akhiri giliran, biarkan combat loop berjalan
             if (mechanics.tool_calls.some(c => c.functionName === 'spawn_monsters')) {
-                turnShouldEnd = false;
+                turnShouldEnd = false; // Biarkan combat loop baru mengambil alih
             }
         }
 
@@ -265,7 +224,7 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
                 ...request,
                 characterId: campaign.currentPlayerId!, 
                 originalActionText: originalActionText,
-                isAdvantage: request.isAdvantage, // Teruskan adv/disadv
+                isAdvantage: request.isAdvantage,
                 isDisadvantage: request.isDisadvantage
             };
 
@@ -280,7 +239,6 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
                 if (request.type === 'attack') {
                     const targetPlayer = players.find(p => p.id === request.target?.id) || players.find(p => p.currentHp > 0) || players[0];
                     if (!targetPlayer) {
-                        console.warn(`Monster ${monster.name} tidak punya target pemain yang valid.`);
                         campaignActions.logEvent({ type: 'system', text: `${monster.name} tidak menemukan target.` }, turnId);
                     } else {
                         const monsterAction = monster.definition.actions.find(a => request.reason.toLowerCase().includes(a.name.toLowerCase())) || monster.definition.actions[0];
@@ -303,15 +261,15 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
 
                         setTimeout(() => {
                             if (campaign.turnId === turnId) {
+                                // PANGGILAN AMAN: processMechanics -> handleRollComplete (tidak ada circular)
                                 handleRollComplete(simulatedRoll, fullRollRequest, turnId);
-                            } else {
-                                console.warn(`Timeout handleRollComplete untuk turn ${turnId} dibatalkan.`);
                             }
                         }, 500);
                         turnShouldEnd = false;
                     }
                 } else {
-                    console.warn(`Jenis roll monster ${request.type} belum diimplementasikan untuk auto-roll.`);
+                     campaignActions.logEvent({ type: 'system', text: `${monster.name} mencoba ${request.reason} (auto-roll).` }, turnId);
+                     // (Logika roll non-attack monster)
                 }
             } else {
                 // --- Ini Roll Request untuk Pemain ---
@@ -330,40 +288,50 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
                 }, delay);
             }
         }
-    }, [campaign.currentPlayerId, campaign.monsters, players, campaignActions, processToolCalls, handleRollComplete, campaign.activeRollRequest, campaign.turnId]);
-
-    // Effect untuk memulai kombat
-    useEffect(() => {
-        if (campaign.gameState === 'combat' && campaign.initiativeOrder.length === 0 && campaign.monsters.length > 0) {
-            const turnId = campaignActions.startTurn();
-            const combatants: (Character | MonsterInstance)[] = [
-                ...players.filter(p => campaign.playerIds.includes(p.id)), 
-                ...campaign.monsters
-            ];
-            
-            const initiatives = combatants.map(c => {
-                const id = ('ownerId' in c) ? c.id : c.instanceId;
-                const dexScore = ('ownerId' in c) ? c.abilityScores.dexterity : c.definition.abilityScores.dexterity;
-                return {
-                    id: id,
-                    initiative: rollInitiative(dexScore)
-                };
-            });
-
-            initiatives.sort((a, b) => b.initiative - a.initiative);
-            const order = initiatives.map(i => i.id);
-            
-            campaignActions.setInitiativeOrder(order);
-            campaignActions.setCurrentPlayerId(order[0]);
-            campaignActions.logEvent({ type: 'system', text: `Pertarungan dimulai! Urutan inisiatif telah ditentukan.` }, turnId);
-            campaignActions.endTurn();
-        }
-    }, [campaign.gameState, campaign.initiativeOrder.length, campaign.monsters, players, campaignActions, campaign.playerIds]);
+    }, [campaign.currentPlayerId, campaign.monsters, players, campaignActions, processToolCalls, handleRollComplete, campaign.activeRollRequest, campaign.turnId]); // <-- handleRollComplete adalah dependensi yang valid
 
 
+    // =================================================================
+    // FUNGSI INTI 3: advanceTurn (Menangani alur giliran)
+    // =================================================================
     const advanceTurn = useCallback(async () => {
+        // --- 1. CEK AKHIR KOMBAT (LOGIKA BARU) ---
+        // Cek jika kombat *seharusnya* berakhir
+        if (campaign.gameState === 'combat' && campaign.monsters.length > 0 && campaign.monsters.every(m => m.currentHp === 0)) {
+            const turnId = campaignActions.startTurn(); // Mulai "turn" cleanup
+            campaignActions.logEvent({ type: 'system', text: 'Semua musuh telah dikalahkan! Pertarungan berakhir.' }, turnId);
+            campaignActions.setGameState('exploration');
+            try {
+                const actionText = "Pertarungan telah berakhir. Apa yang terjadi selanjutnya?";
+                
+                // PANGGILAN 1: Dapatkan Narasi Akhir Kombat
+                const narrationResult = await geminiService.generateNarration(campaign, players, actionText, campaignActions.setThinkingState);
+                if (narrationResult.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: narrationResult.reaction }, turnId);
+                if (narrationResult.narration) campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
+                
+                const contextNarration = narrationResult.narration || narrationResult.reaction || "Pertarungan berakhir.";
+
+                // PANGGILAN 2: Dapatkan Mekanik (loot, quest, dll)
+                const mechanicsResult = await geminiService.determineNextStep(
+                    campaign, players, actionText, contextNarration, campaignActions.setThinkingState
+                );
+
+                // PANGGILAN AMAN: advanceTurn -> processMechanics (tidak ada circular)
+                processMechanics(turnId, mechanicsResult, actionText);
+                
+                // Jika tidak ada roll/choice, mechanics akan panggil endTurn()
+                // Jika ada choice, turnId akan tetap aktif
+
+            } catch(e) {
+                console.error("Gagal memproses akhir kombat:", e);
+                campaignActions.endTurn(); // Pastikan turn berakhir jika AI error
+            }
+            return; // Stop, jangan lanjut ke giliran kombat berikutnya
+        }
+
+        // --- 2. JIKA KOMBAT LANJUT: Logika Giliran Normal ---
         const { initiativeOrder, currentPlayerId, monsters } = campaign;
-        if (initiativeOrder.length === 0 || campaign.turnId) return; 
+        if (initiativeOrder.length === 0 || campaign.turnId) return; // Jangan advance jika giliran sedang berjalan
 
         const currentIndex = initiativeOrder.findIndex(id => id === currentPlayerId);
         const nextIndex = (currentIndex + 1) % initiativeOrder.length;
@@ -378,6 +346,11 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
             campaignActions.logEvent({ type: 'system', text: `Sekarang giliran ${nextCombatant.name}.` }, turnId);
 
             if ('definition' in nextCombatant) { // It's a MonsterInstance
+                if (nextCombatant.currentHp <= 0) {
+                    campaignActions.logEvent({ type: 'system', text: `${nextCombatant.name} sudah mati.` }, turnId);
+                    campaignActions.endTurn(); // Langsung lewati giliran
+                    return;
+                }
                 try {
                     const playerTargets = players.filter(p => p.currentHp > 0);
                     const target = playerTargets[Math.floor(Math.random() * playerTargets.length)];
@@ -399,6 +372,7 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
                             campaign, players, actionText, contextNarration, campaignActions.setThinkingState
                         );
                         
+                        // PANGGILAN AMAN: advanceTurn -> processMechanics
                         processMechanics(turnId, mechanicsResult, actionText);
                     } else {
                         campaignActions.logEvent({ type: 'dm_narration', text: `${nextCombatant.name} tidak menemukan target.` }, turnId);
@@ -427,15 +401,49 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
             campaignActions.endTurn();
         }
 
-    }, [campaign, players, campaignActions, processMechanics]); 
+    }, [campaign, players, campaignActions, processMechanics]); // <-- 'processMechanics' adalah dependensi yang valid
 
-    // Effect untuk memajukan giliran
+
+    // Effect untuk memulai kombat (Tidak berubah)
+    useEffect(() => {
+        if (campaign.gameState === 'combat' && campaign.initiativeOrder.length === 0 && campaign.monsters.length > 0) {
+            const turnId = campaignActions.startTurn();
+            const combatants: (Character | MonsterInstance)[] = [
+                ...players.filter(p => campaign.playerIds.includes(p.id)), 
+                ...campaign.monsters
+            ];
+            
+            const initiatives = combatants.map(c => {
+                const id = ('ownerId' in c) ? c.id : c.instanceId;
+                const dexScore = ('ownerId' in c) ? c.abilityScores.dexterity : c.definition.abilityScores.dexterity;
+                return {
+                    id: id,
+                    initiative: rollInitiative(dexScore)
+                };
+            });
+
+            initiatives.sort((a, b) => b.initiative - a.initiative);
+            const order = initiatives.map(i => i.id);
+            
+            campaignActions.setInitiativeOrder(order);
+            campaignActions.setCurrentPlayerId(order[0]);
+            campaignActions.logEvent({ type: 'system', text: `Pertarungan dimulai! Urutan inisiatif telah ditentukan.` }, turnId);
+            campaignActions.endTurn();
+        }
+    }, [campaign.gameState, campaign.initiativeOrder.length, campaign.monsters, players, campaignActions, campaign.playerIds]);
+
+
+    // Effect untuk memajukan giliran (Tidak berubah)
     useEffect(() => {
         if (campaign.gameState === 'combat' && !campaign.turnId) {
             advanceTurn();
         }
     }, [campaign.gameState, campaign.turnId, advanceTurn]);
 
+
+    // =================================================================
+    // FUNGSI AKSI PLAYER (Tidak berubah dari implementasi Fase 2)
+    // =================================================================
 
     const handlePlayerAttack = useCallback((targetInstanceId: string, item: CharacterInventoryItem) => {
         if (character.currentHp <= 0 || !campaign.turnId || campaign.currentPlayerId !== character.id) {
@@ -447,10 +455,8 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
 
         const turnId = campaign.turnId;
 
-        // Cek Advantage/Disadvantage (Contoh: Aksi 'Hide' sebelumnya, Kesenjangan #5)
-        // Untuk saat ini, kita cek kondisi simpel:
-        const isAdvantage = false; // TODO: Cek kondisi 'invisible' atau 'hidden'
-        const isDisadvantage = false; // TODO: Cek kondisi 'poisoned' atau 'restrained'
+        const isAdvantage = false; // TODO: Cek kondisi
+        const isDisadvantage = false; // TODO: Cek kondisi
 
         const attackRollRequest: RollRequest = {
             type: 'attack', 
@@ -468,7 +474,6 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
 
     }, [campaign.monsters, campaign.turnId, campaign.currentPlayerId, character, campaignActions]);
 
-    // FITUR KELAS: Fighter - Second Wind (Kesenjangan #4)
     const handleSecondWind = useCallback(async () => {
         if (character.currentHp <= 0 || !campaign.turnId || campaign.currentPlayerId !== character.id || character.class !== 'Fighter') {
             return;
@@ -492,8 +497,6 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
 
         campaignActions.logEvent({ type: 'system', text: `${character.name} menggunakan Second Wind (Bonus Action) dan memulihkan ${healedAmount} HP (Total Roll: ${healing})!` }, turnId);
         
-        // Update SSoT Runtime (HP dan Status Bonus Action)
-        // Kita panggil SSoT update, yang akan memicu update state di App.tsx -> GameScreen -> hook ini
         await updateCharacter({ ...character, currentHp: newHp, usedBonusAction: true });
         
     }, [character, campaign.turnId, campaign.currentPlayerId, updateCharacter, campaignActions]);
@@ -568,10 +571,9 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
                     updatedCharacterState.spellSlots = newSlots;
                 } else {
                      campaignActions.logEvent({ type: 'system', text: `${character.name} tidak punya slot Lvl ${spell.level} tersisa!` }, turnId);
-                     return; // Gagal merapal
+                     return; 
                 }
             }
-            // Update SSoT
             await updateCharacter(updatedCharacterState);
         }
 
@@ -585,6 +587,6 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
         handleRollComplete,
         handleItemUse,
         handleSpellCast,
-        handleSecondWind, // Ekspor fungsi baru
+        handleSecondWind,
     };
 }
