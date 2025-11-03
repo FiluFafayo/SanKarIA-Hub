@@ -100,6 +100,7 @@ const App: React.FC = () => {
   // REFAKTORISASI DATA LOADING
   // =================================================================
   useEffect(() => {
+    // Hanya muat data saat ada sesi
     if (!session || !userId) {
         setIsLoading(false);
         setCampaigns([]);
@@ -107,20 +108,23 @@ const App: React.FC = () => {
         return;
     }
     
-    const loadData = async () => {
+    const loadDataAndSeed = async () => {
         setIsLoading(true);
         try {
-            // 1. Muat SSoT Karakter (Mandat 3.4)
+            // 1. Mulai seeding data global (items, spells, dll)
+            // Ini hanya akan berjalan 1x dan akan mengisi cache di dataService
+            await dataService.seedGlobalData();
+
+            // 2. Muat SSoT Karakter (Mandat 3.4)
             const fetchedCharacters = await dataService.getMyCharacters(userId);
             setCharacters(fetchedCharacters);
 
-            // 2. Muat Daftar Campaign berdasarkan karakter yang dimiliki
+            // 3. Muat Daftar Campaign berdasarkan karakter yang dimiliki
             const myCharacterIds = fetchedCharacters.map(c => c.id);
             const fetchedCampaigns = await dataService.getMyCampaigns(myCharacterIds);
             setCampaigns(fetchedCampaigns);
             
-            // 3. (Logika Seeding lama dihapus)
-            // (Kita akan menangani seeding di Fase 1.D jika characters.length === 0)
+            // (Logika seeding karakter default dipindah ke ProfileModal/ProfileView)
 
         } catch (error) {
             console.error("Gagal memuat data:", error);
@@ -130,7 +134,7 @@ const App: React.FC = () => {
         }
     };
 
-    loadData();
+    loadDataAndSeed();
   }, [session, userId]); // Hanya bergantung pada sesi
 
   // =================================================================
@@ -168,6 +172,31 @@ const App: React.FC = () => {
         console.error("Gagal menyimpan kampanye:", e);
         alert("Gagal menyimpan progres kampanye. Periksa koneksi Anda.");
     }
+  };
+
+  /**
+   * Menyimpan SSoT Karakter (Mandat 3.4)
+   * Ini adalah fungsi inti untuk menyimpan progres HP, inventory, spell slot, dll.
+   */
+  /**
+   * (Fase 1.E) Fungsi baru untuk menyimpan karakter yang BARU DIBUAT
+   */
+  const handleSaveNewCharacter = async (
+      charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
+      inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
+      spellData: SpellDefinition[]
+  ): Promise<void> => {
+      if (!userId) throw new Error("Tidak ada user ID saat menyimpan karakter baru.");
+      
+      try {
+          const newCharacter = await dataService.saveNewCharacter(charData, inventoryData, spellData, userId);
+          setCharacters(prev => [...prev, newCharacter]);
+          setPlayingCharacter(newCharacter); // Langsung mainkan karakter baru? (atau set selected)
+      } catch (e) {
+          console.error("Gagal menyimpan karakter baru:", e);
+          alert("Gagal menyimpan karakter baru. Coba lagi.");
+          throw e; // Lemparkan error agar modal tahu
+      }
   };
 
   /**
@@ -403,10 +432,10 @@ const App: React.FC = () => {
       case Location.MirrorOfSouls:
         return <ProfileView 
                   onClose={handleReturnToNexus} 
-                  characters={characters} // Kirim SSoT karakter
-                  setCharacters={setCharacters} // Kirim updater SSoT
+                  characters={characters} // SSoT Characters
+                  onSaveNewCharacter={handleSaveNewCharacter} // Prop baru
+                  setCharacters={setCharacters} // Prop lama (untuk update/delete)
                   userId={userId} 
-                  // (createClassLoadout dihapus, akan ditangani di Fase 1.D)
                 />;
       default:
         return null;

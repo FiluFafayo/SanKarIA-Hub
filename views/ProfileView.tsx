@@ -1,19 +1,20 @@
 import React from 'react';
-import { Character } from '../types';
+import { Character, CharacterInventoryItem, SpellDefinition } from '../types';
 import { ProfileModal } from '../components/modals/ProfileModal';
-
-// createClassLoadout dihapus total dari sini.
-// Logika itu akan dibangun ulang di dalam ProfileModalWizard di Fase 1.D
 
 interface ProfileViewProps {
   onClose: () => void;
   characters: Character[]; // SSoT Characters
-  setCharacters: React.Dispatch<React.SetStateAction<Character[]>>; // SSoT updater
+  setCharacters: React.Dispatch<React.SetStateAction<Character[]>>; // SSoT updater (untuk delete)
   userId: string;
+  onSaveNewCharacter: (
+      charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
+      inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
+      spellData: SpellDefinition[]
+  ) => Promise<void>; // Prop baru
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = (props) => {
-  // Untuk saat ini, kita hanya meneruskan prop SSoT ke ProfileModal.
-  // ProfileModal sendiri akan dirombak di Fase 1.D
+  // Hanya meneruskan prop SSoT ke ProfileModal.
   return <ProfileModal {...props} />;
 };

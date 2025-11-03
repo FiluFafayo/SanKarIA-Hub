@@ -32,7 +32,11 @@ interface ProfileModalProps {
   characters: Character[];
   setCharacters: React.Dispatch<React.SetStateAction<Character[]>>;
   userId: string;
-  // createClassLoadout dihapus, logika pindah ke sini
+  onSaveNewCharacter: (
+      charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
+      inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
+      spellData: SpellDefinition[]
+  ) => Promise<void>;
 }
 
 // =================================================================
@@ -128,7 +132,11 @@ const AbilityRoller: React.FC<{
 // Sub-Komponen: Wizard Pembuatan Karakter
 // =================================================================
 const CreateCharacterWizard: React.FC<{ 
-    onSave: (charData: Omit<Character, 'id' | 'ownerId'>) => void, 
+    onSave: (
+        charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
+        inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
+        spellData: SpellDefinition[]
+    ) => Promise<void>, 
     onCancel: () => void,
     userId: string
 }> = ({ onSave, onCancel, userId }) => {
@@ -165,11 +173,15 @@ const CreateCharacterWizard: React.FC<{
         }
     }
 
-    const handleSave = () => {
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSave = async () => {
         if (Object.keys(abilityScores).length !== 6) {
             alert("Selesaikan pelemparan semua dadu kemampuan.");
             return;
         }
+        
+        setIsSaving(true);
 
         const baseScores = abilityScores as AbilityScores;
         const finalScores = { ...baseScores };
@@ -185,7 +197,7 @@ const CreateCharacterWizard: React.FC<{
         const profSkills = new Set<Skill>([
             ...selectedBackground.skillProficiencies,
             ...(selectedRace.proficiencies?.skills || []),
-            // ... (Kita akan tambahkan 'selectedSkills' dari Step 4 di sini)
+            // TODO (Fase 1.X): Tambahkan 'selectedSkills' dari Step 4 di sini
         ]);
         
         // 3. Hitung Mekanika Inti
@@ -193,34 +205,44 @@ const CreateCharacterWizard: React.FC<{
         const dexModifier = getAbilityModifier(finalScores.dexterity);
         const maxHp = selectedClass.hpAtLevel1(conModifier);
         
-        // 4. Hitung AC (Sederhana, nanti di Fase 2 kita perbaiki)
-        // Untuk sekarang, kita pakai AC hardcode dari class
-        let armorClass = 10 + dexModifier; // Base AC
-        if (selectedClass.name === 'Fighter') armorClass = 18; // Chain Mail + Shield
-        if (selectedClass.name === 'Cleric') armorClass = 16; // Scale Mail + Shield
-        if (selectedClass.name === 'Rogue') armorClass = 11 + dexModifier; // Leather
-        if (selectedClass.name === 'Wizard') armorClass = 10 + dexModifier;
-
-        // 5. Kumpulkan Equipment
-        // (Sederhanakan: ambil semua 'fixed' dan pilihan pertama dari 'choices')
-        let inventory: Omit<CharacterInventoryItem, 'instanceId'>[] = [];
+        // 4. Kumpulkan Equipment (Pilihan Pertama)
+        let inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[] = [];
         selectedClass.startingEquipment.fixed.forEach(item => {
-            inventory.push(createInvItem(item.item, item.quantity));
+            inventoryData.push(createInvItem(item.item, item.quantity));
         });
         selectedClass.startingEquipment.choices.forEach(choice => {
             const firstOption = choice.options[0];
             firstOption.items.forEach(item => {
-                inventory.push(createInvItem(item, firstOption.quantity || 1));
+                inventoryData.push(createInvItem(item, firstOption.quantity || 1));
             });
         });
         selectedBackground.equipment.forEach(itemName => {
-             inventory.push(createInvItem(getItemDef(itemName)));
+             try {
+                inventoryData.push(createInvItem(getItemDef(itemName)));
+             } catch (e) {
+                console.warn(e); // (Abaikan jika item equipment background tidak ada)
+             }
         });
-        // (Logika equip armor/weapon akan kita tambahkan di Fase 2)
         
+        // 5. Hitung AC (Sederhana, berdasarkan equipment pilihan pertama)
+        let armorClass = 10 + dexModifier; // Base AC
+        const equippedArmor = inventoryData.find(i => i.item.type === 'armor');
+        if (equippedArmor) {
+            if (equippedArmor.item.armorType === 'light') {
+                armorClass = (equippedArmor.item.baseAc || 10) + dexModifier;
+            } else if (equippedArmor.item.armorType === 'medium') {
+                armorClass = (equippedArmor.item.baseAc || 10) + Math.min(2, dexModifier);
+            } else if (equippedArmor.item.armorType === 'heavy') {
+                armorClass = (equippedArmor.item.baseAc || 10);
+            }
+        }
+        if (inventoryData.some(i => i.item.name === 'Shield')) {
+            armorClass += 2;
+        }
+
         // 6. Kumpulkan Spell (jika ada)
         const spellSlots = selectedClass.spellcasting?.spellSlots || [];
-        const knownSpells = selectedClass.spellcasting?.knownSpells || [];
+        const spellData: SpellDefinition[] = selectedClass.spellcasting?.knownSpells || [];
 
         // 7. Buat Objek Karakter SSoT
         const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
@@ -231,13 +253,13 @@ const CreateCharacterWizard: React.FC<{
             xp: 0,
             image: `https://picsum.photos/seed/${generateId('charimg')}/100`,
             background: selectedBackground.name,
-            personalityTrait: '', // (Player bisa isi nanti)
+            personalityTrait: '',
             ideal: '',
             bond: '',
             flaw: '',
             abilityScores: finalScores,
             maxHp: Math.max(1, maxHp), 
-            currentHp: Math.max(1, maxHp), // Mulai dengan HP penuh
+            currentHp: Math.max(1, maxHp),
             tempHp: 0,
             armorClass: armorClass,
             speed: selectedRace.speed,
@@ -251,12 +273,16 @@ const CreateCharacterWizard: React.FC<{
             spellSlots: spellSlots,
         };
 
-        // 8. Panggil onSave (yang akan menangani 'inventory' dan 'knownSpells')
-        onSave({ ...newCharData, inventory: [], knownSpells: [] }); // Kirim data inti
-        
-        // (Logika SSoT Inventory & Spells akan ditangani di 'App.tsx' atau 'dataService')
-        // Ini adalah kelemahan desain, tapi untuk Fase 1.D ini cukup.
-        // Kita akan perbaiki di Fase 1.E (Seeding)
+        // 8. Panggil onSave (Fase 1.E)
+        try {
+            await onSave(newCharData, inventoryData, spellData);
+            // (onCancel() akan dipanggil oleh parent)
+        } catch (e) {
+            console.error("Gagal menyimpan:", e);
+            alert("Gagal menyimpan karakter baru. Coba lagi.");
+        } finally {
+            setIsSaving(false);
+        }
     };
     
     const handleBack = () => {
@@ -381,8 +407,10 @@ const CreateCharacterWizard: React.FC<{
                     </div>
                      <div className="flex-grow"></div>
                     <div className="flex justify-between">
-                        <button onClick={() => setStep(3)} className="font-cinzel text-gray-300 hover:text-white">&larr; Ganti Background</button>
-                        <button onClick={handleSave} className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded">Selesaikan</button>
+                        <button onClick={() => setStep(3)} className="font-cinzel text-gray-300 hover:text-white" disabled={isSaving}>&larr; Ganti Background</button>
+                        <button onClick={handleSave} className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500" disabled={isSaving}>
+                            {isSaving ? "Menyimpan..." : "Selesaikan"}
+                        </button>
                     </div>
                 </div>
             )}
@@ -393,8 +421,8 @@ const CreateCharacterWizard: React.FC<{
 // =================================================================
 // Komponen Utama: ProfileModal
 // =================================================================
-export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters, setCharacters, userId }) => {
-  const myCharacters = characters; // 'characters' dari App.tsx sudah di-filter by userId
+export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters, setCharacters, userId, onSaveNewCharacter }) => {
+  const myCharacters = characters; // App.tsx sudah memfilter
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -408,28 +436,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
     }
   }, [myCharacters, isCreating, selectedChar]);
 
-  const handleCreateCharacter = (charData: Omit<Character, 'id' | 'ownerId'>) => {
-    //
-    // INI ADALAH LOGIKA SEMENTARA SEBELUM KITA SEEDING DB 'items' & 'spells'
-    // Kita harus membuat karakter SSoT lengkap di sini
-    //
-    const newChar: Character = {
-        ...charData,
-        id: generateId('char'),
-        ownerId: userId,
-        // (inventory dan knownSpells harusnya kosong, lalu diisi oleh dataService.saveNewCharacter)
-        // Untuk sekarang, kita tiru logika lama
-        inventory: [], 
-        knownSpells: [],
-    };
-    
-    // TODO (Fase 1.E): Panggil dataService.saveNewCharacter(newCharData)
-    // yang akan menyimpan ke 'characters' DAN 'character_inventory' / 'character_spells'
-    // Untuk sekarang, kita update state lokal saja
-    
-    setCharacters(prev => [...prev, newChar]);
-    setSelectedChar(newChar);
-    setIsCreating(false);
+  const handleCreateCharacter = async (
+      charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
+      inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
+      spellData: SpellDefinition[]
+  ) => {
+    try {
+        // Panggil fungsi SSoT dari App.tsx
+        await onSaveNewCharacter(charData, inventoryData, spellData);
+        // 'setCharacters' dan 'setSelectedChar' akan di-trigger oleh App.tsx
+        // Kita hanya perlu menutup mode creating
+        setIsCreating(false);
+    } catch (e) {
+        // Error sudah di-handle di dalam wizard, biarkan modal tetap terbuka
+    }
   };
 
   return (
