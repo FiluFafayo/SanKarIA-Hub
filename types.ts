@@ -1,3 +1,9 @@
+// types.ts
+
+// =================================================================
+// BAGIAN 1: TIPE ENUM & UTILITAS DASAR D&D
+// =================================================================
+
 export enum Location {
     StorytellersSpire = "Puncak Pencerita",
     HallOfEchoes = "Aula Gema",
@@ -8,140 +14,6 @@ export enum Location {
 }
 
 export type ThinkingState = 'idle' | 'thinking' | 'retrying';
-
-export interface DiceRoll {
-    notation: string;
-    rolls: number[];
-    modifier: number;
-    total: number;
-    success?: boolean;
-    type: 'attack' | 'damage' | 'skill' | 'savingThrow' | 'initiative' | 'deathSave';
-    details?: string;
-}
-
-// Base event structure
-interface BaseEvent {
-    id: string;
-    timestamp: string;
-    turnId: string;
-}
-
-export interface PlayerActionEvent extends BaseEvent {
-    type: 'player_action';
-    characterId: string;
-    text: string;
-}
-
-export interface DmNarrationEvent extends BaseEvent {
-    type: 'dm_narration';
-    text: string;
-}
-
-export interface DmReactionEvent extends BaseEvent {
-    type: 'dm_reaction';
-    text: string;
-}
-
-export interface SystemMessageEvent extends BaseEvent {
-    type: 'system';
-    text: string;
-}
-
-export interface RollResultEvent extends BaseEvent {
-    type: 'roll_result';
-    characterId: string;
-    roll: DiceRoll;
-    reason: string;
-}
-
-export type GameEvent = PlayerActionEvent | DmNarrationEvent | SystemMessageEvent | RollResultEvent | DmReactionEvent;
-
-
-export interface MonsterAction {
-    name: string;
-    toHitBonus: number;
-    damageDice: string;
-}
-
-export interface Monster {
-    id: string;
-    name: string;
-    maxHp: number;
-    currentHp: number;
-    armorClass: number;
-    dexterity: number;
-    actions: MonsterAction[];
-    initiative: number;
-    conditions: string[];
-}
-
-export type QuestStatus = 'active' | 'completed' | 'failed' | 'proposed';
-
-export interface Quest {
-    id: string;
-    title: string;
-    description: string;
-    status: QuestStatus;
-    isMainQuest?: boolean;
-    reward?: string; // NEW: Added reward property
-}
-
-export interface NPC {
-    id: string;
-    name: string;
-    description: string;
-    location: string;
-    disposition: 'Friendly' | 'Neutral' | 'Hostile' | 'Unknown';
-    interactionHistory: string[];
-}
-
-export interface MapMarker {
-    id: string;
-    name: string;
-    x: number; // Percentage from left
-    y: number; // Percentage from top
-}
-
-export type WorldTime = 'Pagi' | 'Siang' | 'Sore' | 'Malam';
-export type WorldWeather = 'Cerah' | 'Berawan' | 'Hujan' | 'Badai';
-
-
-export interface Campaign {
-    id: string;
-    title: string;
-    description: string;
-    mainGenre: string;
-    subGenre: string;
-    duration: string;
-    isNSFW: boolean;
-    maxPlayers: number;
-    theme: string;
-    dmPersonality: string;
-    dmNarrationStyle: 'Deskriptif' | 'Langsung & Percakapan';
-    responseLength: 'Singkat' | 'Standar' | 'Rinci';
-    eventLog: GameEvent[];
-    turnId: string | null;
-    longTermMemory: string;
-    image: string;
-    playerIds: string[];
-    currentPlayerId: string | null;
-    joinCode: string;
-    gameState: 'exploration' | 'combat';
-    monsters: Monster[];
-    initiativeOrder: string[]; // array of character/monster ids
-    isPublished?: boolean;
-    choices: string[];
-    quests: Quest[];
-    npcs: NPC[];
-    // Dynamic World State
-    currentTime: WorldTime;
-    currentWeather: WorldWeather;
-    worldEventCounter: number; // Tracks turns until next world event check
-    // Interactive Map State
-    mapImageUrl?: string;
-    mapMarkers: MapMarker[];
-    currentPlayerLocation?: string; // ID of the marker where players are
-}
 
 export enum Ability {
     Strength = 'strength',
@@ -206,80 +78,310 @@ export const SKILL_ABILITY_MAP: Record<Skill, Ability> = {
 };
 
 
-export type ItemType = 'weapon' | 'armor' | 'consumable' | 'tool' | 'other';
-export interface ItemEffect {
-    type: 'heal' | 'damage';
-    dice: string;
-}
+// =================================================================
+// BAGIAN 2: TIPE DEFINISI GLOBAL (Data Aturan dari DB)
+// =================================================================
 
-export interface InventoryItem {
+// Merepresentasikan tabel 'items'
+export interface ItemDefinition {
+    id: string;
     name: string;
-    quantity: number;
     description?: string;
-    type: ItemType;
-    isEquipped?: boolean;
-    toHitBonus?: number; // For weapons
-    damageDice?: string; // For weapons
-    effect?: ItemEffect; // For consumables
+    type: 'weapon' | 'armor' | 'consumable' | 'tool' | 'other';
+    isMagical: boolean;
+    rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary';
+    requiresAttunement: boolean;
+    bonuses?: { attack?: number; damage?: number; ac?: number };
+    damageDice?: string;
+    damageType?: string;
+    baseAc?: number;
+    armorType?: 'light' | 'medium' | 'heavy' | 'shield';
+    stealthDisadvantage?: boolean;
+    strengthRequirement?: number;
+    effect?: { type: 'heal' | 'damage'; dice: string };
 }
 
-export interface SpellSlot {
-    level: number;
-    max: number;
-    used: number;
-}
-
-export type SpellTarget = 'self' | 'creature' | 'point';
-export interface Spell {
+// Merepresentasikan tabel 'spells'
+export interface SpellDefinition {
+    id: string;
     name: string;
     level: number;
     description: string;
-    target: SpellTarget;
-    effect: ItemEffect; // Can re-use ItemEffect for healing/damage spells
+    castingTime: 'action' | 'bonus_action' | 'reaction' | 'minute' | 'hour';
+    range: string;
+    components: ('V' | 'S' | 'M')[];
+    duration: string; // 'Instantaneous', 'Concentration, 1 minute'
+    school: string;
+    effectType: 'damage' | 'heal' | 'buff' | 'debuff' | 'control' | 'utility';
+    damageDice?: string;
+    damageType?: string;
+    saveRequired?: Ability;
+    saveOnSuccess?: 'half_damage' | 'no_effect';
+    conditionApplied?: string;
 }
 
+// Merepresentasikan tabel 'monsters'
+export interface MonsterDefinition {
+    id: string;
+    name: string;
+    armorClass: number;
+    maxHp: number;
+    abilityScores: AbilityScores;
+    skills: Partial<Record<Skill, number>>;
+    traits: { name: string; description: string }[];
+    actions: { name: string; toHitBonus?: number; damageDice?: string; description?: string }[];
+    senses: { darkvision: number; passivePerception: number; tremorsense?: number; truesight?: number };
+    languages: string[];
+    challengeRating: number;
+    xp: number;
+}
 
+// =================================================================
+// BAGIAN 3: TIPE KARAKTER (SSoT - Mandat 3.4)
+// =================================================================
+
+// Fitur dari Ras atau Kelas
+export interface CharacterFeature {
+    name: string;
+    description: string;
+    // (Akan ditambah di Fase 2)
+    // uses?: { max: number; spent: number; resetOn: 'short_rest' | 'long_rest' };
+}
+
+// Item spesifik di inventory karakter
+export interface CharacterInventoryItem {
+    instanceId: string; // ID unik dari tabel 'character_inventory'
+    item: ItemDefinition; // Data definisi dari tabel 'items'
+    quantity: number;
+    isEquipped: boolean;
+    // (Akan ditambah di Fase 1)
+    // isAttuned: boolean; 
+}
+
+// Slot sihir karakter
+export interface CharacterSpellSlot {
+    level: number;
+    max: number;
+    spent: number;
+}
+
+// Tipe Karakter SSoT (Single Source of Truth)
+// Ini adalah gabungan dari data di tabel 'characters', 
+// 'character_inventory', dan 'character_spells'.
+// Ini adalah SSoT untuk Karakter, persisten di semua campaign.
 export interface Character {
     id: string;
-    ownerId: string;
+    ownerId: string; // 'owner_id' dari 'profiles'
     name: string;
     class: string;
     race: string;
     level: number;
+    xp: number;
     image: string;
+    
+    // Detail Karakter (dari Background - Fase 1)
     background: string;
     personalityTrait: string;
     ideal: string;
     bond: string;
     flaw: string;
+    
+    // Status & Mekanika Inti (Data Persisten per Mandat 3.4)
     abilityScores: AbilityScores;
     maxHp: number;
-    currentHp: number;
-    armorClass: number;
-    speed: number;
-    hitDice: string; // e.g., '1d10'
-    hitDiceSpent: number;
+    currentHp: number; // STATE PERSISTEN
+    tempHp: number;
+    armorClass: number; // Akan di-cache di sini
+    speed: number; // Akan di-cache di sini
+    hitDice: Record<string, { max: number; spent: number }>; // e.g., { "d10": { max: 1, spent: 0 } }
     deathSaves: { successes: number; failures: number };
-    conditions: string[]; // e.g., 'poisoned', 'prone'
+    conditions: string[]; // e.g., 'poisoned', 'exhaustion_1'
+    
+    // Proficiency & Fitur (dari Ras & Kelas - Fase 1)
+    racialTraits: CharacterFeature[];
+    classFeatures: CharacterFeature[];
     proficientSkills: Skill[];
     proficientSavingThrows: Ability[];
-    inventory: InventoryItem[];
-    spellSlots: SpellSlot[];
-    knownSpells: Spell[];
+    
+    // Resource (Data Persisten per Mandat 3.4)
+    spellSlots: CharacterSpellSlot[]; // STATE PERSISTEN
+
+    // Data Relasional (digabungkan saat loading)
+    inventory: CharacterInventoryItem[]; // STATE PERSISTEN
+    knownSpells: SpellDefinition[];
 }
+
+
+// =================================================================
+// BAGIAN 4: TIPE KAMPANYE (State Sesi Permainan)
+// =================================================================
+
+export type QuestStatus = 'active' | 'completed' | 'failed' | 'proposed';
+
+export interface Quest {
+    id: string;
+    title: string;
+    description: string;
+    status: QuestStatus;
+    isMainQuest?: boolean;
+    reward?: string;
+}
+
+export interface NPC {
+    id: string;
+    name: string;
+    description: string;
+    location: string;
+    disposition: 'Friendly' | 'Neutral' | 'Hostile' | 'Unknown';
+    interactionHistory: string[];
+}
+
+export interface MapMarker {
+    id: string;
+    name: string;
+    x: number; // Percentage from left
+    y: number; // Percentage from top
+}
+
+export type WorldTime = 'Pagi' | 'Siang' | 'Sore' | 'Malam';
+export type WorldWeather = 'Cerah' | 'Berawan' | 'Hujan' | 'Badai';
+
+// Ini adalah *instansi* monster dalam campaign
+export interface MonsterInstance {
+    instanceId: string; // ID unik dari 'campaign_monsters'
+    definition: MonsterDefinition; // Stat block dari 'monsters'
+    name: string; // "Goblin 1"
+    currentHp: number;
+    conditions: string[];
+    initiative: number;
+}
+
+// Base event structure
+interface BaseEvent {
+    id: string;
+    timestamp: string;
+    turnId: string;
+}
+
+export interface PlayerActionEvent extends BaseEvent {
+    type: 'player_action';
+    characterId: string;
+    text: string;
+}
+
+export interface DmNarrationEvent extends BaseEvent {
+    type: 'dm_narration';
+    text: string;
+}
+
+export interface DmReactionEvent extends BaseEvent {
+    type: 'dm_reaction';
+    text: string;
+}
+
+export interface SystemMessageEvent extends BaseEvent {
+    type: 'system';
+    text: string;
+}
+
+export interface DiceRoll {
+    notation: string;
+    rolls: number[];
+    modifier: number;
+    total: number;
+    success?: boolean;
+    type: 'attack' | 'damage' | 'skill' | 'savingThrow' | 'initiative' | 'deathSave';
+    details?: string;
+}
+
+export interface RollResultEvent extends BaseEvent {
+    type: 'roll_result';
+    characterId: string;
+    roll: DiceRoll;
+    reason: string;
+}
+
+export type GameEvent = PlayerActionEvent | DmNarrationEvent | SystemMessageEvent | RollResultEvent | DmReactionEvent;
+
+// Ini adalah objek Campaign DEFINISI (yang kita dapat dari list)
+export interface Campaign {
+    id: string;
+    ownerId: string;
+    title: string;
+    description: string;
+    image: string;
+    joinCode: string;
+    isPublished: boolean;
+    maxPlayers: number; // Saya tambahkan ini dari file lama, penting
+    theme: string; // Saya tambahkan ini dari file lama, penting
+    mainGenre: string; // Saya tambahkan ini dari file lama
+    subGenre: string; // Saya tambahkan ini dari file lama
+    duration: string; // Saya tambahkan ini dari file lama
+    isNSFW: boolean; // Saya tambahkan ini dari file lama
+
+    // DM Settings
+    dmPersonality: string;
+    dmNarrationStyle: 'Deskriptif' | 'Langsung & Percakapan';
+    responseLength: 'Singkat' | 'Standar' | 'Rinci';
+    
+    // Game State (disimpan di DB)
+    gameState: 'exploration' | 'combat';
+    currentPlayerId: string | null; // ID Karakter
+    initiativeOrder: string[]; // Array of 'character.id' dan 'monster.instanceId'
+    longTermMemory: string;
+    
+    // World State (disimpan di DB)
+    currentTime: WorldTime;
+    currentWeather: WorldWeather;
+    worldEventCounter: number;
+    
+    // Map State (disimpan di DB)
+    mapImageUrl?: string;
+    mapMarkers: MapMarker[];
+    currentPlayerLocation?: string;
+    
+    // Dynamic Data (disimpan di DB)
+    quests: Quest[];
+    npcs: NPC[];
+
+    // Data relasional (di-load saat runtime)
+    monsters: MonsterInstance[];
+    eventLog: GameEvent[];
+    playerIds: string[]; // Daftar ID Karakter yang ada di campaign ini
+
+    // Runtime-only state (Tidak disimpan di DB 'campaigns')
+    choices: string[];
+    turnId: string | null;
+}
+
+// =================================================================
+// BAGIAN 5: TIPE INTERAKSI & AI
+// =================================================================
+
+// Tipe ini merepresentasikan state gabungan yang dikirim ke AI
+// dan juga state yang di-pass ke GameScreen
+export interface CampaignState extends Campaign {
+    thinkingState: ThinkingState;
+    activeRollRequest: RollRequest | null;
+    players: Character[]; // Daftar objek Karakter *lengkap* yang ada di sesi ini
+}
+
 
 export interface RollRequest {
     type: 'skill' | 'savingThrow' | 'attack' | 'damage' | 'deathSave';
-    characterId: string;
+    characterId: string; // 'character.id' atau 'monster.instanceId'
     reason: string;
     skill?: Skill;
     ability?: Ability;
     dc?: number;
-    target?: { id: string; name: string; ac: number }; // For attack rolls
-    item?: InventoryItem; // For attack rolls with items
+    target?: { id: string; name: string; ac: number }; // ID bisa 'character.id' atau 'monster.instanceId'
+    item?: CharacterInventoryItem; // Untuk serangan dengan item
     originalActionText?: string;
-    stage?: 'attack' | 'damage'; // Added for two-step combat rolls
-    damageDice?: string; // Added for damage roll stage
+    stage?: 'attack' | 'damage';
+    damageDice?: string;
+    // (Akan ditambah di Fase 2)
+    // isAdvantage?: boolean;
+    // isDisadvantage?: boolean;
 }
 
 export interface ToolCall {
@@ -287,7 +389,6 @@ export interface ToolCall {
     args: any;
 }
 
-// The new structured response format expected from the AI.
 export interface StructuredApiResponse {
     reaction?: string;
     narration: string;
