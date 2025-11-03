@@ -133,11 +133,6 @@ const App: React.FC = () => {
     loadData();
   }, [session, userId]); // Hanya bergantung pada sesi
 
-  const handleReturnToNexus = useCallback(() => {
-    setCurrentView('nexus');
-    setCampaignToJoinOrStart(null);
-  }, []);
-
   // =================================================================
   // REFAKTORISASI FUNGSI DATA (SESUAI SSoT)
   // =================================================================
