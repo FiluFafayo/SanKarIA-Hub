@@ -5,22 +5,20 @@ import {
     Character, Ability, Skill, ALL_ABILITIES, AbilityScores, CharacterInventoryItem, 
     SpellDefinition, CharacterSpellSlot, CharacterFeature, ItemDefinition 
 } from '../../types';
-import { generateId, getAbilityModifier, rollOneAbilityScore } from '../../utils';
-// HAPUS IMPORT DATA STATIS
-// import { RACES, RaceData } from '../../data/races';
-// import { CLASS_DEFINITIONS, ClassData } from '../../data/classes';
-// import { BACKGROUNDS, BackgroundData } from '../../data/backgrounds';
-// import { ITEM_DEFINITIONS } from '../../data/items';
-// import { SPELL_DEFINITIONS } from '../../data/spells';
-import { dataService } from '../../services/dataService'; // GANTI DENGAN dataService
+import { generateId, getAbilityModifier, getProficiencyBonus } from '../../utils';
+import { dataService } from '../../services/dataService';
 import { Die } from '../Die';
+import { SelectionCard } from '../SelectionCard'; // Import SelectionCard
+import { RaceData } from '../../data/races'; // Import Tipe Data
+import { ClassData, EquipmentChoice } from '../../data/classes'; // Import Tipe Data
+import { BackgroundData } from '../../data/backgrounds'; // Import Tipe Data
 
 // Helper untuk mengambil definisi item berdasarkan nama dari cache dataService
 const getItemDef = (name: string): ItemDefinition => {
     const definition = dataService.findItemDefinition(name);
     if (!definition) {
         console.error(`ItemDefinition not found in cache: ${name}`);
-        // Buat fallback agar UI tidak crash, meskipun DB insert akan gagal
+        // Buat fallback agar UI tidak crash
         return { id: name, name, type: 'other', isMagical: false, rarity: 'common', requiresAttunement: false };
     }
     return definition;
@@ -46,7 +44,7 @@ interface ProfileModalProps {
 }
 
 // =================================================================
-// Sub-Komponen: AbilityRoller
+// Sub-Komponen: AbilityRoller (Tidak Berubah)
 // =================================================================
 const AbilityRoller: React.FC<{ 
     ability: Ability; 
@@ -57,11 +55,10 @@ const AbilityRoller: React.FC<{
     const [rolls, setRolls] = useState([0, 0, 0, 0]);
     const [result, setResult] = useState(0);
 
-    // Jika sudah ada skor (misal, saat 'back'), langsung tampilkan 'finished'
     useEffect(() => {
         if (currentScore) {
             setResult(currentScore);
-            setRolls([currentScore, 0, 0, 0]); // Tampilkan skornya saja
+            setRolls([currentScore, 0, 0, 0]); 
             setPhase('finished');
         }
     }, [currentScore]);
@@ -77,13 +74,13 @@ const AbilityRoller: React.FC<{
             clearInterval(interval);
             const finalRolls = [ Math.ceil(Math.random() * 6), Math.ceil(Math.random() * 6), Math.ceil(Math.random() * 6), Math.ceil(Math.random() * 6) ];
             const sortedRolls = [...finalRolls].sort((a, b) => a - b);
-            sortedRolls.shift(); // Buang terendah
+            sortedRolls.shift(); 
             const finalResult = sortedRolls.reduce((sum, roll) => sum + roll, 0);
             
             setRolls(finalRolls);
             setResult(finalResult);
             setPhase('finished');
-            setTimeout(() => onRoll(ability, finalResult), 1500); // Kirim skor
+            setTimeout(() => onRoll(ability, finalResult), 1500);
         }, 1500);
     };
 
@@ -102,7 +99,7 @@ const AbilityRoller: React.FC<{
                 </div>
             ) : (
                  <div className="my-6 h-20 flex flex-col items-center">
-                    {rolls.length === 4 ? ( // Tampilkan 4 dadu jika kita baru roll
+                    {rolls.length === 4 ? (
                         <>
                             <div className="flex gap-4">
                                 {sortedRollsForDisplay.map((r, i) => (
@@ -111,12 +108,11 @@ const AbilityRoller: React.FC<{
                             </div>
                             <p className="text-sm text-gray-400 mt-1">Nilai terendah ({sortedRollsForDisplay[0]}) dibuang.</p>
                         </>
-                    ) : ( // Tampilkan hanya 1 dadu (skor) jika kita 'back'
+                    ) : (
                         <Die sides={20} value={result} size="md" />
                     )}
                 </div>
             )}
-
 
             {phase === 'waiting' && (
                 <button onClick={handleRoll} className="font-cinzel text-2xl bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-lg shadow-lg transition-transform hover:scale-105">
@@ -135,7 +131,7 @@ const AbilityRoller: React.FC<{
 };
 
 // =================================================================
-// Sub-Komponen: Wizard Pembuatan Karakter
+// Sub-Komponen: Wizard Pembuatan Karakter (REFAKTORISASI BESAR)
 // =================================================================
 const CreateCharacterWizard: React.FC<{ 
     onSave: (
@@ -146,10 +142,10 @@ const CreateCharacterWizard: React.FC<{
     onCancel: () => void,
     userId: string
 }> = ({ onSave, onCancel, userId }) => {
+    // Alur 6 langkah baru
     const [step, setStep] = useState(1);
 
-    // Ambil data definisi dari file data statis (ini masih oke untuk UI wizard)
-    // Kita akan gunakan cache dataService untuk helper `getItemDef` saat menyimpan
+    // Ambil data definisi dari global scope (di-load oleh App.tsx)
     const RACES: RaceData[] = useMemo(() => (window as any).RACES_DATA || [], []);
     const CLASS_DEFINITIONS: Record<string, ClassData> = useMemo(() => (window as any).CLASS_DEFINITIONS_DATA || {}, []);
     const BACKGROUNDS: BackgroundData[] = useMemo(() => (window as any).BACKGROUNDS_DATA || [], []);
@@ -167,26 +163,36 @@ const CreateCharacterWizard: React.FC<{
     // Step 3: Background
     const [selectedBackground, setSelectedBackground] = useState<BackgroundData>(BACKGROUNDS[0]);
     
-    // Step 4: Pilihan (Skill & Equipment)
-    // (Ini akan jadi kompleks, kita sederhanakan dulu)
+    // Step 4: Pilihan Skill (BARU)
     const [selectedSkills, setSelectedSkills] = useState<Skill[]>([]);
     
-    // Step 5: Finalisasi (HP, AC, dll)
-    // (Ini akan dihitung di step 5)
+    // Step 5: Pilihan Equipment (BARU)
+    // Menyimpan Opsi yang dipilih (bukan item-nya) per indeks
+    const [selectedEquipment, setSelectedEquipment] = useState<Record<number, EquipmentChoice['options'][0]>>({});
+
+    // Reset pilihan jika class berubah
+    useEffect(() => {
+        setSelectedSkills([]);
+        const initialEquipment: Record<number, EquipmentChoice['options'][0]> = {};
+        selectedClass.startingEquipment.choices.forEach((choice, index) => {
+            initialEquipment[index] = choice.options[0]; // Default ke pilihan pertama
+        });
+        setSelectedEquipment(initialEquipment);
+    }, [selectedClass]);
+
 
     const handleAbilityRollComplete = (ability: Ability, score: number) => {
         setAbilityScores(prev => ({...prev, [ability]: score}));
-        // Otomatis lanjut ke roll berikutnya
-        if (currentAbilityIndex < abilitiesToRoll.length - 1) {
-             // (Tidak ada 'setStep', biarkan 'AbilityRoller' di-render ulang)
-        } else {
-            // Selesai roll, lanjut ke step 3
-            setStep(3);
+        if (currentAbilityIndex === abilitiesToRoll.length - 1) {
+            setStep(3); // Lanjut ke Background
         }
     }
 
     const [isSaving, setIsSaving] = useState(false);
 
+    // =================================================================
+    // LOGIKA 'handleSave' BARU (Kesenjangan #2)
+    // =================================================================
     const handleSave = async () => {
         if (Object.keys(abilityScores).length !== 6) {
             alert("Selesaikan pelemparan semua dadu kemampuan.");
@@ -205,11 +211,11 @@ const CreateCharacterWizard: React.FC<{
             }
         }
         
-        // 2. Kumpulkan Proficiency
+        // 2. Kumpulkan Proficiency (DARI PILIHAN)
         const profSkills = new Set<Skill>([
             ...selectedBackground.skillProficiencies,
             ...(selectedRace.proficiencies?.skills || []),
-            // TODO (Fase 1.X): Tambahkan 'selectedSkills' dari Step 4 di sini
+            ...selectedSkills, // <- Gunakan state pilihan
         ]);
         
         // 3. Hitung Mekanika Inti
@@ -217,44 +223,64 @@ const CreateCharacterWizard: React.FC<{
         const dexModifier = getAbilityModifier(finalScores.dexterity);
         const maxHp = selectedClass.hpAtLevel1(conModifier);
         
-        // 4. Kumpulkan Equipment (Pilihan Pertama)
+        // 4. Kumpulkan Equipment (DARI PILIHAN)
         let inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[] = [];
+        // Tambahkan item Tetap (Fixed) dari Kelas
         selectedClass.startingEquipment.fixed.forEach(item => {
             inventoryData.push(createInvItem(item.item, item.quantity));
         });
-        selectedClass.startingEquipment.choices.forEach(choice => {
-            const firstOption = choice.options[0];
-            firstOption.items.forEach(item => {
-                inventoryData.push(createInvItem(item, firstOption.quantity || 1));
+        // Tambahkan item Pilihan (Choices) dari Kelas
+        Object.values(selectedEquipment).forEach(chosenOption => {
+            chosenOption.items.forEach(itemDef => {
+                inventoryData.push(createInvItem(itemDef, chosenOption.quantity || 1));
             });
         });
+        // Tambahkan item dari Background
         selectedBackground.equipment.forEach(itemName => {
              try {
                 inventoryData.push(createInvItem(getItemDef(itemName)));
              } catch (e) {
-                console.warn(e); // (Abaikan jika item equipment background tidak ada)
+                console.warn(e);
              }
         });
         
-        // 5. Hitung AC (Sederhana, berdasarkan equipment pilihan pertama)
-        let armorClass = 10 + dexModifier; // Base AC
-        const equippedArmor = inventoryData.find(i => i.item.type === 'armor');
-        if (equippedArmor) {
-            if (equippedArmor.item.armorType === 'light') {
-                armorClass = (equippedArmor.item.baseAc || 10) + dexModifier;
-            } else if (equippedArmor.item.armorType === 'medium') {
-                armorClass = (equippedArmor.item.baseAc || 10) + Math.min(2, dexModifier);
-            } else if (equippedArmor.item.armorType === 'heavy') {
-                armorClass = (equippedArmor.item.baseAc || 10);
+        // 5. Hitung AC (BERDASARKAN PILIHAN)
+        let armorClass = 10 + dexModifier; // Base AC (Unarmored)
+        let equippedArmorDef: ItemDefinition | null = null;
+        
+        // Tandai armor & shield pertama yang ditemukan sebagai 'equipped'
+        const armorIndex = inventoryData.findIndex(i => i.item.type === 'armor' && i.item.armorType !== 'shield');
+        const shieldIndex = inventoryData.findIndex(i => i.item.name === 'Shield');
+        
+        if (armorIndex > -1) {
+            inventoryData[armorIndex].isEquipped = true;
+            equippedArmorDef = inventoryData[armorIndex].item;
+        }
+        if (shieldIndex > -1) {
+            inventoryData[shieldIndex].isEquipped = true;
+        }
+
+        // Hitung AC berdasarkan armor yang terpasang
+        if (equippedArmorDef) {
+            const baseAc = equippedArmorDef.baseAc || 10;
+            if (equippedArmorDef.armorType === 'light') {
+                armorClass = baseAc + dexModifier;
+            } else if (equippedArmorDef.armorType === 'medium') {
+                armorClass = baseAc + Math.min(2, dexModifier);
+            } else if (equippedArmorDef.armorType === 'heavy') {
+                armorClass = baseAc;
             }
         }
-        if (inventoryData.some(i => i.item.name === 'Shield')) {
-            armorClass += 2;
+        if (shieldIndex > -1) {
+            armorClass += 2; // Tambah bonus shield
         }
 
         // 6. Kumpulkan Spell (jika ada)
         const spellSlots = selectedClass.spellcasting?.spellSlots || [];
-        const spellData: SpellDefinition[] = selectedClass.spellcasting?.knownSpells || [];
+        const spellData: SpellDefinition[] = [
+            ...(selectedClass.spellcasting?.knownCantrips || []),
+            ...(selectedClass.spellcasting?.knownSpells || []),
+        ];
 
         // 7. Buat Objek Karakter SSoT
         const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
@@ -263,9 +289,9 @@ const CreateCharacterWizard: React.FC<{
             race: selectedRace.name,
             level: 1,
             xp: 0,
-            image: `https://picsum.photos/seed/${generateId('charimg')}/100`,
+            image: selectedRace.img, // Gunakan gambar Ras
             background: selectedBackground.name,
-            personalityTrait: '',
+            personalityTrait: '', // (Kita bisa tambahkan ini di wizard nanti)
             ideal: '',
             bond: '',
             flaw: '',
@@ -285,10 +311,9 @@ const CreateCharacterWizard: React.FC<{
             spellSlots: spellSlots,
         };
 
-        // 8. Panggil onSave (Fase 1.E)
+        // 8. Panggil onSave
         try {
             await onSave(newCharData, inventoryData, spellData);
-            // (onCancel() akan dipanggil oleh parent)
         } catch (e) {
             console.error("Gagal menyimpan:", e);
             alert("Gagal menyimpan karakter baru. Coba lagi.");
@@ -304,15 +329,40 @@ const CreateCharacterWizard: React.FC<{
            onCancel();
        }
     }
+    
+    // Helper untuk Pilihan Skill (Step 4)
+    const handleSkillToggle = (skill: Skill) => {
+        const limit = selectedClass.proficiencies.skills.choices;
+        setSelectedSkills(prev => {
+            if (prev.includes(skill)) {
+                return prev.filter(s => s !== skill);
+            } else {
+                if (prev.length >= limit) {
+                    alert(`Anda hanya bisa memilih ${limit} skill.`);
+                    return prev;
+                }
+                return [...prev, skill];
+            }
+        });
+    };
+    
+    // Helper untuk Pilihan Equipment (Step 5)
+    const handleEquipmentSelect = (choiceIndex: number, optionIndex: number) => {
+        const choice = selectedClass.startingEquipment.choices[choiceIndex];
+        const selectedOption = choice.options[optionIndex];
+        setSelectedEquipment(prev => ({
+            ...prev,
+            [choiceIndex]: selectedOption
+        }));
+    };
 
     // ================== RENDER WIZARD ==================
     return (
         <div className="p-4 w-full h-full flex flex-col">
              <h3 className="font-cinzel text-2xl text-blue-200 mb-4 text-center">
-                Menciptakan Jiwa Baru (Langkah {step}/5)
+                Menciptakan Jiwa Baru (Langkah {step}/6)
             </h3>
 
-            {/* Tombol Back (selalu ada kecuali di step 1) */}
             {step > 1 && (
                 <button onClick={handleBack} className="absolute top-4 left-4 font-cinzel text-gray-300 hover:text-white z-10">
                     &larr; Kembali
@@ -326,30 +376,27 @@ const CreateCharacterWizard: React.FC<{
                     <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4" />
                     
                     <label className="block mb-1 font-cinzel text-sm">Ras</label>
-                    <select value={selectedRace.name} onChange={e => setSelectedRace(RACES.find(r => r.name === e.target.value) || RACES[0])} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
-                        {RACES.map(r => <option key={r.name} value={r.name}>{r.name}</option>)}
-                    </select>
+                    <div className="grid grid-cols-3 gap-2 mb-4">
+                        {RACES.map(r => (
+                            <SelectionCard 
+                                key={r.name} 
+                                title={r.name} 
+                                imageUrl={r.img}
+                                isSelected={selectedRace.name === r.name}
+                                onClick={() => setSelectedRace(r)}
+                            />
+                        ))}
+                    </div>
 
                     <label className="block mb-1 font-cinzel text-sm">Kelas</label>
-                    <select value={selectedClass.name} onChange={e => setSelectedClass(CLASS_DEFINITIONS[e.target.value] || CLASS_DEFINITIONS['Fighter'])} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-6">
+                    <select value={selectedClass.name} onChange={e => setSelectedClass(CLASS_DEFINITIONS[e.target.value] || CLASS_DEFINITIONS['Fighter'])} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
                        {Object.keys(CLASS_DEFINITIONS).map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     
-                    {/* Tampilkan Info Pilihan */}
-                    <div className="grid grid-cols-2 gap-4 text-xs bg-black/20 p-3 rounded">
-                        <div>
-                            <strong className="text-blue-300">{selectedRace.name} Traits:</strong>
-                            <ul className="list-disc list-inside pl-2">
-                                {selectedRace.traits.map(t => <li key={t.name}>{t.name}</li>)}
-                                {selectedRace.senses?.darkvision && <li>Darkvision</li>}
-                            </ul>
-                        </div>
-                        <div>
-                            <strong className="text-blue-300">{selectedClass.name} Features:</strong>
-                            <ul className="list-disc list-inside pl-2">
-                                {selectedClass.features.map(f => <li key={f.name}>{f.name}</li>)}
-                            </ul>
-                        </div>
+                    <div className="text-xs bg-black/20 p-3 rounded">
+                        <p>{selectedClass.description}</p>
+                        <p className="mt-2"><strong>Proficiency:</strong> {selectedClass.proficiencies.armor.join(', ') || 'None'}, {selectedClass.proficiencies.weapons.join(', ')}.</p>
+                        <p><strong>Saving Throw:</strong> {selectedClass.proficiencies.savingThrows.join(', ')}.</p>
                     </div>
 
                     <div className="flex-grow"></div>
@@ -363,7 +410,7 @@ const CreateCharacterWizard: React.FC<{
             {/* === STEP 2: Ability Scores === */}
             {step === 2 && currentAbilityIndex < abilitiesToRoll.length && (
                <AbilityRoller 
-                    key={abilitiesToRoll[currentAbilityIndex]} // Kunci agar komponen di-reset
+                    key={abilitiesToRoll[currentAbilityIndex]}
                     ability={abilitiesToRoll[currentAbilityIndex]}
                     onRoll={handleAbilityRollComplete}
                     currentScore={abilityScores[abilitiesToRoll[currentAbilityIndex]] || null}
@@ -374,9 +421,17 @@ const CreateCharacterWizard: React.FC<{
             {step === 3 && (
                 <div className="flex flex-col flex-grow animate-fade-in-fast">
                     <label className="block mb-1 font-cinzel text-sm">Background</label>
-                    <select value={selectedBackground.name} onChange={e => setSelectedBackground(BACKGROUNDS.find(b => b.name === e.target.value) || BACKGROUNDS[0])} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
-                        {BACKGROUNDS.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
-                    </select>
+                    <div className="grid grid-cols-3 gap-2 mb-4 max-h-80 overflow-y-auto">
+                        {BACKGROUNDS.map(b => (
+                            <SelectionCard 
+                                key={b.name} 
+                                title={b.name} 
+                                imageUrl={`https://picsum.photos/seed/${b.name.toLowerCase()}/200`}
+                                isSelected={selectedBackground.name === b.name}
+                                onClick={() => setSelectedBackground(b)}
+                            />
+                        ))}
+                    </div>
 
                     <div className="bg-black/20 p-3 rounded text-sm space-y-2">
                         <p>{selectedBackground.description}</p>
@@ -393,12 +448,69 @@ const CreateCharacterWizard: React.FC<{
                 </div>
             )}
 
-            {/* === STEP 4: Pilihan (Sederhana) === */}
-            {/* (Sesuai Mandat 4.7, kita skip UI kompleks untuk 'pilihan' skill/equip dulu,
-               kita lanjut ke review) */}
-
-            {/* === STEP 5: Review & Finalisasi === */}
+            {/* === STEP 4: Pilihan Skill (BARU) === */}
             {step === 4 && (
+                <div className="flex flex-col flex-grow animate-fade-in-fast">
+                    <h4 className="font-cinzel text-xl text-blue-200 mb-2">Pilihan Skill Kelas</h4>
+                    <p className="text-sm mb-4">Sebagai {selectedClass.name}, pilih <strong>{selectedClass.proficiencies.skills.choices}</strong> skill berikut:</p>
+                    <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                        {selectedClass.proficiencies.skills.options.map(skill => (
+                            <label key={skill} className={`p-3 rounded-lg cursor-pointer ${selectedSkills.includes(skill) ? 'bg-blue-600' : 'bg-black/30 hover:bg-black/50'}`}>
+                                <input 
+                                    type="checkbox" 
+                                    className="mr-2"
+                                    checked={selectedSkills.includes(skill)}
+                                    onChange={() => handleSkillToggle(skill)}
+                                />
+                                {skill}
+                            </label>
+                        ))}
+                    </div>
+                    <div className="flex-grow"></div>
+                    <div className="flex justify-between">
+                         <button onClick={() => setStep(3)} className="font-cinzel text-gray-300 hover:text-white">&larr; Ganti Background</button>
+                        <button 
+                            onClick={() => setStep(5)} 
+                            disabled={selectedSkills.length !== selectedClass.proficiencies.skills.choices}
+                            className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"
+                        >
+                            Lanjutkan
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* === STEP 5: Pilihan Equipment (BARU) === */}
+            {step === 5 && (
+                 <div className="flex flex-col flex-grow animate-fade-in-fast">
+                    <h4 className="font-cinzel text-xl text-blue-200 mb-2">Pilihan Equipment</h4>
+                    <p className="text-sm mb-4">Pilih equipment awal Anda:</p>
+                    <div className="space-y-4 max-h-72 overflow-y-auto pr-2">
+                        {selectedClass.startingEquipment.choices.map((choice, choiceIndex) => (
+                            <div key={choiceIndex}>
+                                <label className="block mb-1 text-sm text-gray-300">{choice.description}</label>
+                                <select 
+                                    value={choice.options.findIndex(opt => opt.name === selectedEquipment[choiceIndex]?.name)}
+                                    onChange={(e) => handleEquipmentSelect(choiceIndex, parseInt(e.target.value, 10))}
+                                    className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1"
+                                >
+                                    {choice.options.map((option, optionIndex) => (
+                                        <option key={option.name} value={optionIndex}>{option.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex-grow"></div>
+                    <div className="flex justify-between">
+                         <button onClick={() => setStep(4)} className="font-cinzel text-gray-300 hover:text-white">&larr; Ganti Skill</button>
+                        <button onClick={() => setStep(6)} className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded">Lanjutkan</button>
+                    </div>
+                 </div>
+            )}
+
+            {/* === STEP 6: Review & Finalisasi (Dulu Step 4) === */}
+            {step === 6 && (
                 <div className="flex flex-col flex-grow animate-fade-in-fast">
                     <p className="text-center text-lg text-gray-300 mb-4">Inilah takdirmu. Tinjau nilaimu sebelum melangkah ke dunia.</p>
                      <div className="grid grid-cols-3 gap-x-4 gap-y-4 p-4 bg-black/20 rounded-lg">
@@ -419,7 +531,7 @@ const CreateCharacterWizard: React.FC<{
                     </div>
                      <div className="flex-grow"></div>
                     <div className="flex justify-between">
-                        <button onClick={() => setStep(3)} className="font-cinzel text-gray-300 hover:text-white" disabled={isSaving}>&larr; Ganti Background</button>
+                        <button onClick={() => setStep(5)} className="font-cinzel text-gray-300 hover:text-white" disabled={isSaving}>&larr; Ganti Equipment</button>
                         <button onClick={handleSave} className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500" disabled={isSaving}>
                             {isSaving ? "Menyimpan..." : "Selesaikan"}
                         </button>
@@ -431,10 +543,10 @@ const CreateCharacterWizard: React.FC<{
 };
 
 // =================================================================
-// Komponen Utama: ProfileModal
+// Komponen Utama: ProfileModal (Tidak Berubah)
 // =================================================================
 export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters, setCharacters, userId, onSaveNewCharacter }) => {
-  const myCharacters = characters; // App.tsx sudah memfilter
+  const myCharacters = characters;
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -444,7 +556,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
     }
     if (myCharacters.length === 0) {
       setSelectedChar(null);
-      setIsCreating(true); // Langsung ke mode create jika tidak punya karakter
+      setIsCreating(true);
     }
   }, [myCharacters, isCreating, selectedChar]);
 
@@ -454,13 +566,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
       spellData: SpellDefinition[]
   ) => {
     try {
-        // Panggil fungsi SSoT dari App.tsx
         await onSaveNewCharacter(charData, inventoryData, spellData);
-        // 'setCharacters' dan 'setSelectedChar' akan di-trigger oleh App.tsx
-        // Kita hanya perlu menutup mode creating
         setIsCreating(false);
     } catch (e) {
-        // Error sudah di-handle di dalam wizard, biarkan modal tetap terbuka
+        // Error di-handle di wizard
     }
   };
 
@@ -517,7 +626,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
                                     <p key={slot.level} className="text-sm">Lvl {slot.level} Slots: {slot.max - slot.spent}/{slot.max}</p>
                                 ))}
                                 <ul className="text-xs list-disc list-inside mt-2">
-                                    {selectedChar.knownSpells.map(spell => <li key={spell.name}>{spell.name}</li>)}
+                                    {selectedChar.knownSpells.map(spell => <li key={spell.name}>{spell.name} (Lvl {spell.level})</li>)}
                                 </ul>
                                 </>
                             ) : <p className="text-xs text-gray-400">Tidak memiliki kemampuan sihir.</p>}
@@ -526,7 +635,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onClose, characters,
                              <h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">Inventory</h4>
                              {selectedChar.inventory.length > 0 ? (
                                 <ul className="text-xs">
-                                    {selectedChar.inventory.map(item => <li key={item.instanceId}>{item.item.name} (x{item.quantity})</li>)}
+                                    {selectedChar.inventory.map(item => (
+                                        <li key={item.instanceId}>
+                                            {item.item.name} (x{item.quantity}) {item.isEquipped ? "[E]" : ""}
+                                        </li>
+                                    ))}
                                 </ul>
                             ) : <p className="text-xs text-gray-400">Inventaris kosong.</p>}
                         </div>
