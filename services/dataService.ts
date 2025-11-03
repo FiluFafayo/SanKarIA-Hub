@@ -213,7 +213,7 @@ class DataService {
                     stealth_disadvantage: item.stealthDisadvantage,
                     strength_requirement: item.strengthRequirement
                 }));
-                const { error }_ = await supabase.from('items').insert(itemsToSeed);
+                const { error } = await supabase.from('items').insert(itemsToSeed);
                 if (error) throw new Error(`Seeding items gagal: ${error.message}`);
             }
 
