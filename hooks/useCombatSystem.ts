@@ -1,10 +1,10 @@
 import { useCallback, useEffect } from 'react';
 import { CampaignState, CampaignActions } from './useCampaign';
 import { 
-    Character, DiceRoll, RollRequest, InventoryItem, Spell, MonsterInstance, 
-    StructuredApiResponse, ToolCall, CharacterInventoryItem, SpellDefinition 
+    Character, DiceRoll, RollRequest, CharacterInventoryItem, SpellDefinition, MonsterInstance, 
+    StructuredApiResponse, ToolCall, Ability
 } from '../types';
-import { rollInitiative, rollDice } from '../utils';
+import { rollInitiative, rollDice, getAbilityModifier, getProficiencyBonus } from '../../utils';
 import { geminiService } from '../services/geminiService';
 
 interface CombatSystemProps {
@@ -15,9 +15,8 @@ interface CombatSystemProps {
     updateCharacter: (character: Character) => Promise<void>; // Ini untuk SSoT
 }
 
-export function useCombatSystem({ campaign, character, players, campaignActions, updateCharacter }: CombatSystemProps) {
+export const useCombatSystem = ({ campaign, character, players, campaignActions, updateCharacter }: CombatSystemProps) => {
 
-    // (processToolCalls identik dengan exploration system, jadi kita salin)
     const processToolCalls = useCallback((turnId: string, toolCalls: ToolCall[]) => {
         toolCalls.forEach(call => {
             let message = '';
@@ -45,7 +44,9 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
         });
     }, [campaignActions]);
 
-
+    // =================================================================
+    // FUNGSI INTI 1: handleRollComplete (HANYA menangani hasil roll)
+    // =================================================================
     const handleRollComplete = useCallback(async (roll: DiceRoll, request: RollRequest, turnId: string) => {
         if (!turnId) {
             console.error("Mencoba mencatat peristiwa kombat tanpa turnId eksplisit.");
@@ -59,35 +60,34 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
         // ==================================
         if (request.type === 'deathSave') {
             const playerToSave = players.find(p => p.id === request.characterId);
-            if (!playerToSave) return; // Seharusnya tidak terjadi
+            if (!playerToSave) return;
 
             const newSaves = { ...playerToSave.deathSaves };
             let message = `${playerToSave.name} membuat lemparan penyelamatan kematian... `;
             
             if (roll.total >= 10) { // Sukses
                 newSaves.successes++;
-                message += `dan berhasil! (Sukses: ${newSaves.successes}, Gagal: ${newSaves.failures})`;
                 if (roll.total === 20) { // Kritis sukses
-                    message += " Lemparan kritis! Dia sadar dengan 1 HP!";
+                    message += ` LEMPARAN KRITIS! Dia sadar dengan 1 HP!`;
                     const updatedChar = { ...playerToSave, currentHp: 1, deathSaves: { successes: 0, failures: 0 } };
-                    await updateCharacter(updatedChar); // Simpan SSoT
+                    await updateCharacter(updatedChar); 
                     campaignActions.logEvent({ type: 'system', text: message }, turnId);
                     campaignActions.endTurn();
                     return;
                 }
+                message += `dan berhasil! (Sukses: ${newSaves.successes}, Gagal: ${newSaves.failures})`;
             } else { // Gagal
                 newSaves.failures++;
-                message += `dan gagal. (Sukses: ${newSaves.successes}, Gagal: ${newSaves.failures})`;
                  if (roll.total === 1) { // Kritis gagal
                     newSaves.failures++;
-                    message += " Lemparan kritis! Dihitung sebagai 2 kegagalan.";
+                    message += " LEMPARAN KRITIS! Dihitung sebagai 2 kegagalan.";
                  }
+                message += `dan gagal. (Sukses: ${newSaves.successes}, Gagal: ${newSaves.failures})`;
             }
             
             campaignActions.logEvent({ type: 'system', text: message }, turnId);
-
             const updatedChar = { ...playerToSave, deathSaves: newSaves };
-            await updateCharacter(updatedChar); // Simpan SSoT
+            await updateCharacter(updatedChar);
 
             if (newSaves.successes >= 3) {
                 campaignActions.logEvent({ type: 'system', text: `${playerToSave.name} telah stabil!` }, turnId);
@@ -114,22 +114,18 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
         if (request.stage === 'attack') {
             const targetAC = ('ownerId' in target) ? target.armorClass : target.definition.armorClass;
             const successText = roll.success ? `mengenai (Total ${roll.total} vs AC ${targetAC})` : `gagal mengenai (Total ${roll.total} vs AC ${targetAC})`;
-
+            
             const attacker = [...players, ...campaign.monsters].find(c => ('ownerId' in c ? c.id : c.instanceId) === request.characterId);
             const attackerName = attacker?.name || 'Seseorang';
             
             const rollMessage = `${attackerName} menyerang ${target.name} dan ${successText}.`;
-
             campaignActions.logEvent({ type: 'system', text: rollMessage }, turnId);
 
             if (roll.success) {
-                const attacker = [...players, ...campaign.monsters].find(c => ('ownerId' in c ? c.id : c.instanceId) === request.characterId);
                 let finalDamageDice = request.damageDice;
 
                 // FITUR KELAS: Rogue - Sneak Attack (Kesenjangan #4)
                 if (attacker && 'ownerId' in attacker && attacker.class === 'Rogue') {
-                    // Cek Kondisi A: Advantage (Kesenjangan #5)
-                    // Cek Kondisi B: Sekutu (Kesenjangan #6 - Belum ada posisi, TAPI kita bisa cek jika ada player lain di kombat)
                     const isAdvantage = request.isAdvantage || false;
                     const hasAllyNearby = players.some(p => p.id !== attacker.id && p.currentHp > 0 && campaign.initiativeOrder.includes(p.id));
 
@@ -140,18 +136,17 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
                         campaignActions.logEvent({ type: 'system', text: `${attacker.name} menambahkan ${sneakAttackDice} Sneak Attack! ${reason}` }, turnId);
                     }
                 }
-                
+
                 const damageRollRequest: RollRequest = {
                     type: 'damage', characterId: request.characterId, reason: `Menentukan kerusakan terhadap ${target.name}`,
                     target: { id: ('ownerId' in target ? target.id : target.instanceId), name: target.name, ac: targetAC },
-                    stage: 'damage', damageDice: finalDamageDice, // Gunakan finalDamageDice
+                    stage: 'damage', damageDice: finalDamageDice,
                 };
                 
-                // Jika ini monster, auto-roll damage
                 if ('definition' in attacker) { // Ini MonsterInstance
-                    const damageResult = rollDice(request.damageDice || '1d4');
+                    const damageResult = rollDice(damageRollRequest.damageDice || '1d4');
                     const simulatedDamageRoll: DiceRoll = {
-                        notation: request.damageDice || '1d4',
+                        notation: damageRollRequest.damageDice || '1d4',
                         rolls: damageResult.rolls,
                         modifier: damageResult.modifier,
                         total: damageResult.total,
@@ -165,7 +160,6 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
                         }
                     }, 500);
                 } else {
-                    // Ini Player, minta roll
                     campaignActions.setActiveRollRequest(damageRollRequest);
                 }
             } else {
@@ -180,10 +174,10 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
 
             if ('ownerId' in target) { // it's a Character (Player)
                 const updatedTarget = { ...target, currentHp: newHp };
-                await updateCharacter(updatedTarget); // Simpan SSoT (Mandat 3.4)
+                await updateCharacter(updatedTarget);
             } else { // it's a Monster
                 const updatedTarget = { ...target, currentHp: newHp };
-                campaignActions.updateMonster(updatedTarget); // Update state runtime
+                campaignActions.updateMonster(updatedTarget);
             }
 
             if (newHp === 0) {
@@ -192,9 +186,11 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
                     campaignActions.removeMonster(target.instanceId);
                 }
                 
-                // REFAKTOR: Cek akhir kombat
-                const remainingMonsters = campaign.monsters.filter(m => m.instanceId !== target.instanceId && m.currentHp > 0);
+                const remainingMonsters = campaign.monsters.filter(m => m.instanceId !== (target as MonsterInstance).instanceId && m.currentHp > 0);
 
+                // ==================================
+                // LOGIKA AKHIR KOMBAT (DIPINDAH KE SINI)
+                // ==================================
                 if (remainingMonsters.length === 0) {
                     campaignActions.logEvent({ type: 'system', text: 'Semua musuh telah dikalahkan! Pertarungan berakhir.' }, turnId);
                     campaignActions.setGameState('exploration');
@@ -235,7 +231,9 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
         }
     }, [campaign, players, campaignActions, updateCharacter, processToolCalls]);
 
-
+    // =================================================================
+    // FUNGSI INTI 2: processMechanics (HANYA menentukan aksi berikutnya)
+    // =================================================================
     const processMechanics = useCallback((turnId: string, mechanics: Omit<StructuredApiResponse, 'reaction' | 'narration'>, originalActionText: string) => {
         if (!turnId) {
             console.error("processMechanics dipanggil tanpa turnId aktif!");
@@ -246,6 +244,10 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
 
         if (mechanics.tool_calls && mechanics.tool_calls.length > 0) {
             processToolCalls(turnId, mechanics.tool_calls);
+            // Jika monster baru di-spawn, jangan akhiri giliran, biarkan combat loop berjalan
+            if (mechanics.tool_calls.some(c => c.functionName === 'spawn_monsters')) {
+                turnShouldEnd = false;
+            }
         }
 
         const hasChoices = mechanics.choices && mechanics.choices.length > 0;
@@ -261,8 +263,10 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
             const request = mechanics.rollRequest!;
             const fullRollRequest: RollRequest = {
                 ...request,
-                characterId: campaign.currentPlayerId!, // Ini bisa ID player atau monster instance
+                characterId: campaign.currentPlayerId!, 
                 originalActionText: originalActionText,
+                isAdvantage: request.isAdvantage, // Teruskan adv/disadv
+                isDisadvantage: request.isDisadvantage
             };
 
             if (isMonsterTurn) {
@@ -274,13 +278,11 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
                 let damageDice = '1d4';
 
                 if (request.type === 'attack') {
-                    // REFAKTOR: Target adalah Character (Player)
                     const targetPlayer = players.find(p => p.id === request.target?.id) || players.find(p => p.currentHp > 0) || players[0];
                     if (!targetPlayer) {
                         console.warn(`Monster ${monster.name} tidak punya target pemain yang valid.`);
                         campaignActions.logEvent({ type: 'system', text: `${monster.name} tidak menemukan target.` }, turnId);
                     } else {
-                        // REFAKTOR: Gunakan stat block dari 'definition'
                         const monsterAction = monster.definition.actions.find(a => request.reason.toLowerCase().includes(a.name.toLowerCase())) || monster.definition.actions[0];
                         
                         modifier = monsterAction.toHitBonus || 0;
@@ -334,7 +336,6 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
     useEffect(() => {
         if (campaign.gameState === 'combat' && campaign.initiativeOrder.length === 0 && campaign.monsters.length > 0) {
             const turnId = campaignActions.startTurn();
-            // REFAKTOR: Combatants sekarang adalah Character dan MonsterInstance
             const combatants: (Character | MonsterInstance)[] = [
                 ...players.filter(p => campaign.playerIds.includes(p.id)), 
                 ...campaign.monsters
@@ -366,12 +367,11 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
 
         const currentIndex = initiativeOrder.findIndex(id => id === currentPlayerId);
         const nextIndex = (currentIndex + 1) % initiativeOrder.length;
-        const nextPlayerId = initiativeOrder[nextIndex]; // Ini bisa jadi ID player atau ID monster instance
+        const nextPlayerId = initiativeOrder[nextIndex];
 
         const turnId = campaignActions.startTurn();
         campaignActions.setCurrentPlayerId(nextPlayerId);
 
-        // REFAKTOR: Cari combatant berdasarkan ID
         const nextCombatant = [...players, ...monsters].find(c => ('ownerId' in c ? c.id : c.instanceId) === nextPlayerId);
 
         if (nextCombatant) {
@@ -411,7 +411,6 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
                 }
             } else { 
                 // It's a player's turn
-                // Cek apakah player ini mati -> otomatis picu death save
                 const me = players.find(p => p.id === nextPlayerId);
                 if (me && me.currentHp <= 0 && me.deathSaves.failures < 3 && me.deathSaves.successes < 3) {
                      campaignActions.setActiveRollRequest({
@@ -419,6 +418,7 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
                         characterId: me.id,
                         reason: 'Membuat lemparan penyelamatan kematian untuk bertahan hidup.',
                     });
+                     // (turnId tetap aktif, menunggu RollModal)
                 }
                 // Jika player hidup, kita tidak endTurn(). Kita tunggu aksi mereka.
             }
@@ -442,13 +442,16 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
             return;
         }
 
-        // REFAKTOR: Cari monster berdasarkan instanceId
         const target = campaign.monsters.find(m => m.instanceId === targetInstanceId);
         if (!target) return;
 
         const turnId = campaign.turnId;
 
-        // REFAKTOR: Gunakan data dari item.definition
+        // Cek Advantage/Disadvantage (Contoh: Aksi 'Hide' sebelumnya, Kesenjangan #5)
+        // Untuk saat ini, kita cek kondisi simpel:
+        const isAdvantage = false; // TODO: Cek kondisi 'invisible' atau 'hidden'
+        const isDisadvantage = false; // TODO: Cek kondisi 'poisoned' atau 'restrained'
+
         const attackRollRequest: RollRequest = {
             type: 'attack', 
             characterId: character.id, 
@@ -457,42 +460,13 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
             item: item, 
             stage: 'attack', 
             damageDice: item.item.damageDice,
+            isAdvantage,
+            isDisadvantage
         };
         campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: `Menyerang ${target.name} dengan ${item.item.name}.` }, turnId);
         campaignActions.setActiveRollRequest(attackRollRequest);
 
     }, [campaign.monsters, campaign.turnId, campaign.currentPlayerId, character, campaignActions]);
-
-    const handleItemUse = useCallback(async (item: CharacterInventoryItem) => {
-        if (character.currentHp <= 0 || !campaign.turnId || campaign.currentPlayerId !== character.id) {
-            return;
-        }
-
-        if (item.item.type === 'consumable' && item.item.effect?.type === 'heal') {
-            const turnId = campaign.turnId;
-            const healingResult = rollDice(item.item.effect.dice || '2d4+2');
-            const healing = healingResult.total;
-            const newHp = Math.min(character.maxHp, character.currentHp + healing);
-            const healedAmount = newHp - character.currentHp;
-
-            campaignActions.logEvent({ type: 'system', text: `${character.name} menggunakan ${item.item.name} dan memulihkan ${healedAmount} HP (Total: ${healing}).` }, turnId);
-
-            // REFAKTOR: Logika SSoT. Update inventory.
-            const newInventory = character.inventory.map(i => 
-                i.instanceId === item.instanceId 
-                ? { ...i, quantity: i.quantity - 1 } 
-                : i
-            ).filter(i => i.quantity > 0);
-
-            const updatedCharacter = {
-                ...character,
-                currentHp: newHp,
-                inventory: newInventory
-            };
-            await updateCharacter(updatedCharacter); // Simpan SSoT
-            campaignActions.endTurn(); 
-        }
-    }, [character, campaign.turnId, campaign.currentPlayerId, updateCharacter, campaignActions]);
 
     // FITUR KELAS: Fighter - Second Wind (Kesenjangan #4)
     const handleSecondWind = useCallback(async () => {
@@ -517,14 +491,42 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
         }
 
         campaignActions.logEvent({ type: 'system', text: `${character.name} menggunakan Second Wind (Bonus Action) dan memulihkan ${healedAmount} HP (Total Roll: ${healing})!` }, turnId);
-
+        
         // Update SSoT Runtime (HP dan Status Bonus Action)
+        // Kita panggil SSoT update, yang akan memicu update state di App.tsx -> GameScreen -> hook ini
         await updateCharacter({ ...character, currentHp: newHp, usedBonusAction: true });
         
-        // (Tidak panggil endTurn() karena ini Bonus Action)
-
     }, [character, campaign.turnId, campaign.currentPlayerId, updateCharacter, campaignActions]);
 
+    const handleItemUse = useCallback(async (item: CharacterInventoryItem) => {
+        if (character.currentHp <= 0 || !campaign.turnId || campaign.currentPlayerId !== character.id) {
+            return;
+        }
+
+        if (item.item.type === 'consumable' && item.item.effect?.type === 'heal') {
+            const turnId = campaign.turnId;
+            const healingResult = rollDice(item.item.effect.dice || '2d4+2');
+            const healing = healingResult.total;
+            const newHp = Math.min(character.maxHp, character.currentHp + healing);
+            const healedAmount = newHp - character.currentHp;
+
+            campaignActions.logEvent({ type: 'system', text: `${character.name} menggunakan ${item.item.name} dan memulihkan ${healedAmount} HP (Total: ${healing}).` }, turnId);
+
+            const newInventory = character.inventory.map(i => 
+                i.instanceId === item.instanceId 
+                ? { ...i, quantity: i.quantity - 1 } 
+                : i
+            ).filter(i => i.quantity > 0);
+
+            const updatedCharacter = {
+                ...character,
+                currentHp: newHp,
+                inventory: newInventory
+            };
+            await updateCharacter(updatedCharacter);
+            campaignActions.endTurn(); 
+        }
+    }, [character, campaign.turnId, campaign.currentPlayerId, updateCharacter, campaignActions]);
 
     const handleSpellCast = useCallback(async (spell: SpellDefinition) => {
         if (character.currentHp <= 0 || !campaign.turnId || campaign.currentPlayerId !== character.id) {
@@ -533,20 +535,18 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
         const turnId = campaign.turnId;
         let isTurnEndingAction = false;
         let usedAction = false;
+        let updatedCharacterState = { ...character };
 
-        // Cek Tipe Aksi
         if (spell.castingTime === 'bonus_action') {
             if (character.usedBonusAction) {
                 campaignActions.logEvent({ type: 'system', text: `${character.name} sudah menggunakan Bonus Action.` }, turnId);
-                return; // Gagal, sudah dipakai
+                return;
             }
-            // Tandai Bonus Action sebagai terpakai (Update SSoT Runtime)
-            await updateCharacter({ ...character, usedBonusAction: true });
+            updatedCharacterState.usedBonusAction = true;
             campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: `Merapal ${spell.name} (Bonus Action).` }, turnId);
-            usedAction = true; // (Secara teknis, Bonus Action sudah dipakai)
+            usedAction = true;
 
         } else if (spell.castingTime === 'reaction') {
-            // Logika reaksi harus dipicu, bukan dari tombol panel
             campaignActions.logEvent({ type: 'system', text: `Spell reaksi seperti ${spell.name} tidak bisa dirapal dari panel aksi.` }, turnId);
             return;
 
@@ -559,25 +559,26 @@ export function useCombatSystem({ campaign, character, players, campaignActions,
         if (usedAction) {
             // TODO (Fase 2): Terapkan logika spell (roll, damage, heal) di sini
             
-            // Habiskan Spell Slot (Contoh untuk Lvl 1)
+            // Habiskan Spell Slot
             if (spell.level > 0) {
-                const slotIndex = character.spellSlots.findIndex(s => s.level === spell.level);
+                const slotIndex = character.spellSlots.findIndex(s => s.level === spell.level && s.spent < s.max);
                 if (slotIndex > -1) {
                     const newSlots = [...character.spellSlots];
                     newSlots[slotIndex] = { ...newSlots[slotIndex], spent: newSlots[slotIndex].spent + 1 };
-                    // Update SSoT (Mandat 3.4)
-                    await updateCharacter({ ...character, spellSlots: newSlots, usedBonusAction: spell.castingTime === 'bonus_action' ? true : character.usedBonusAction });
+                    updatedCharacterState.spellSlots = newSlots;
+                } else {
+                     campaignActions.logEvent({ type: 'system', text: `${character.name} tidak punya slot Lvl ${spell.level} tersisa!` }, turnId);
+                     return; // Gagal merapal
                 }
             }
+            // Update SSoT
+            await updateCharacter(updatedCharacterState);
         }
 
-        // Hanya Aksi (bukan Bonus Aksi) yang (biasanya) mengakhiri giliran
         if (isTurnEndingAction) {
             campaignActions.endTurn(); 
         }
     }, [character, campaign.turnId, campaign.currentPlayerId, campaignActions, updateCharacter]);
-
-    // (useEffect untuk death save dipindahkan ke advanceTurn)
     
     return {
         handlePlayerAttack,
