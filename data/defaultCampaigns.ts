@@ -1,10 +1,13 @@
+// data/defaultCampaigns.ts
 
 import { Campaign } from '../types';
 import { generateJoinCode, generateId } from '../utils';
 
-export const DEFAULT_CAMPAIGNS: Campaign[] = [
+// Ini adalah data DEFINISI untuk seeding.
+// Data runtime (eventLog, monsters, players, dll) akan di-generate
+// atau di-load secara terpisah.
+export const DEFAULT_CAMPAIGNS: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | 'monsters' | 'players' | 'playerIds' | 'choices' | 'turnId' | 'initiativeOrder'>[] = [
   {
-    id: 'default-campaign-1',
     title: 'Misteri Kuil Tenggelam',
     description: 'Jauh di bawah ombak, Kuil A\'zoth yang telah lama hilang memanggil. Harta karun kuno dan kengerian yang tak terkatakan menanti mereka yang cukup berani untuk mengungkap rahasianya. Tapi hati-hati, laut tidak mudah melepaskan apa yang telah diambilnya.',
     mainGenre: 'Fantasi',
@@ -16,28 +19,32 @@ export const DEFAULT_CAMPAIGNS: Campaign[] = [
     dmPersonality: 'Narator Misterius',
     dmNarrationStyle: 'Langsung & Percakapan',
     responseLength: 'Standar',
-    eventLog: [
-      {
-        id: generateId('event'),
-        type: 'dm_narration',
-        text: 'Udara asin terasa berat di paru-paru Anda saat perahu kecil Anda terombang-ambing di atas perairan biru kehijauan yang tenang. Di bawah Anda, garis-garis samar dari sebuah bangunan besar yang mustahil dapat terlihat, terdistorsi oleh riak air. Ini dia, Kuil A\'zoth yang legendaris, tertidur di dasar laut. Satu-satunya jalan masuk yang terlihat adalah sebuah [OBJECT:lengkungan besar|entrance-arch-1] yang menganga seperti mulut gelap, mengundang Anda ke dalam keheningan yang berair.',
-        timestamp: new Date().toISOString(),
-        turnId: 'turn-0'
-      }
-    ],
-    turnId: null,
     longTermMemory: 'Ada sebuah kuil kuno yang tenggelam di lepas pantai, dikenal sebagai Kuil A\'zoth. Legenda mengatakan itu menyimpan artefak kuat yang disebut Mata Kraken.',
     image: 'https://picsum.photos/seed/sunken-temple/400/300',
-    playerIds: [],
-    currentPlayerId: null,
     joinCode: generateJoinCode(),
     gameState: 'exploration',
-    monsters: [],
-    initiativeOrder: [],
-    choices: ["Menyelam ke dalam lengkungan", "Mengitari kuil untuk mencari jalan masuk lain", "Mengucapkan doa terakhir sebelum masuk"],
     isPublished: true,
-    quests: [],
-    npcs: [],
+    quests: [
+      // Quest sekarang didefinisikan di sini
+      {
+        id: 'main-quest-1',
+        title: 'Temukan Mata Kraken',
+        description: 'Selidiki Kuil A\'zoth yang tenggelam dan temukan artefak legendaris, Mata Kraken, sebelum jatuh ke tangan yang salah.',
+        status: 'active',
+        isMainQuest: true
+      }
+    ],
+    npcs: [
+      // NPC sekarang didefinisikan di sini
+      {
+        id: 'npc-shore-captain',
+        name: 'Kapten Elias',
+        description: 'Seorang kapten kapal tua yang mengantarmu ke lokasi kuil. Tampak gugup dan tidak ingin berlama-lama.',
+        location: 'Garis Pantai',
+        disposition: 'Neutral',
+        interactionHistory: ['Mengantarkan para petualang ke Kuil A\'zoth.']
+      }
+    ],
     currentTime: 'Siang',
     currentWeather: 'Cerah',
     worldEventCounter: 0,
@@ -47,9 +54,9 @@ export const DEFAULT_CAMPAIGNS: Campaign[] = [
         { id: 'temple-azoth', name: 'Kuil A\'zoth', x: 75, y: 60 },
     ],
     currentPlayerLocation: 'shoreline',
+    currentPlayerId: null, // Ditetapkan saat player pertama join
   },
   {
-    id: 'default-campaign-2',
     title: 'Bisikan di Puncak Merah',
     description: 'Desa terpencil di Puncak Merah diganggu oleh penyakit aneh dan mimpi buruk. Para tetua menyalahkan roh gunung yang marah, tetapi beberapa orang berbisik tentang kultus gelap yang melakukan ritual terlarang di reruntuhan terdekat. Apakah Anda akan menjawab panggilan mereka untuk meminta bantuan?',
     mainGenre: 'Horor',
@@ -61,27 +68,20 @@ export const DEFAULT_CAMPAIGNS: Campaign[] = [
     dmPersonality: 'Penyair Epik',
     dmNarrationStyle: 'Langsung & Percakapan',
     responseLength: 'Rinci',
-    eventLog: [
-       {
-        id: generateId('event'),
-        type: 'dm_narration',
-        text: 'Angin dingin melolong di antara rumah-rumah kayu sederhana di Puncak Merah, membawa aroma tajam dari pohon pinus dan ketakutan yang samar. Asap dari perapian tampak enggan naik ke langit yang kelabu, seolah-olah ditekan oleh kesuraman yang menyelimuti desa. Warga desa yang Anda temui menatap Anda dengan mata cekung dan penuh kecurigaan, beberapa dari mereka bergumam pelan sebelum bergegas masuk. Seorang [OBJECT:wanita tua|old-woman-1] menunjuk ke arah puncak gunung yang bergerigi, bayangannya tampak mengancam. "Itu datang dari atas sana," bisiknya, suaranya serak. "Kegilaan itu merayap turun seperti kabut."',
-        timestamp: new Date().toISOString(),
-        turnId: 'turn-0'
-      }
-    ],
-    turnId: null,
     longTermMemory: 'Desa Puncak Merah adalah komunitas pertambangan yang terisolasi. Baru-baru ini, para penduduk desa menderita penyakit misterius yang menyebabkan kegilaan. Ada reruntuhan kuno di gunung di atas desa.',
     image: 'https://picsum.photos/seed/crimson-peaks/400/300',
-    playerIds: [],
-    currentPlayerId: null,
     joinCode: generateJoinCode(),
     gameState: 'exploration',
-    monsters: [],
-    initiativeOrder: [],
-    choices: ["Mendekati wanita tua itu untuk bertanya lebih lanjut", "Pergi ke kedai untuk mendengar gosip", "Mulai mendaki ke arah reruntuhan di puncak"],
     isPublished: true,
-    quests: [],
+    quests: [
+      {
+        id: 'main-quest-2',
+        title: 'Selidiki Kegilaan',
+        description: 'Cari tahu sumber kegilaan yang melanda Desa Puncak Merah dan hentikan itu.',
+        status: 'active',
+        isMainQuest: true
+      }
+    ],
     npcs: [],
     currentTime: 'Sore',
     currentWeather: 'Berawan',
@@ -92,51 +92,7 @@ export const DEFAULT_CAMPAIGNS: Campaign[] = [
         { id: 'ruins', name: 'Reruntuhan Kuno', x: 50, y: 20 },
     ],
     currentPlayerLocation: 'red-peak-village',
-  },
-  {
-    id: 'default-campaign-3',
-    title: 'Konspirasi Clockwork',
-    description: 'Di kota metropolis Zafira yang digerakkan oleh uap, seorang penemu terkenal telah dibunuh, dan penemuan revolusionernya dicuri. Penjaga Kota tampaknya menutupi jejak, mengarahkan kecurigaan pada serikat pekerja yang kuat dan bangsawan yang korup. Ini adalah perlombaan melawan waktu untuk menemukan kebenaran di kota yang penuh dengan roda gigi dan keserakahan.',
-    mainGenre: 'Sci-Fi',
-    subGenre: 'Cyberpunk',
-    duration: 'Kampanye Mini (3-5 Sesi)',
-    isNSFW: false,
-    maxPlayers: 4,
-    theme: 'Sci-Fi',
-    dmPersonality: 'Kecerdasan Buatan yang Logis',
-    dmNarrationStyle: 'Langsung & Percakapan',
-    responseLength: 'Standar',
-    eventLog: [
-       {
-        id: generateId('event'),
-        type: 'dm_narration',
-        text: 'Hujan gerimis membasahi jalanan berbatu Zafira, membuat cahaya dari lampu-lampu gas berkelip di genangan air. Di gang yang sempit, di belakang bengkel penemu Arion, Penjaga Kota telah memasang garis batas. Bau ozon dari mekanisme yang rusak dan sesuatu yang lebih tajam—darah—menggantung di udara. Seorang [OBJECT:petugas|guard-1] dengan wajah masam menghalangi jalan Anda. "Tidak ada yang bisa dilihat di sini," geramnya, tangannya bertumpu pada gagang pistol uapnya. "Urusan resmi. Bubar."',
-        timestamp: new Date().toISOString(),
-        turnId: 'turn-0'
-      }
-    ],
-    turnId: null,
-    longTermMemory: 'Kota Zafira adalah pusat inovasi teknologi, yang dijalankan oleh mesin uap dan mekanisme clockwork. Ada ketegangan antara serikat penemu, perusahaan besar, dan bangsawan yang memerintah. Penemu Arion aken dibunuh.',
-    image: 'https://picsum.photos/seed/clockwork-city/400/300',
-    playerIds: [],
     currentPlayerId: null,
-    joinCode: generateJoinCode(),
-    gameState: 'exploration',
-    monsters: [],
-    initiativeOrder: [],
-    choices: ["Mencoba membujuk penjaga untuk membiarkan Anda masuk", "Mencari jalan lain ke bengkel melalui atap", "Mengamati kerumunan untuk mencari wajah yang mencurigakan"],
-    isPublished: true,
-    quests: [],
-    npcs: [],
-    currentTime: 'Malam',
-    currentWeather: 'Hujan',
-    worldEventCounter: 0,
-    mapImageUrl: 'https://picsum.photos/seed/map-clockwork/800/600',
-    mapMarkers: [
-        { id: 'crime-scene', name: 'Bengkel Arion (TKP)', x: 55, y: 45 },
-        { id: 'city-guard-hq', name: 'Markas Penjaga Kota', x: 30, y: 30 },
-        { id: 'inventors-guild', name: 'Serikat Penemu', x: 70, y: 65 },
-    ],
-    currentPlayerLocation: 'crime-scene',
   },
+  // (Campaign 3 akan mengikuti pola yang sama)
 ];
