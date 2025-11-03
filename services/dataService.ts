@@ -62,12 +62,60 @@ type DbCharacter = {
     spell_slots: CharacterSpellSlot[];
 };
 
-type DbItemDefinition = Omit<ItemDefinition, 'baseAc' | 'armorType' | 'stealthDisadvantage' | 'strengthRequirement'> & {
-    base_ac: number;
-    armor_type: string;
-    stealth_disadvantage: boolean;
-    strength_requirement: number;
+// Tipe ItemDefinition di DB (snake_case)
+type DbItemDefinition = {
+    id: string;
+    name: string;
+    description?: string;
+    type: 'weapon' | 'armor' | 'consumable' | 'tool' | 'other';
+    is_magical: boolean;
+    rarity: 'common' | 'uncommon' | 'rare' | 'very_rare' | 'legendary';
+    requires_attunement: boolean;
+    bonuses?: { attack?: number; damage?: number; ac?: number };
+    damage_dice?: string;
+    damage_type?: string;
+    base_ac?: number;
+    armor_type?: 'light' | 'medium' | 'heavy' | 'shield';
+    stealth_disadvantage?: boolean;
+    strength_requirement?: number;
+    effect?: { type: 'heal' | 'damage'; dice: string };
 };
+
+// Tipe SpellDefinition di DB (snake_case)
+type DbSpellDefinition = {
+    id: string;
+    name: string;
+    level: number;
+    description: string;
+    casting_time: 'action' | 'bonus_action' | 'reaction' | 'minute' | 'hour';
+    range: string;
+    components: ('V' | 'S' | 'M')[];
+    duration: string;
+    school: string;
+    effect_type: 'damage' | 'heal' | 'buff' | 'debuff' | 'control' | 'utility';
+    damage_dice?: string;
+    damage_type?: string;
+    save_required?: Ability;
+    save_on_success?: 'half_damage' | 'no_effect';
+    condition_applied?: string;
+};
+
+// Tipe MonsterDefinition di DB (snake_case)
+type DbMonsterDefinition = {
+    id: string;
+    name: string;
+    armor_class: number;
+    max_hp: number;
+    ability_scores: AbilityScores;
+    skills: Partial<Record<Skill, number>>;
+    traits: { name: string; description: string }[];
+    actions: { name: string; toHitBonus?: number; damageDice?: string; description?: string }[];
+    senses: { darkvision: number; passivePerception: number; tremorsense?: number; truesight?: number };
+    languages: string[];
+    challenge_rating: number;
+    xp: number;
+};
+
 
 type DbCharacterInventory = {
     id: string;
@@ -77,7 +125,7 @@ type DbCharacterInventory = {
     is_equipped: boolean;
 };
 
-type DbCharacterInventoryJoined = DbCharacterInventory & {
+type DbCharacterInventoryJoined = Omit<DbCharacterInventory, 'item_id'> & {
     item: DbItemDefinition
 };
 
@@ -87,8 +135,8 @@ type DbCharacterSpell = {
     spell_id: string;
 };
 
-type DbCharacterSpellJoined = DbCharacterSpell & {
-    spell: SpellDefinition
+type DbCharacterSpellJoined = Omit<DbCharacterSpell, 'spell_id'> & {
+    spell: DbSpellDefinition
 };
 
 type DbCampaign = {
@@ -106,7 +154,7 @@ type DbCampaign = {
     duration: string;
     isNSFW: boolean;
     dm_personality: string;
-    dm_narration_style: 'Deskriptif' | 'Langsung & Percapan';
+    dm_narration_style: 'Deskriptif' | 'Langsung & Percakapan';
     response_length: 'Singkat' | 'Standar' | 'Rinci';
     game_state: 'exploration' | 'combat';
     current_player_id: string | null;
@@ -145,8 +193,8 @@ type DbMonsterInstance = {
     initiative: number;
 };
 
-type DbMonsterInstanceJoined = DbMonsterInstance & {
-    monster: MonsterDefinition
+type DbMonsterInstanceJoined = Omit<DbMonsterInstance, 'monster_id'> & {
+    monster: DbMonsterDefinition
 };
 
 type DbCampaignPlayer = {
@@ -163,7 +211,6 @@ type DbCampaignPlayer = {
 class DataService {
     private supabase: SupabaseClient | null = null;
     
-    // Cache lokal untuk data definisi (Mandat 1.2 Free Tier)
     private itemDefinitions: ItemDefinition[] = [];
     private spellDefinitions: SpellDefinition[] = [];
     private monsterDefinitions: MonsterDefinition[] = [];
@@ -192,7 +239,7 @@ class DataService {
     }
     
     // =================================================================
-    // METODE SEEDING DATA GLOBAL (Fase 1.E)
+    // METODE SEEDING DATA GLOBAL (Fase 1.E - DIPERBAIKI)
     // =================================================================
     public async seedGlobalData() {
         if (this.isSeeding || this.hasSeeded) return;
@@ -206,14 +253,24 @@ class DataService {
             const { count: itemCount } = await supabase.from('items').select('*', { count: 'exact', head: true });
             if (itemCount === 0) {
                 console.log("Seeding tabel 'items'...");
+                // PERBAIKAN: Petakan properti secara eksplisit, jangan gunakan spread
                 const itemsToSeed = ITEM_DEFINITIONS.map(item => ({
-                    ...item,
+                    name: item.name,
+                    description: item.description,
+                    type: item.type,
+                    is_magical: item.isMagical,
+                    rarity: item.rarity,
+                    requires_attunement: item.requiresAttunement,
+                    bonuses: item.bonuses,
+                    damage_dice: item.damageDice,
+                    damage_type: item.damageType,
                     base_ac: item.baseAc,
                     armor_type: item.armorType,
                     stealth_disadvantage: item.stealthDisadvantage,
-                    strength_requirement: item.strengthRequirement
+                    strength_requirement: item.strengthRequirement,
+                    effect: item.effect
                 }));
-                const { error } = await supabase.from('items').insert(itemsToSeed);
+                const { error }_ = await supabase.from('items').insert(itemsToSeed);
                 if (error) throw new Error(`Seeding items gagal: ${error.message}`);
             }
 
@@ -221,9 +278,16 @@ class DataService {
             const { count: spellCount } = await supabase.from('spells').select('*', { count: 'exact', head: true });
             if (spellCount === 0) {
                 console.log("Seeding tabel 'spells'...");
+                // PERBAIKAN: Petakan properti secara eksplisit
                 const spellsToSeed = SPELL_DEFINITIONS.map(spell => ({
-                    ...spell,
+                    name: spell.name,
+                    level: spell.level,
+                    description: spell.description,
                     casting_time: spell.castingTime,
+                    range: spell.range,
+                    components: spell.components,
+                    duration: spell.duration,
+                    school: spell.school,
                     effect_type: spell.effectType,
                     damage_dice: spell.damageDice,
                     damage_type: spell.damageType,
@@ -231,7 +295,7 @@ class DataService {
                     save_on_success: spell.saveOnSuccess,
                     condition_applied: spell.conditionApplied
                 }));
-                const { error } = await supabase.from('spells').insert(spellsToSeed);
+                const { error }_ = await supabase.from('spells').insert(spellsToSeed);
                 if (error) throw new Error(`Seeding spells gagal: ${error.message}`);
             }
 
@@ -239,14 +303,21 @@ class DataService {
             const { count: monsterCount } = await supabase.from('monsters').select('*', { count: 'exact', head: true });
             if (monsterCount === 0) {
                 console.log("Seeding tabel 'monsters'...");
+                // PERBAIKAN: Petakan properti secara eksplisit
                 const monstersToSeed = MONSTER_DEFINITIONS.map(monster => ({
-                    ...monster,
+                    name: monster.name,
                     armor_class: monster.armorClass,
                     max_hp: monster.maxHp,
                     ability_scores: monster.abilityScores,
-                    challenge_rating: monster.challengeRating
+                    skills: monster.skills,
+                    traits: monster.traits,
+                    actions: monster.actions,
+                    senses: monster.senses,
+                    languages: monster.languages,
+                    challenge_rating: monster.challengeRating,
+                    xp: monster.xp
                 }));
-                const { error } = await supabase.from('monsters').insert(monstersToSeed);
+                const { error }_ = await supabase.from('monsters').insert(monstersToSeed);
                 if (error) throw new Error(`Seeding monsters gagal: ${error.message}`);
             }
             
@@ -255,31 +326,69 @@ class DataService {
             const { data: spells } = await supabase.from('spells').select('*');
             const { data: monsters } = await supabase.from('monsters').select('*');
             
-            this.itemDefinitions = (items || []).map(i => ({...i, baseAc: i.base_ac, armorType: i.armor_type, stealthDisadvantage: i.stealth_disadvantage, strengthRequirement: i.strength_requirement})) as ItemDefinition[];
-            this.spellDefinitions = (spells || []).map(s => ({...s, castingTime: s.casting_time, effectType: s.effect_type, damageDice: s.damage_dice, damageType: s.damage_type, saveRequired: s.save_required, saveOnSuccess: s.save_on_success, conditionApplied: s.condition_applied })) as SpellDefinition[];
-            this.monsterDefinitions = (monsters || []).map(m => ({...m, armorClass: m.armor_class, maxHp: m.max_hp, abilityScores: m.ability_scores, challengeRating: m.challenge_rating})) as MonsterDefinition[];
+            this.itemDefinitions = (items || []).map(this.mapDbItemToApp);
+            this.spellDefinitions = (spells || []).map(this.mapDbSpellToApp);
+            this.monsterDefinitions = (monsters || []).map(this.mapDbMonsterToApp);
 
             console.log(`Data global berhasil di-cache: ${this.itemDefinitions.length} item, ${this.spellDefinitions.length} spell, ${this.monsterDefinitions.length} monster.`);
             this.hasSeeded = true;
 
         } catch (error) {
             console.error("Gagal melakukan seeding data global:", error);
+            this.hasSeeded = false; // Pastikan bisa coba lagi
+            this.isSeeding = false;
+            throw error; // Lemparkan error agar App.tsx tahu
         } finally {
             this.isSeeding = false;
         }
     }
     
+    // =================================================================
+    // HELPER MAPPING (DB -> APP)
+    // =================================================================
+    
+    private mapDbItemToApp = (dbItem: DbItemDefinition): ItemDefinition => ({
+        ...dbItem,
+        isMagical: dbItem.is_magical,
+        requiresAttunement: dbItem.requires_attunement,
+        damageDice: dbItem.damage_dice,
+        damageType: dbItem.damage_type,
+        baseAc: dbItem.base_ac,
+        armorType: dbItem.armor_type,
+        stealthDisadvantage: dbItem.stealth_disadvantage,
+        strengthRequirement: dbItem.strength_requirement
+    });
+    
+    private mapDbSpellToApp = (dbSpell: DbSpellDefinition): SpellDefinition => ({
+        ...dbSpell,
+        castingTime: dbSpell.casting_time,
+        effectType: dbSpell.effect_type,
+        damageDice: dbSpell.damage_dice,
+        damageType: dbSpell.damage_type,
+        saveRequired: dbSpell.save_required,
+        saveOnSuccess: dbSpell.save_on_success,
+        conditionApplied: dbSpell.condition_applied
+    });
+    
+    private mapDbMonsterToApp = (dbMonster: DbMonsterDefinition): MonsterDefinition => ({
+       ...dbMonster,
+       armorClass: dbMonster.armor_class,
+       maxHp: dbMonster.max_hp,
+       abilityScores: dbMonster.ability_scores,
+       challengeRating: dbMonster.challenge_rating
+    });
+    
     // Helper untuk mendapatkan cache (untuk fallback jika App.tsx belum siap)
     private async getItemDefinitions(): Promise<ItemDefinition[]> {
-        if (this.itemDefinitions.length === 0) await this.seedGlobalData();
+        if (this.itemDefinitions.length === 0 && !this.isSeeding) await this.seedGlobalData();
         return this.itemDefinitions;
     }
     private async getSpellDefinitions(): Promise<SpellDefinition[]> {
-        if (this.spellDefinitions.length === 0) await this.seedGlobalData();
+        if (this.spellDefinitions.length === 0 && !this.isSeeding) await this.seedGlobalData();
         return this.spellDefinitions;
     }
      private async getMonsterDefinitions(): Promise<MonsterDefinition[]> {
-        if (this.monsterDefinitions.length === 0) await this.seedGlobalData();
+        if (this.monsterDefinitions.length === 0 && !this.isSeeding) await this.seedGlobalData();
         return this.monsterDefinitions;
     }
 
@@ -321,8 +430,11 @@ class DataService {
             .single();
             
         if (error) {
-            console.error('Gagal mengambil profil:', error);
-            throw error;
+            // Jangan lempar error jika profil tidak ditemukan, itu wajar
+            if (error.code !== 'PGRST116') {
+                console.error('Gagal mengambil profil:', error);
+            }
+            return null;
         }
         return data;
     }
@@ -338,53 +450,27 @@ class DataService {
     // METODE KARAKTER (MANDAT 3.4: SSoT KARAKTER)
     // =================================================================
     
-    /**
-     * Mengonversi DbCharacterInventoryJoined menjadi CharacterInventoryItem
-     */
     private mapDbInventory(dbInv: DbCharacterInventoryJoined): CharacterInventoryItem {
-        const itemDef = dbInv.item;
         return {
             instanceId: dbInv.id,
-            item: {
-                ...itemDef,
-                baseAc: itemDef.base_ac,
-                armorType: itemDef.armor_type,
-                stealthDisadvantage: itemDef.stealth_disadvantage,
-                strengthRequirement: itemDef.strength_requirement,
-            } as ItemDefinition,
+            item: this.mapDbItemToApp(dbInv.item),
             quantity: dbInv.quantity,
             isEquipped: dbInv.is_equipped,
         };
     }
     
-    /**
-     * Mengonversi DbCharacterSpellJoined menjadi SpellDefinition
-     */
     private mapDbSpell(dbSpell: DbCharacterSpellJoined): SpellDefinition {
-         const spellDef = dbSpell.spell;
-         return {
-            ...spellDef,
-            castingTime: spellDef.castingTime,
-            effectType: spellDef.effectType,
-            damageDice: spellDef.damageDice,
-            damageType: spellDef.damageType,
-            saveRequired: spellDef.saveRequired,
-            saveOnSuccess: spellDef.saveOnSuccess,
-            conditionApplied: spellDef.conditionApplied
-         } as SpellDefinition;
+         return this.mapDbSpellToApp(dbSpell.spell);
     }
     
-    /**
-     * Mengonversi DbCharacter menjadi Character (SSoT)
-     */
     private mapDbCharacter(dbChar: DbCharacter, allInventory: DbCharacterInventoryJoined[], allSpells: DbCharacterSpellJoined[]): Character {
         const inventory: CharacterInventoryItem[] = (allInventory || [])
             .filter(inv => inv.character_id === dbChar.id)
-            .map(this.mapDbInventory);
+            .map(this.mapDbInventory.bind(this)); // Pastikan 'this' terikat
 
         const knownSpells: SpellDefinition[] = (allSpells || [])
             .filter(spell => spell.character_id === dbChar.id)
-            .map(this.mapDbSpell);
+            .map(this.mapDbSpell.bind(this)); // Pastikan 'this' terikat
             
         return {
             ...dbChar,
@@ -396,12 +482,15 @@ class DataService {
             armorClass: dbChar.armor_class,
             hitDice: dbChar.hit_dice,
             deathSaves: dbChar.death_saves,
-            racialTraits: dbChar.racial_traits,
-            classFeatures: dbChar.class_features,
-            proficientSkills: dbChar.proficient_skills,
-            proficientSavingThrows: dbChar.proficient_saving_throws,
-            spellSlots: dbChar.spell_slots,
-            personalityTrait: dbChar.personality_trait,
+            racialTraits: dbChar.racial_traits || [],
+            classFeatures: dbChar.class_features || [],
+            proficientSkills: dbChar.proficient_skills || [],
+            proficientSavingThrows: dbChar.proficient_saving_throws || [],
+            spellSlots: dbChar.spell_slots || [],
+            personalityTrait: dbChar.personality_trait || '',
+            ideal: dbChar.ideal || '',
+            bond: dbChar.bond || '',
+            flaw: dbChar.flaw || '',
             inventory,
             knownSpells,
         };
@@ -443,9 +532,6 @@ class DataService {
         return characters;
     }
 
-    /**
-     * Menyimpan SATU karakter (SSoT).
-     */
     async saveCharacter(character: Character): Promise<Character> {
         const supabase = this.ensureSupabase();
         const { inventory, knownSpells, ownerId, id, ...coreData } = character;
@@ -479,13 +565,46 @@ class DataService {
             throw error;
         }
         
-        // Kembalikan SSoT lengkap
-        return this.mapDbCharacter(data as DbCharacter, inventory.map(i => ({...i, character_id: id, item_id: i.item.id, is_equipped: i.isEquipped, id: i.instanceId, item: i.item as DbItemDefinition})), []);
+        // Ambil kembali relasi dari input 'character' (karena mereka SSoT)
+        const joinedInventory = inventory.map(i => ({
+            ...i,
+            character_id: id,
+            item_id: i.item.id,
+            is_equipped: i.isEquipped,
+            id: i.instanceId,
+            item: {
+                ...i.item,
+                is_magical: i.item.isMagical,
+                requires_attunement: i.item.requiresAttunement,
+                damage_dice: i.item.damageDice,
+                damage_type: i.item.damageType,
+                base_ac: i.item.baseAc,
+                armor_type: i.item.armorType,
+                stealth_disadvantage: i.item.stealthDisadvantage,
+                strength_requirement: i.item.strengthRequirement
+            }
+        })) as DbCharacterInventoryJoined[];
+        
+        const joinedSpells = knownSpells.map(s => ({
+            id: s.id, // (ini ID spell, bukan instance)
+            character_id: id,
+            spell_id: s.id,
+            spell: {
+                ...s,
+                casting_time: s.castingTime,
+                effect_type: s.effectType,
+                damage_dice: s.damageDice,
+                damage_type: s.damageType,
+                save_required: s.saveRequired,
+                save_on_success: s.saveOnSuccess,
+                condition_applied: s.conditionApplied
+            }
+        })) as DbCharacterSpellJoined[];
+
+
+        return this.mapDbCharacter(data as DbCharacter, joinedInventory, joinedSpells);
     }
     
-    /**
-     * Membuat karakter BARU dan data relasionalnya (Fase 1.E)
-     */
     async saveNewCharacter(
         charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
         inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
@@ -494,11 +613,9 @@ class DataService {
     ): Promise<Character> {
         const supabase = this.ensureSupabase();
         
-        // 1. Pastikan cache definisi kita ada
         const allItems = await this.getItemDefinitions();
         const allSpells = await this.getSpellDefinitions();
 
-        // 2. Siapkan data inti karakter
         const coreDbChar: Omit<DbCharacter, 'id' | 'owner_id'> = {
             ...charData,
             owner_id: ownerId, // (ini akan diabaikan oleh insert, tapi untuk tipe)
@@ -517,7 +634,6 @@ class DataService {
             personality_trait: charData.personalityTrait,
         };
 
-        // 3. Insert karakter baru
         const { data: newDbCharacter, error: charError } = await supabase
             .from('characters')
             .insert({ ...coreDbChar, owner_id: ownerId })
@@ -528,29 +644,26 @@ class DataService {
         
         const newCharacterId = newDbCharacter.id;
 
-        // 4. Siapkan data relasional (Inventory)
-        const inventoryToInsert: Omit<DbCharacterInventory, 'id' | 'character_id'>[] = inventoryData.map(inv => {
+        const inventoryToInsert: Omit<DbCharacterInventory, 'id'>[] = inventoryData.map(inv => {
             const definition = allItems.find(def => def.name === inv.item.name);
             if (!definition) throw new Error(`Item definition cache miss: ${inv.item.name}`);
             return {
+                character_id: newCharacterId,
                 item_id: definition.id,
                 quantity: inv.quantity,
                 is_equipped: inv.isEquipped,
-                character_id: newCharacterId // Tambahkan ID karakter baru
             };
         });
         
-        // 5. Siapkan data relasional (Spells)
-        const spellsToInsert: Omit<DbCharacterSpell, 'id' | 'character_id'>[] = spellData.map(sp => {
+        const spellsToInsert: Omit<DbCharacterSpell, 'id'>[] = spellData.map(sp => {
             const definition = allSpells.find(def => def.name === sp.name);
             if (!definition) throw new Error(`Spell definition cache miss: ${sp.name}`);
             return {
+                character_id: newCharacterId,
                 spell_id: definition.id,
-                character_id: newCharacterId // Tambahkan ID karakter baru
             };
         });
 
-        // 6. Batch insert data relasional
         if (inventoryToInsert.length > 0) {
             const { error: invError } = await supabase.from('character_inventory').insert(inventoryToInsert);
             if (invError) console.error("Gagal menyimpan inventory awal:", invError);
@@ -560,9 +673,8 @@ class DataService {
             if (spellError) console.error("Gagal menyimpan spell awal:", spellError);
         }
 
-        // 7. Ambil kembali data lengkap untuk SSoT
-        const { data: finalInventory } = await supabase.from('character_inventory').select('*, item:item_id(*)').eq('character_id', newCharacterId);
-        const { data: finalSpells } = await supabase.from('character_spells').select('*, spell:spell_id(*)').eq('character_id', newCharacterId);
+        const { data: finalInventory }_ = await supabase.from('character_inventory').select('*, item:item_id(*)').eq('character_id', newCharacterId);
+        const { data: finalSpells }_ = await supabase.from('character_spells').select('*, spell:spell_id(*)').eq('character_id', newCharacterId);
 
         return this.mapDbCharacter(newDbCharacter as DbCharacter, finalInventory as DbCharacterInventoryJoined[], finalSpells as DbCharacterSpellJoined[]);
     }
@@ -602,7 +714,6 @@ class DataService {
             mapMarkers: map_markers,
             currentPlayerLocation: current_player_location,
             playerIds: playerIds,
-            // Data runtime diinisialisasi sebagai kosong
             eventLog: [],
             monsters: [],
             players: [], 
@@ -632,7 +743,7 @@ class DataService {
             
         if (campaignError) throw campaignError;
         
-        return campaignsData.map(dbCampaign => this.mapDbCampaign(dbCampaign as DbCampaign));
+        return campaignsData.map(dbCampaign => this.mapDbCampaign(dbCampaign as any));
     }
     
     async getPublishedCampaigns(): Promise<Campaign[]> {
@@ -645,7 +756,7 @@ class DataService {
             
         if (campaignError) throw campaignError;
         
-        return campaignsData.map(dbCampaign => this.mapDbCampaign(dbCampaign as DbCampaign));
+        return campaignsData.map(dbCampaign => this.mapDbCampaign(dbCampaign as any));
     }
     
     async getCampaignByJoinCode(joinCode: string): Promise<Campaign | null> {
@@ -654,7 +765,7 @@ class DataService {
         const { data: dbCampaign, error } = await supabase
             .from('campaigns')
             .select('*, campaign_players(character_id)')
-            .eq('join_code', joinCode.toUpperCase()) // Pastikan case-insensitive
+            .eq('join_code', joinCode.toUpperCase())
             .single();
 
         if (error) {
@@ -664,7 +775,7 @@ class DataService {
         }
         if (!dbCampaign) return null;
         
-        return this.mapDbCampaign(dbCampaign as DbCampaign);
+        return this.mapDbCampaign(dbCampaign as any);
     }
 
     async saveCampaign(campaign: Campaign): Promise<Campaign> {
@@ -676,7 +787,7 @@ class DataService {
             ownerId, id, ...coreData 
         } = campaign as CampaignState;
         
-        const dbCampaign: Partial<DbCampaign> = { // Gunakan Partial untuk update
+        const dbCampaign: Partial<DbCampaign> = {
             ...coreData,
             join_code: coreData.joinCode,
             is_published: coreData.isPublished,
@@ -695,7 +806,6 @@ class DataService {
             current_player_location: coreData.currentPlayerLocation,
         };
         
-        // Hapus 'undefined' properties agar Supabase tidak error
         Object.keys(dbCampaign).forEach(key => dbCampaign[key as keyof typeof dbCampaign] === undefined && delete dbCampaign[key as keyof typeof dbCampaign]);
 
         const { data, error } = await supabase
@@ -710,7 +820,7 @@ class DataService {
             throw error;
         }
         
-        return this.mapDbCampaign(data as DbCampaign);
+        return this.mapDbCampaign(data as any);
     }
     
     async createCampaign(campaign: Omit<Campaign, 'id' | 'eventLog' | 'monsters' | 'players' | 'playerIds' | 'choices' | 'turnId' | 'initiativeOrder'>, ownerId: string): Promise<Campaign> {
@@ -780,7 +890,6 @@ class DataService {
     }> {
         const supabase = this.ensureSupabase();
         
-        // 1. Ambil Event Log
         const { data: events, error: eventError } = await supabase
             .from('game_events')
             .select('*')
@@ -789,7 +898,6 @@ class DataService {
             
         if (eventError) throw eventError;
 
-        // 2. Ambil Monster Instances (dan join stat blocknya)
         const { data: monsterInstances, error: monsterError } = await supabase
             .from('campaign_monsters')
             .select('*, monster:monster_id(*)')
@@ -799,14 +907,13 @@ class DataService {
 
         const monsters: MonsterInstance[] = monsterInstances.map((inst: any) => ({
             instanceId: inst.id,
-            definition: { ...inst.monster, armorClass: inst.monster.armor_class, maxHp: inst.monster.max_hp, abilityScores: inst.monster.ability_scores, challengeRating: inst.monster.challenge_rating } as MonsterDefinition,
+            definition: this.mapDbMonsterToApp(inst.monster),
             name: inst.name,
             currentHp: inst.current_hp,
             conditions: inst.conditions,
             initiative: inst.initiative
         }));
         
-        // 3. Ambil data SSoT semua player di campaign ini (Mandat 2.2 & 3.4)
         const { data: charData, error: charError } = await supabase
             .from('characters')
             .select('*')
@@ -814,7 +921,6 @@ class DataService {
             
         if (charError) throw charError;
         
-        // 4. Ambil inventory & spell untuk SEMUA player tersebut
         const { data: inventoryData, error: invError } = await supabase
             .from('character_inventory')
             .select('*, item:item_id(*)')
@@ -828,7 +934,6 @@ class DataService {
         if (invError) throw invError;
         if (spellError) throw spellError;
         
-        // 5. Gabungkan data karakter player
         const players: Character[] = charData.map((dbChar: DbCharacter) => 
             this.mapDbCharacter(
                 dbChar, 
