@@ -4,7 +4,7 @@ import { Campaign, Quest, NPC, MapMarker } from '../types';
 import { generateId, generateJoinCode } from '../utils';
 import { generationService } from '../services/ai/generationService';
 import { InteractiveMap } from '../components/game/InteractiveMap';
-import { useCreationStore } from '../store/creationStore'; // REFAKTOR G-3: Import store
+import { useAppStore } from '../store/appStore'; // REFAKTOR G-3: Import store
 
 
 interface CreateCampaignViewProps {
