@@ -1,13 +1,15 @@
 import React from 'react';
 import { Location } from '../types';
 import { LocationCard } from './LocationCard';
+import { useAppStore } from '../store/appStore'; // REFAKTOR G-4
 
 interface NexusSanctumProps {
-  onLocationClick: (location: Location) => void;
   userEmail?: string | null;
 }
 
-export const NexusSanctum: React.FC<NexusSanctumProps> = ({ onLocationClick, userEmail }) => {
+export const NexusSanctum: React.FC<NexusSanctumProps> = ({ userEmail }) => {
+  // REFAKTOR G-4: Ambil aksi navigasi dari store
+  const navigateTo = useAppStore(s => s.actions.navigateTo);
 
   const locations = [
     { id: Location.StorytellersSpire, desc: "Ciptakan dunia dan petualangan baru dari imajinasimu.", img: "https://picsum.photos/seed/spire/400/600" },
@@ -48,7 +50,7 @@ export const NexusSanctum: React.FC<NexusSanctumProps> = ({ onLocationClick, use
             name={id}
             description={desc}
             imageUrl={img}
-            onClick={() => onLocationClick(id)}
+            onClick={() => navigateTo(id)} // REFAKTOR G-4
           />
         ))}
       </div>

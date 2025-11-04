@@ -1,10 +1,11 @@
+// REFAKTOR G-4: Disederhanakan, props data dihapus
 import React from 'react';
 import { ViewWrapper } from '../components/ViewWrapper';
 import { Character } from '../types';
 
 interface CharacterSelectionViewProps {
-  characters: Character[];
-  onSelect: (character: Character) => void; // REFAKTOR: Kirim objek penuh
+  characters: Character[]; // SSoT Karakter milikku (tetap di-pass dari ViewManager)
+  onSelect: (character: Character) => void;
   onClose: () => void;
 }
 

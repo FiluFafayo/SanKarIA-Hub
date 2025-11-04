@@ -1,12 +1,12 @@
+// REFAKTOR G-4: Disederhanakan
 import React, { useState } from 'react';
 import { ViewWrapper } from '../components/ViewWrapper';
 import { Campaign } from '../types';
-import { dataService } from '../services/dataService'; // Import dataService
+import { dataService } from '../services/dataService';
 
 interface JoinCampaignViewProps {
   onClose: () => void;
-  // 'campaigns' prop dihapus
-  onCampaignFound: (campaign: Campaign) => void;
+  onCampaignFound: (campaign: Campaign) => void; // Handler dari AppLayout
 }
 
 export const JoinCampaignView: React.FC<JoinCampaignViewProps> = ({ onClose, onCampaignFound }) => {

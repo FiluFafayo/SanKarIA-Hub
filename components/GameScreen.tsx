@@ -14,12 +14,15 @@ import { ChatLog } from './game/ChatLog';
 import { ActionBar } from './game/ActionBar';
 import { RollModal } from './game/RollModal';
 
+// REFAKTOR G-4: GameScreen sekarang mengambil SSoT updater dari store
+import { useDataStore } from '../store/dataStore'; 
+
 interface GameScreenProps {
-    initialCampaign: Campaign;
+    initialCampaign: Campaign; // Ini sekarang CampaignState
     character: Character;
     players: Character[];
-    onExit: (finalCampaignState: Campaign) => void;
-    updateCharacter: (character: Character) => Promise<void>;
+    onExit: (finalCampaignState: CampaignState) => void; // Kirim CampaignState lengkap
+    // updateCharacter prop dihapus
     userId: string;
 }
 
@@ -30,8 +33,10 @@ interface ContextMenuState {
     objectId: string;
 }
 
-export const GameScreen: React.FC<GameScreenProps> = ({ initialCampaign, character, players, onExit, updateCharacter, userId }) => {
-    const { campaign, campaignActions } = useCampaign(initialCampaign, players);
+export const GameScreen: React.FC<GameScreenProps> = ({ initialCampaign, character, players, onExit, userId }) => {
+    const { campaign, campaignActions } = useCampaign(initialCampaign as CampaignState, players);
+    // REFAKTOR G-4: Ambil SSoT updater dari store
+    const { updateCharacter } = useDataStore(s => s.actions);
     const [activeMobileTab, setActiveMobileTab] = useState<'chat' | 'character' | 'info'>('chat');
     const [pendingSkill, setPendingSkill] = useState<Skill | null>(null);
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -57,7 +62,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({ initialCampaign, charact
     ]);
 
     const memoizedUpdateCharacter = useCallback(async (updatedChar: Character) => {
+        // 1. Update SSoT DB (via store)
         await updateCharacter(updatedChar);
+        // 2. Update state runtime campaign
         campaignActions.updateCharacterInCampaign(updatedChar);
     }, [updateCharacter, campaignActions]);
 
@@ -159,7 +166,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({ initialCampaign, charact
                 monsters={campaign.monsters}
                 isMyTurn={isMyTurn}
                 combatSystem={combatSystem}
-                updateCharacter={updateCharacter}
+                // updateCharacter prop dihapus
                 gameState={campaign.gameState}
                 onSkillSelect={handleSkillSelect}
             />

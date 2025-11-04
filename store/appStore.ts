@@ -1,23 +1,20 @@
-// REFAKTOR G-3: File BARU.
-// Menggunakan Zustand untuk state management global yang persisten
-// untuk form multi-step (Character & Campaign creation).
-// Ini MEMPERBAIKI P0 UX Bug (G-3) di mana state form hilang saat ganti tab.
+// REFAKTOR G-4: Menggantikan creationStore.ts
+// Store ini sekarang mengelola SEMUA state UI global, termasuk Navigasi dan Form.
 
 import { create } from 'zustand';
 import { 
     Ability, Skill, AbilityScores, CharacterInventoryItem, SpellDefinition, 
-    Character, MapMarker, Campaign, CharacterSpellSlot, ItemDefinition
+    Character, MapMarker, Campaign, ItemDefinition
 } from '../types';
-
-// Impor data SSoT untuk default state
 import { RACES, RaceData } from '../data/races';
 import { CLASS_DEFINITIONS, ClassData, EquipmentChoice } from '../data/classes';
 import { BACKGROUNDS, BackgroundData } from '../data/backgrounds';
 import { getAbilityModifier } from '../utils';
-import { dataService } from '../services/dataService'; // (Diperlukan untuk getItemDef)
+import { dataService } from '../services/dataService';
+import { useDataStore } from './dataStore'; // Import dataStore
 
 // =================================================================
-// Helper (Dipindah dari ProfileModal)
+// Tipe Helper
 // =================================================================
 const getItemDef = (name: string): ItemDefinition => {
     const definition = dataService.findItemDefinition(name);
@@ -33,11 +30,28 @@ const createInvItem = (def: ItemDefinition, qty = 1, equipped = false): Omit<Cha
     isEquipped: equipped,
 });
 
+type View = Location | 'nexus' | 'character-selection';
+
 // =================================================================
 // Tipe State & Aksi
 // =================================================================
 
-// --- Slice 1: Character Creation ---
+// --- Slice 1: Navigation ---
+interface NavigationState {
+    currentView: View;
+    campaignToJoinOrStart: Campaign | null; // Untuk alur join
+}
+const initialNavigationState: NavigationState = {
+    currentView: 'nexus',
+    campaignToJoinOrStart: null,
+};
+interface NavigationActions {
+    navigateTo: (view: Location) => void;
+    returnToNexus: () => void;
+    startJoinFlow: (campaign: Campaign) => void;
+}
+
+// --- Slice 2: Character Creation ---
 interface CharacterCreationState {
     step: number;
     name: string;
@@ -49,17 +63,15 @@ interface CharacterCreationState {
     selectedEquipment: Record<number, EquipmentChoice['options'][0]>;
     isSaving: boolean;
 }
-
 const getDefaultEquipment = (charClass: ClassData): Record<number, EquipmentChoice['options'][0]> => {
     const initialEquipment: Record<number, EquipmentChoice['options'][0]> = {};
     charClass.startingEquipment.choices.forEach((choice, index) => {
-        initialEquipment[index] = choice.options[0]; // Default ke pilihan pertama
+        initialEquipment[index] = choice.options[0];
     });
     return initialEquipment;
 };
-
 const initialCharacterState: CharacterCreationState = {
-    step: 1,
+    step: 0, // 0 = tidak aktif
     name: '',
     selectedRace: RACES[0],
     selectedClass: CLASS_DEFINITIONS['Fighter'],
@@ -69,7 +81,6 @@ const initialCharacterState: CharacterCreationState = {
     selectedEquipment: getDefaultEquipment(CLASS_DEFINITIONS['Fighter']),
     isSaving: false,
 };
-
 interface CharacterCreationActions {
     setCharacterStep: (step: number) => void;
     setName: (name: string) => void;
@@ -81,19 +92,10 @@ interface CharacterCreationActions {
     toggleSkill: (skill: Skill) => void;
     setSelectedEquipment: (choiceIndex: number, option: EquipmentChoice['options'][0]) => void;
     resetCharacterCreation: () => void;
-    // Logika bisnis kompleks dipindah ke store
-    finalizeCharacter: (
-        userId: string,
-        // Callback untuk memberi tahu App.tsx bahwa SSoT DB telah diperbarui
-        onSaveSuccess: (
-            charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
-            inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
-            spellData: SpellDefinition[]
-        ) => Promise<void>
-    ) => Promise<void>;
+    finalizeCharacter: (userId: string) => Promise<void>; // (Logika dipindah)
 }
 
-// --- Slice 2: Campaign Creation ---
+// --- Slice 3: Campaign Creation ---
 interface CampaignCreationPillars {
     premise: string;
     keyElements: string;
@@ -107,7 +109,7 @@ interface CampaignFramework {
     description: string;
 }
 interface CampaignCreationState {
-    step: number;
+    step: number; // 0 = tidak aktif
     pillars: CampaignCreationPillars;
     framework: CampaignFramework | null;
     mapData: { imageUrl: string; markers: MapMarker[], startLocationId: string } | null;
@@ -117,9 +119,8 @@ interface CampaignCreationState {
         dmNarrationStyle: Campaign['dmNarrationStyle'];
     };
 }
-
 const initialCampaignState: CampaignCreationState = {
-    step: 1,
+    step: 0,
     pillars: { premise: '', keyElements: '', endGoal: '' },
     framework: null,
     mapData: null,
@@ -129,7 +130,6 @@ const initialCampaignState: CampaignCreationState = {
         dmNarrationStyle: 'Deskriptif',
     },
 };
-
 interface CampaignCreationActions {
     setCampaignStep: (step: number) => void;
     setPillars: (pillars: CampaignCreationPillars) => void;
@@ -140,22 +140,52 @@ interface CampaignCreationActions {
 }
 
 // --- Gabungan Store ---
-type CreationStore = {
+type AppStore = {
+    navigation: NavigationState;
     characterCreation: CharacterCreationState;
     campaignCreation: CampaignCreationState;
-    actions: CharacterCreationActions & CampaignCreationActions;
+    actions: NavigationActions & CharacterCreationActions & CampaignCreationActions;
 }
 
 // =================================================================
 // STORE DEFINITION
 // =================================================================
-export const useCreationStore = create<CreationStore>((set, get) => ({
+export const useAppStore = create<AppStore>((set, get) => ({
     // === STATE ===
+    navigation: initialNavigationState,
     characterCreation: initialCharacterState,
     campaignCreation: initialCampaignState,
 
     // === ACTIONS ===
     actions: {
+        // --- Navigation Actions ---
+        navigateTo: (view) => {
+            // Saat menavigasi, reset state form jika kita TIDAK ke view itu
+            if (view !== Location.MirrorOfSouls) {
+                get().actions.resetCharacterCreation();
+            }
+            if (view !== Location.StorytellersSpire) {
+                get().actions.resetCampaignCreation();
+            }
+            // Mulai step 1 jika kita navigasi ke view tersebut
+            if (view === Location.MirrorOfSouls) {
+                set(state => ({ characterCreation: { ...state.characterCreation, step: 1 } }));
+            }
+            if (view === Location.StorytellersSpire) {
+                set(state => ({ campaignCreation: { ...state.campaignCreation, step: 1 } }));
+            }
+            
+            set(state => ({ navigation: { ...state.navigation, currentView: view } }));
+        },
+        returnToNexus: () => {
+            get().actions.resetCharacterCreation();
+            get().actions.resetCampaignCreation();
+            set({ navigation: initialNavigationState });
+        },
+        startJoinFlow: (campaign) => set(state => ({
+            navigation: { ...state.navigation, currentView: 'character-selection', campaignToJoinOrStart: campaign }
+        })),
+
         // --- Character Actions ---
         setCharacterStep: (step) => set(state => ({ characterCreation: { ...state.characterCreation, step } })),
         setName: (name) => set(state => ({ characterCreation: { ...state.characterCreation, name } })),
@@ -164,8 +194,8 @@ export const useCreationStore = create<CreationStore>((set, get) => ({
             characterCreation: { 
                 ...state.characterCreation, 
                 selectedClass,
-                selectedSkills: [], // Reset skill pilihan
-                selectedEquipment: getDefaultEquipment(selectedClass), // Reset equipment pilihan
+                selectedSkills: [],
+                selectedEquipment: getDefaultEquipment(selectedClass),
             } 
         })),
         setAbilityScore: (ability, score) => set(state => ({
@@ -197,9 +227,9 @@ export const useCreationStore = create<CreationStore>((set, get) => ({
                 selectedEquipment: { ...state.characterCreation.selectedEquipment, [choiceIndex]: option }
             }
         })),
-        resetCharacterCreation: () => set({ characterCreation: initialCharacterState }),
+        resetCharacterCreation: () => set({ characterCreation: { ...initialCharacterState, step: 0 } }), // Set step ke 0
         
-        finalizeCharacter: async (userId, onSaveSuccess) => {
+        finalizeCharacter: async (userId) => {
             const { characterCreation } = get();
             const { name, selectedRace, selectedClass, abilityScores, selectedBackground, selectedSkills, selectedEquipment } = characterCreation;
 
@@ -210,57 +240,34 @@ export const useCreationStore = create<CreationStore>((set, get) => ({
             set(state => ({ characterCreation: { ...state.characterCreation, isSaving: true } }));
 
             try {
+                // (Logika G-3 dari ProfileModal dipindah ke sini)
                 const baseScores = abilityScores as AbilityScores;
                 const finalScores = { ...baseScores };
-
-                // 1. Terapkan Bonus Ras
                 for (const [ability, bonus] of Object.entries(selectedRace.abilityScoreBonuses)) {
-                    if (typeof bonus === 'number') {
-                        finalScores[ability as Ability] += bonus;
-                    }
+                    if (typeof bonus === 'number') finalScores[ability as Ability] += bonus;
                 }
-                
-                // 2. Kumpulkan Proficiency
                 const profSkills = new Set<Skill>([
                     ...selectedBackground.skillProficiencies,
                     ...(selectedRace.proficiencies?.skills || []),
                     ...selectedSkills,
                 ]);
-                
-                // 3. Hitung Mekanika Inti
                 const conModifier = getAbilityModifier(finalScores.constitution);
                 const dexModifier = getAbilityModifier(finalScores.dexterity);
                 const maxHp = selectedClass.hpAtLevel1(conModifier);
-                
-                // 4. Kumpulkan Equipment
                 let inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[] = [];
-                selectedClass.startingEquipment.fixed.forEach(item => {
-                    inventoryData.push(createInvItem(item.item, item.quantity));
-                });
+                selectedClass.startingEquipment.fixed.forEach(item => inventoryData.push(createInvItem(item.item, item.quantity)));
                 Object.values(selectedEquipment).forEach(chosenOption => {
-                    chosenOption.items.forEach(itemDef => {
-                        inventoryData.push(createInvItem(itemDef, chosenOption.quantity || 1));
-                    });
+                    chosenOption.items.forEach(itemDef => inventoryData.push(createInvItem(itemDef, chosenOption.quantity || 1)));
                 });
                 selectedBackground.equipment.forEach(itemName => {
-                     try {
-                        inventoryData.push(createInvItem(getItemDef(itemName)));
-                     } catch (e) { console.warn(e); }
+                     try { inventoryData.push(createInvItem(getItemDef(itemName))); } catch (e) { console.warn(e); }
                 });
-                
-                // 5. Hitung AC
                 let armorClass = 10 + dexModifier;
                 let equippedArmorDef: ItemDefinition | null = null;
                 const armorIndex = inventoryData.findIndex(i => i.item.type === 'armor' && i.item.armorType !== 'shield');
                 const shieldIndex = inventoryData.findIndex(i => i.item.name === 'Shield');
-                
-                if (armorIndex > -1) {
-                    inventoryData[armorIndex].isEquipped = true;
-                    equippedArmorDef = inventoryData[armorIndex].item;
-                }
-                if (shieldIndex > -1) {
-                    inventoryData[shieldIndex].isEquipped = true;
-                }
+                if (armorIndex > -1) { inventoryData[armorIndex].isEquipped = true; equippedArmorDef = inventoryData[armorIndex].item; }
+                if (shieldIndex > -1) { inventoryData[shieldIndex].isEquipped = true; }
                 if (equippedArmorDef) {
                     const baseAc = equippedArmorDef.baseAc || 10;
                     if (equippedArmorDef.armorType === 'light') armorClass = baseAc + dexModifier;
@@ -268,45 +275,32 @@ export const useCreationStore = create<CreationStore>((set, get) => ({
                     else if (equippedArmorDef.armorType === 'heavy') armorClass = baseAc;
                 }
                 if (shieldIndex > -1) armorClass += 2;
-
-                // 6. Kumpulkan Spell
                 const spellSlots = selectedClass.spellcasting?.spellSlots || [];
                 const spellData: SpellDefinition[] = [
                     ...(selectedClass.spellcasting?.knownCantrips || []),
                     ...(selectedClass.spellcasting?.knownSpells || []),
                 ];
-
-                // 7. Buat Objek Karakter SSoT
                 const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
-                    name,
-                    class: selectedClass.name,
-                    race: selectedRace.name,
-                    level: 1,
-                    xp: 0,
-                    image: selectedRace.img,
-                    background: selectedBackground.name,
+                    name, class: selectedClass.name, race: selectedRace.name, level: 1, xp: 0,
+                    image: selectedRace.img, background: selectedBackground.name,
                     personalityTrait: '', ideal: '', bond: '', flaw: '',
-                    abilityScores: finalScores,
-                    maxHp: Math.max(1, maxHp), 
-                    currentHp: Math.max(1, maxHp),
-                    tempHp: 0,
-                    armorClass: armorClass,
-                    speed: selectedRace.speed,
+                    abilityScores: finalScores, maxHp: Math.max(1, maxHp), currentHp: Math.max(1, maxHp),
+                    tempHp: 0, armorClass: armorClass, speed: selectedRace.speed,
                     hitDice: { [selectedClass.hitDice]: { max: 1, spent: 0 } },
-                    deathSaves: { successes: 0, failures: 0}, 
-                    conditions: [],
-                    racialTraits: selectedRace.traits,
-                    classFeatures: selectedClass.features,
+                    deathSaves: { successes: 0, failures: 0}, conditions: [],
+                    racialTraits: selectedRace.traits, classFeatures: selectedClass.features,
                     proficientSkills: Array.from(profSkills),
                     proficientSavingThrows: selectedClass.proficiencies.savingThrows,
                     spellSlots: spellSlots,
                 };
 
-                // 8. Panggil Callback (dari App.tsx) untuk menyimpan ke DB
-                await onSaveSuccess(newCharData, inventoryData, spellData);
+                // Panggil aksi SSoT dari dataStore (G-4)
+                await useDataStore.getState().actions.saveNewCharacter(newCharData, inventoryData, spellData, userId);
                 
-                // 9. Reset state setelah sukses
-                set({ characterCreation: initialCharacterState });
+                // Reset state G-3 setelah sukses
+                get().actions.resetCharacterCreation();
+                // Pindah kembali ke Nexus (G-4)
+                get().actions.returnToNexus();
 
             } catch (e) {
                 console.error("Gagal finalisasi karakter:", e);
@@ -322,6 +316,6 @@ export const useCreationStore = create<CreationStore>((set, get) => ({
         setFramework: (framework) => set(state => ({ campaignCreation: { ...state.campaignCreation, framework } })),
         setMapData: (mapData) => set(state => ({ campaignCreation: { ...state.campaignCreation, mapData } })),
         setCampaignData: (data) => set(state => ({ campaignCreation: { ...state.campaignCreation, campaignData: data } })),
-        resetCampaignCreation: () => set({ campaignCreation: initialCampaignState }),
+        resetCampaignCreation: () => set({ campaignCreation: { ...initialCampaignState, step: 0 } }),
     }
 }));

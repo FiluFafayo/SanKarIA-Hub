@@ -9,7 +9,7 @@ import { useCreationStore } from '../store/creationStore'; // REFAKTOR G-3: Impo
 
 interface CreateCampaignViewProps {
   onClose: () => void;
-  onCreateCampaign: (campaign: Campaign) => Promise<void>;
+  onCreateCampaign: (campaignData: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | 'monsters' | 'players' | 'playerIds' | 'choices' | 'turnId' | 'initiativeOrder'>) => Promise<any>; // REFAKTOR G-4
 }
 
 interface CampaignFramework {
@@ -52,9 +52,8 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
     resetCampaignCreation: s.actions.resetCampaignCreation
   }));
 
-  // REFAKTOR G-3: Wrapper untuk onClose
   const handleClose = () => {
-    resetCampaignCreation();
+    // resetCampaignCreation(); // (Sudah ditangani oleh returnToNexus di ViewManager)
     onClose();
   };
 
@@ -177,8 +176,9 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
           currentPlayerLocation: mapData?.startLocationId,
         };
         
-        await onCreateCampaign(newCampaign);
-        resetCampaignCreation(); // REFAKTOR G-3: Reset state on success
+        // REFAKTOR G-4: onCreateCampaign sekarang adalah aksi dari dataStore
+        await onCreateCampaign(newCampaign); 
+        resetCampaignCreation(); // Reset state G-3 setelah sukses
 
     } catch (e) {
         console.error("Gagal memekanisasi atau membuat kampanye:", e);

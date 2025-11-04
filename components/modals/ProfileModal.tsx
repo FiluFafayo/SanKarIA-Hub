@@ -38,8 +38,7 @@ const createInvItem = (
 
 interface ProfileModalProps {
 	onClose: () => void;
-	characters: Character[];
-	setCharacters: React.Dispatch<React.SetStateAction<Character[]>>;
+	characters: Character[]; // SSoT Karakter milikku
 	userId: string;
 	onSaveNewCharacter: (
 		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
@@ -584,6 +583,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 	userId,
 	onSaveNewCharacter,
 }) => {
+	// REFAKTOR G-4: myCharacters sekarang adalah prop 'characters'
 	const myCharacters = characters;
 	const [selectedChar, setSelectedChar] = useState<Character | null>(null);
 	// REFAKTOR G-3: 'isCreating' sekarang dikontrol oleh state 'step' di store
@@ -610,7 +610,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 		spellData: SpellDefinition[]
 	) => {
 		try {
-			await onSaveNewCharacter(charData, inventoryData, spellData);
+			// REFAKTOR G-4: Panggil prop onSaveNewCharacter (dari dataStore)
+			await onSaveNewCharacter(charData, inventoryData, spellData, userId);
 			// Reset state G-3 di-handle oleh finalizeCharacter di store
 			// setIsCreating(false); // (Tidak perlu lagi)
 		} catch (e) {
