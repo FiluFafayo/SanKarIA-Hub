@@ -42,7 +42,9 @@ export const DEFAULT_CAMPAIGNS: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | '
         description: 'Seorang kapten kapal tua yang mengantarmu ke lokasi kuil. Tampak gugup dan tidak ingin berlama-lama.',
         location: 'Garis Pantai',
         disposition: 'Neutral',
-        interactionHistory: ['Mengantarkan para petualang ke Kuil A\'zoth.']
+        interactionHistory: ['Mengantarkan para petualang ke Kuil A\'zoth.'],
+        opinion: {}, // (Poin 4)
+        secret: 'Dia berhutang budi pada kultus yang menjaga kuil dan diam-diam melapor kepada mereka.' // (Poin 4)
       }
     ],
     currentTime: 43200, // (Poin 5) 12:00 PM

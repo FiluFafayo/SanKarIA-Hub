@@ -103,6 +103,7 @@ export interface CampaignActions {
     advanceTime: (seconds: number) => void;
     setWeather: (weather: WorldWeather) => void;
     awardXp: (characterId: string, amount: number) => void; // (Poin 7)
+    updateNpcOpinion: (npcId: string, characterId: string, change: number) => void; // (Poin 4)
 }
 
 type Action =
@@ -127,6 +128,11 @@ type Action =
             // (Poin 7) Aksi baru untuk XP
             type: "AWARD_XP";
             payload: { characterId: string; amount: number };
+      }
+    | {
+            // (Poin 4) Aksi baru untuk Opini NPC
+            type: "UPDATE_NPC_OPINION";
+            payload: { npcId: string; characterId: string; change: number };
       }
     | {
             // (Poin 5) Aksi terpisah untuk cuaca
@@ -346,6 +352,27 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
                 ),
             };
         }
+        // (Poin 4) Reducer untuk Opini NPC
+        case "UPDATE_NPC_OPINION": {
+            const { npcId, characterId, change } = action.payload;
+            return {
+                ...state,
+                npcs: state.npcs.map(npc => {
+                    if (npc.id === npcId) {
+                        const currentOpinion = npc.opinion?.[characterId] || 0;
+                        const newOpinion = currentOpinion + change;
+                        return {
+                            ...npc,
+                            opinion: {
+                                ...npc.opinion,
+                                [characterId]: newOpinion
+                            }
+                        };
+                    }
+                    return npc;
+                })
+            };
+        }
 		default:
 			return state;
 	}
@@ -425,6 +452,9 @@ export const useCampaign = (
         // (Poin 7)
         const awardXp = (characterId: string, amount: number) =>
             dispatch({ type: "AWARD_XP", payload: { characterId, amount } });
+        // (Poin 4)
+        const updateNpcOpinion = (npcId: string, characterId: string, change: number) =>
+            dispatch({ type: "UPDATE_NPC_OPINION", payload: { npcId, characterId, change } });
 
 		return {
 			logEvent,
@@ -440,6 +470,7 @@ export const useCampaign = (
             advanceTime,
             setWeather,
             awardXp, // (Poin 7)
+            updateNpcOpinion, // (Poin 4)
 			updateMonster: (monster) =>
 				dispatch({ type: "UPDATE_MONSTER", payload: monster }),
 			removeMonster: (monsterId) =>

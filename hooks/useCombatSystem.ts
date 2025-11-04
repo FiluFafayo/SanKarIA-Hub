@@ -95,6 +95,15 @@ export const useCombatSystem = ({
                         message = `${player.name} menerima ${call.args.amount} XP untuk: ${call.args.reason}`;
                     }
                     break;
+                // (Poin 4) Tangani tool Opini
+                case 'update_npc_opinion':
+                    const npc = campaign.npcs.find(n => n.id === call.args.npcId);
+                    const char = players.find(p => p.id === call.args.characterId);
+                    if (npc && char) {
+                        campaignActions.updateNpcOpinion(call.args.npcId, call.args.characterId, call.args.change);
+                        message = `Opini ${npc.name} terhadap ${char.name} berubah (${call.args.change > 0 ? '+' : ''}${call.args.change} karena: ${call.args.reason})`;
+                    }
+                    break;
 			}
 				if (message) {
 					campaignActions.logEvent(

@@ -164,6 +164,21 @@ const TOOLS: FunctionDeclaration[] = [
             },
             required: ['characterId', 'amount', 'reason']
         }
+    },
+    // (Poin 4) Alat baru untuk Opini NPC
+    {
+        name: 'update_npc_opinion',
+        description: "Memperbarui opini (hubungan) NPC terhadap seorang karakter berdasarkan interaksi sosial.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                npcId: { type: Type.STRING, description: "ID NPC yang opininya berubah (dari konteks)." },
+                characterId: { type: Type.STRING, description: "ID karakter yang berinteraksi." },
+                change: { type: Type.INTEGER, description: "Jumlah perubahan opini (misal: 1 untuk positif, -1 untuk negatif, 2 untuk sangat positif)." },
+                reason: { type: Type.STRING, description: "Alasan singkat perubahan opini (misal: 'Pemain mengancamnya')." }
+            },
+            required: ['npcId', 'characterId', 'change', 'reason']
+        }
     }
 ];
 
@@ -174,9 +189,10 @@ class GameService {
     private buildPrompt(campaign: Campaign, players: Character[], playerAction: string, actingCharacterId: string | null): string { // (Poin 6)
         const worldState = `Saat ini adalah ${formatDndTime(campaign.currentTime)} hari, dengan cuaca ${campaign.currentWeather}.`;
         
-        // Konteks Quest/NPC disederhanakan
-        const questContext = `Misi Aktif: ${campaign.quests.filter(q => q.status === 'active').map(q => q.title).join(', ') || 'Tidak ada'}`;
-        const npcContext = `NPC Terdekat: ${campaign.npcs.filter(n => n.location === campaign.currentPlayerLocation).map(n => n.name).join(', ') || 'Tidak ada'}`;
+        // (Poin 4) Konteks Quest/NPC diperkaya
+        const questContext = `Misi Aktif: ${JSON.stringify(campaign.quests.filter(q => q.status === 'active').map(q => ({ title: q.title, id: q.id }))) || 'Tidak ada'}`;
+        // (Poin 4) Kirim opini NPC (tapi BUKAN rahasia)
+        const npcContext = `Konteks NPC: ${JSON.stringify(campaign.npcs.map(n => ({ id: n.id, name: n.name, disposition: n.disposition, location: n.location, opinion: n.opinion || {} }))) || 'Tidak ada NPC'}`;
         
         const recentEvents = campaign.eventLog.slice(-10).map((event: GameEvent) => {
             switch (event.type) {
@@ -247,6 +263,10 @@ class GameService {
         1.  JANGAN PERNAH menulis dialog NPC (misal: "Elias berkata, 'Halo'") di dalam field 'narration' atau 'reaction'.
         2.  UNTUK DIALOG NPC, SELALU gunakan format tag ini TEPAT di dalam string 'narration': [DIALOGUE:Nama NPC|Teks dialog mereka di sini]
         3.  Contoh: Pintu berderit terbuka. [DIALOGUE:Elias|Siapa disana?] Dia mengangkat lentera.
+        
+        ATURAN SOSIAL (NPC):
+        1.  Anda HARUS membaca 'Konteks NPC' (terutama field 'opinion') untuk menentukan bagaimana NPC bereaksi.
+        2.  Jika aksi pemain bersifat sosial (membujuk, mengintimidasi, membantu), Anda HARUS memanggil tool 'update_npc_opinion' untuk mencatat perubahan hubungan.
         
         ATURAN MEKANIK (WAJIB DIPATUHI):
         1.  Validasi Inventaris: Anda HARUS memvalidasi aksi pemain terhadap 'KONTEKS PEMAIN SAAT INI (Inventaris)'. Jika pemain mencoba menggunakan item yang tidak mereka miliki (misal 'Potion of Healing' padahal inventaris kosong), 'narration' Anda HARUS menyatakan bahwa mereka tidak memilikinya, dan 'choices' Anda harus merefleksikan kegagalan itu.

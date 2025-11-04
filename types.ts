@@ -238,6 +238,9 @@ export interface NPC {
     location: string;
     disposition: 'Friendly' | 'Neutral' | 'Hostile' | 'Unknown';
     interactionHistory: string[];
+    // (Poin 4) NPC Mendalam
+    opinion?: Record<string, number>; // mapping characterId -> opinion score
+    secret?: string; // Rahasia tersembunyi
 }
 
 export interface MapMarker {
