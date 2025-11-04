@@ -195,7 +195,7 @@ export interface Character {
     speed: number; // Akan di-cache di sini
     hitDice: Record<string, { max: number; spent: number }>; // e.g., { "d10": { max: 1, spent: 0 } }
     deathSaves: { successes: number; failures: number };
-    conditions: string[]; // e.g., 'poisoned', 'exhaustion_1'
+    conditions: string[]; // e.g., 'poisoned', 'exhaustion_1', 'Prone', 'Hidden'
     
     // Proficiency & Fitur (dari Ras & Kelas - Fase 1)
     racialTraits: CharacterFeature[];
