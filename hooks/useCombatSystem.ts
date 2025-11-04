@@ -556,6 +556,7 @@ export const useCombatSystem = ({
 					campaign,
 					players,
 					actionText,
+					null, // (Poin 6) Tidak ada pelaku aksi spesifik di akhir kombat
 					campaignActions.setThinkingState
 				);
 
@@ -628,6 +629,7 @@ export const useCombatSystem = ({
 							campaign,
 							players,
 							actionText,
+							nextCombatant.instanceId, // (Poin 6) Kirim ID pelaku aksi (monster)
 							campaignActions.setThinkingState
 						);
 

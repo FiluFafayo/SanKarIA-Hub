@@ -171,8 +171,8 @@ const TOOLS: FunctionDeclaration[] = [
 // FUNGSI LAMA (Dipindah dari geminiService.ts)
 class GameService {
 
-    private buildPrompt(campaign: Campaign, players: Character[], playerAction: string): string {
-        const worldState = `Saat ini adalah ${campaign.currentTime} hari, dengan cuaca ${campaign.currentWeather}.`;
+    private buildPrompt(campaign: Campaign, players: Character[], playerAction: string, actingCharacterId: string | null): string { // (Poin 6)
+        const worldState = `Saat ini adalah ${formatDndTime(campaign.currentTime)} hari, dengan cuaca ${campaign.currentWeather}.`;
         
         // Konteks Quest/NPC disederhanakan
         const questContext = `Misi Aktif: ${campaign.quests.filter(q => q.status === 'active').map(q => q.title).join(', ') || 'Tidak ada'}`;
@@ -196,12 +196,21 @@ class GameService {
             }
         }).filter(Boolean).join('\n');
         
+        // (Poin 6) Temukan pelaku aksi dan inventarisnya
+        const actingCharacter = players.find(p => p.id === actingCharacterId);
+        const inventoryContext = actingCharacter 
+            ? `Inventaris ${actingCharacter.name}: ${actingCharacter.inventory.map(i => `${i.item.name} (x${i.quantity})`).join(', ') || 'Kosong'}`
+            : 'Inventaris pemain tidak diketahui.';
+
         return `KONTEKS KAMPANYE:
         - Cerita Jangka Panjang: ${campaign.longTermMemory}
         - State Dunia: ${worldState}. Lokasi Saat Ini: ${campaign.currentPlayerLocation || 'Tidak diketahui'}.
         - ${questContext}
         - ${npcContext}
         
+        KONTEKS PEMAIN SAAT INI:
+        - ${inventoryContext}
+
         PERISTIWA TERBARU:
         ${recentEvents}
         
@@ -215,6 +224,7 @@ class GameService {
         campaign: Campaign, 
         players: Character[], 
         playerAction: string, 
+        actingCharacterId: string | null, // (Poin 6) ID pelaku aksi
         onStateChange: (state: 'thinking' | 'retrying') => void
     ): Promise<StructuredApiResponse> {
         onStateChange('thinking');
@@ -229,24 +239,25 @@ class GameService {
         Kepribadian Anda: DM yang suportif namun menantang, fokus pada cerita.
         Panjang Respons: Standar.
         
-        ATURAN GAYA (WAJIB DIPATUHI - Poin 2):
+        ATURAN GAYA (WAJIB DIPATUHI):
         1.  Gaya narasi HARUS langsung, sederhana, dan hidup (vivid). Gunakan kalimat aktif. Hindari frasa bertele-tele.
         2.  Gunakan format markdown (*tebal* untuk penekanan, *italics* untuk pikiran internal).
         
-        ATURAN DIALOG (WAJIB DIPATUHI - Poin 3):
+        ATURAN DIALOG (WAJIB DIPATUHI):
         1.  JANGAN PERNAH menulis dialog NPC (misal: "Elias berkata, 'Halo'") di dalam field 'narration' atau 'reaction'.
         2.  UNTUK DIALOG NPC, SELALU gunakan format tag ini TEPAT di dalam string 'narration': [DIALOGUE:Nama NPC|Teks dialog mereka di sini]
         3.  Contoh: Pintu berderit terbuka. [DIALOGUE:Elias|Siapa disana?] Dia mengangkat lentera.
         
-        ATURAN MEKANIK (WAJIB DIPATUHI - Poin 2):
-        1.  Tugas Anda adalah merespons aksi pemain secara ATOMIK: Berikan Narasi DAN Mekanik selanjutnya dalam SATU respons JSON.
-        2.  Tentukan SATU MEKANIK UTAMA (choices, rollRequest, atau panggil alat 'spawn_monsters').
-        3.  ATURAN EKSPLORASI: Jika 'exploration', Anda WAJIB mengisi 'choices' (selalu 3 pilihan).
-        4.  PILIHAN KE-3: Pilihan 1 & 2 harus logis. Pilihan 3 harus sedikit 'brilian', berbahaya, atau acak/kreatif.
-        5.  ALAT SEKUNDER: Anda BISA memanggil 'add_items', 'update_quest', 'log_npc', atau 'award_xp' BERSAMAAN dengan mekanik utama.
-        6.  JANGAN panggil 'spawn_monsters' BERSAMAAN dengan 'choices' or 'rollRequest'.`;
+        ATURAN MEKANIK (WAJIB DIPATUHI):
+        1.  Validasi Inventaris: Anda HARUS memvalidasi aksi pemain terhadap 'KONTEKS PEMAIN SAAT INI (Inventaris)'. Jika pemain mencoba menggunakan item yang tidak mereka miliki (misal 'Potion of Healing' padahal inventaris kosong), 'narration' Anda HARUS menyatakan bahwa mereka tidak memilikinya, dan 'choices' Anda harus merefleksikan kegagalan itu.
+        2.  Tugas Anda adalah merespons aksi pemain secara ATOMIK: Berikan Narasi DAN Mekanik selanjutnya dalam SATU respons JSON.
+        3.  Tentukan SATU MEKANIK UTAMA (choices, rollRequest, atau panggil alat 'spawn_monsters').
+        4.  ATURAN EKSPLORASI: Jika 'exploration', Anda WAJIB mengisi 'choices' (selalu 3 pilihan).
+        5.  PILIHAN KE-3: Pilihan 1 & 2 harus logis. Pilihan 3 harus sedikit 'brilian', berbahaya, atau acak/kreatif.
+        6.  ALAT SEKUNDER: Anda BISA memanggil 'add_items', 'update_quest', 'log_npc', atau 'award_xp' BERSAMAAN dengan mekanik utama.
+        7.  JANGAN panggil 'spawn_monsters' BERSAMAAN dengan 'choices' or 'rollRequest'.`;
         
-        const prompt = this.buildPrompt(campaign, players, playerAction);
+        const prompt = this.buildPrompt(campaign, players, playerAction, actingCharacterId); // (Poin 6)
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({

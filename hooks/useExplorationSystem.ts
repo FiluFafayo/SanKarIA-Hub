@@ -193,6 +193,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                     campaign,
                     players,
                     encounterActionText, // Paksa prompt encounter
+                    null, // (Poin 6) Aksi 'random encounter' tidak punya pelaku spesifik
                     campaignActions.setThinkingState
                 );
                 
@@ -231,6 +232,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 campaign,
                 players,
                 actionText,
+                character.id, // (Poin 6) Kirim ID pelaku aksi
                 campaignActions.setThinkingState
             );
             // ==========================================================
@@ -282,6 +284,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 campaign,
                 players,
                 actionText, // Inputnya sekarang adalah hasil roll
+                character.id, // (Poin 6) Kirim ID pelaku aksi
                 campaignActions.setThinkingState
             );
             // ========================================================================
