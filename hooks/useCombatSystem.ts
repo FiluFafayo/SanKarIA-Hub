@@ -298,8 +298,23 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
     // FUNGSI INTI 3: advanceTurn (Menangani alur giliran)
     // =================================================================
     const advanceTurn = useCallback(async () => {
-        // --- 1. CEK AKHIR KOMBAT (LOGIKA BARU) ---
-        // Cek jika kombat *seharusnya* berakhir
+        // --- 1A. CEK TPK (Total Party Kill) (F1.2) ---
+        const playersInCombat = players.filter(p => campaign.initiativeOrder.includes(p.id));
+        const allPlayersDown = playersInCombat.length > 0 && playersInCombat.every(p => p.currentHp <= 0);
+        
+        if (campaign.gameState === 'combat' && allPlayersDown) {
+            // Jika semua pemain di 0 HP (dying atau dead), TPK terjadi.
+            const turnId = campaignActions.startTurn();
+            campaignActions.logEvent({ type: 'system', text: 'Semua petualang telah gugur. Kegelapan menyelimuti...' }, turnId);
+            campaignActions.setGameState('exploration'); // Akhiri loop kombat
+            campaignActions.logEvent({ type: 'dm_narration', text: 'Dunia menjadi hening saat kesadaran terakhir memudar. Petualangan ini telah berakhir tragis.' }, turnId);
+            campaignActions.setChoices(["Petualangan Telah Berakhir."]);
+            // Kita tidak endTurn() agar UI terkunci di pesan "Game Over"
+            return; // Stop
+        }
+
+        // --- 1B. CEK AKHIR KOMBAT (Kemenangan) ---
+        // Cek jika kombat *seharusnya* berakhir (Monster mati)
         if (campaign.gameState === 'combat' && campaign.monsters.length > 0 && campaign.monsters.every(m => m.currentHp === 0)) {
             const turnId = campaignActions.startTurn(); // Mulai "turn" cleanup
             campaignActions.logEvent({ type: 'system', text: 'Semua musuh telah dikalahkan! Pertarungan berakhir.' }, turnId);

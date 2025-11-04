@@ -239,9 +239,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 				</h1>
 				<button
 					onClick={() => onExit(campaign)}
-					className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded flex-shrink-0"
+					className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded flex-shrink-0 transition-colors
+                               disabled:bg-gray-600 disabled:cursor-not-allowed"
+					// F1.1: Mencegah race condition saat keluar
+					disabled={
+						campaign.thinkingState !== "idle" || !!campaign.activeRollRequest
+					}
 				>
-					Keluar
+					{campaign.thinkingState !== "idle" ? "Menunggu..." : "Keluar"}
 				</button>
 			</header>
 
