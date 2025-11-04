@@ -96,6 +96,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 			currentWeather: "Cerah",
 			// (ownerId akan di-set oleh dataService.createCampaign)
 		};
+        
+        // (Poin 5) Pastikan campaign baru yang disalin juga menggunakan format waktu number
+        if (typeof (newCampaign as any).currentTime === 'string') {
+            (newCampaign as any).currentTime = 43200; // Fallback ke 12:00 PM
+        }
 
 		try {
 			// REFAKTOR G-4: Panggil aksi dataStore untuk membuat campaign

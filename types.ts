@@ -247,7 +247,7 @@ export interface MapMarker {
     y: number; // Percentage from top
 }
 
-export type WorldTime = 'Pagi' | 'Siang' | 'Sore' | 'Malam';
+// export type WorldTime = 'Pagi' | 'Siang' | 'Sore' | 'Malam'; // (Poin 5) Dihapus, diganti number
 export type WorldWeather = 'Cerah' | 'Berawan' | 'Hujan' | 'Badai';
 
 // Ini adalah *instansi* monster dalam campaign
@@ -283,6 +283,13 @@ export interface DmReactionEvent extends BaseEvent {
     text: string;
 }
 
+// (Poin 3) Tipe event baru untuk dialog NPC
+export interface DmDialogueEvent extends BaseEvent {
+    type: 'dm_dialogue';
+    npcName: string;
+    text: string;
+}
+
 export interface SystemMessageEvent extends BaseEvent {
     type: 'system';
     text: string;
@@ -305,7 +312,7 @@ export interface RollResultEvent extends BaseEvent {
     reason: string;
 }
 
-export type GameEvent = PlayerActionEvent | DmNarrationEvent | SystemMessageEvent | RollResultEvent | DmReactionEvent;
+export type GameEvent = PlayerActionEvent | DmNarrationEvent | SystemMessageEvent | RollResultEvent | DmReactionEvent | DmDialogueEvent;
 
 // Ini adalah objek Campaign DEFINISI (yang kita dapat dari list)
 export interface Campaign {
@@ -335,7 +342,7 @@ export interface Campaign {
     longTermMemory: string;
     
     // World State (disimpan di DB)
-    currentTime: WorldTime;
+    currentTime: number; // (Poin 5) Diubah dari WorldTime (string) ke number (total detik)
     currentWeather: WorldWeather;
     worldEventCounter: number;
     

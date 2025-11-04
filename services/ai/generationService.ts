@@ -161,14 +161,17 @@ class GenerationService {
     }
 
     async generateOpeningScene(campaign: Campaign): Promise<string> {
-        const prompt = `Anda adalah Dungeon Master. Mulai kampanye baru dengan detail berikut dan tuliskan adegan pembuka yang menarik dalam 1-2 paragraf.
-
+        const prompt = `Anda adalah Dungeon Master. Mulai kampanye baru dengan detail berikut dan tuliskan adegan pembuka yang menarik (1-2 paragraf).
+        
         Judul: ${campaign.title}
         Deskripsi: ${campaign.description}
         Kepribadian DM: ${campaign.dmPersonality}
 
-        Tulis adegan pembuka yang imersif yang menempatkan para pemain langsung ke dalam aksi atau misteri. Jangan ajukan pertanyaan, cukup atur panggungnya.`;
-
+        ATURAN WAJIB (Poin 11):
+        1.  **Transisi:** Mulai adegan *sebelum* pemain tiba di lokasi utama (misal: "Kalian telah berjalan selama tiga hari...", "Kereta kuda berderit berhenti di gerbang..."). JANGAN mulai di dalam ruangan/kota secara tiba-tiba.
+        2.  **Hook:** Sertakan SATU alasan yang jelas mengapa para pemain ada di sana (misal: "Kalian semua menjawab panggilan pekerjaan dari...", "Rumor tentang artefak itu terlalu menggiurkan...", "Surat mendesak dari kerabatmu...").
+        3.  Tulis adegan imersif yang mengatur panggung. Jangan ajukan pertanyaan.`;
+        
         const call = async (client: any) => {
             const response = await client.models.generateContent({
                 model: 'gemini-2.5-flash',
@@ -179,29 +182,33 @@ class GenerationService {
         return geminiService.makeApiCall(call);
     }
     
-    async generateWorldEvent(campaign: Campaign): Promise<{ event: string, time: WorldTime, weather: WorldWeather }> {
+    // (Poin 5) Modifikasi untuk mengembalikan detik, bukan string
+    async generateWorldEvent(campaign: Campaign): Promise<{ event: string, secondsToAdd: number, nextWeather: WorldWeather }> {
         const { currentTime, currentWeather } = campaign;
-        const prompt = `Ini adalah TTRPG fantasi. Waktu saat ini adalah ${currentTime} dan cuacanya ${currentWeather}.
+        const formattedTime = formatDndTime(currentTime); // Gunakan helper
         
-        Tuliskan peristiwa dunia singkat (1 kalimat) yang terjadi di latar belakang. Bisa berupa perubahan cuaca, suara, atau pengamatan kecil.
+        const prompt = `Ini adalah TTRPG fantasi. Waktu saat ini adalah ${formattedTime} dan cuacanya ${currentWeather}.
         
-        Kemudian, tentukan waktu dan cuaca BERIKUTNYA.
+        Tuliskan peristiwa dunia singkat (1 kalimat) yang terjadi di latar belakang.
         
-        Respons dalam format JSON: { "event": "...", "nextTime": "...", "nextWeather": "..." }
-        Contoh: { "event": "Angin dingin bertiup dari utara, membawa aroma hujan.", "nextTime": "Sore", "nextWeather": "Berawan" }
+        Kemudian, tentukan jumlah WAKTU YANG BERLALU (misal 1 jam, 30 menit) dan cuaca BERIKUTNYA.
+        
+        Respons dalam format JSON: { "event": "...", "timePassedInMinutes": 60, "nextWeather": "..." }
+        Contoh: { "event": "Angin dingin bertiup dari utara, membawa aroma hujan.", "timePassedInMinutes": 30, "nextWeather": "Berawan" }
         `;
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
             try {
                 const parsed = JSON.parse(response.text);
+                const minutesToAdd = parsed.timePassedInMinutes || 60; // Fallback 1 jam
                 return {
                     event: parsed.event,
-                    time: parsed.nextTime,
-                    weather: parsed.nextWeather
+                    secondsToAdd: minutesToAdd * 60,
+                    nextWeather: parsed.nextWeather
                 };
             } catch {
-                return { event: "Dunia bergeser secara halus.", time: "Siang", weather: "Cerah" };
+                return { event: "Dunia bergeser secara halus.", secondsToAdd: 3600, weather: "Cerah" };
             }
         };
         return geminiService.makeApiCall(call);

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Campaign, Character, Quest, WorldTime, WorldWeather } from '../../types';
+import { Campaign, Character, Quest, WorldWeather } from '../../types'; // Hapus WorldTime
+import { formatDndTime } from '../../utils'; // (Poin 5) Impor helper format
 import { QuestLogPanel } from './QuestLogPanel';
 import { NpcTrackerPanel } from './NpcTrackerPanel';
 import { InteractiveMap } from './InteractiveMap';
@@ -35,17 +36,20 @@ const CampaignProgressBar: React.FC<{ quests: Quest[] }> = ({ quests }) => {
     );
 };
 
-const WorldStatePanel: React.FC<{time: WorldTime, weather: WorldWeather}> = ({ time, weather }) => {
-    const timeIcons = { 'Pagi': '☀️', 'Siang': '☀️', 'Sore': '🌇', 'Malam': '🌙' };
+// (Poin 5) Update WorldStatePanel untuk menggunakan number (detik)
+const WorldStatePanel: React.FC<{time: number, weather: WorldWeather}> = ({ time, weather }) => {
+    // const timeIcons = { 'Pagi': '☀️', 'Siang': '☀️', 'Sore': '🌇', 'Malam': '🌙' }; // Dihapus
     const weatherIcons = { 'Cerah': '😊', 'Berawan': '☁️', 'Hujan': '🌧️', 'Badai': '⛈️' };
+    
+    const formattedTime = formatDndTime(time); // Gunakan helper
 
     return (
         <div className="bg-gray-900/50 p-4 rounded-lg">
              <h2 className="font-cinzel text-lg text-amber-300 mb-2">Status Dunia</h2>
              <div className="flex justify-around text-center">
                 <div>
-                    <span className="text-3xl">{timeIcons[time]}</span>
-                    <p className="text-sm text-gray-300">{time}</p>
+                    {/* <span className="text-3xl">{timeIcons[time]}</span> // Dihapus */}
+                    <p className="text-lg font-bold text-gray-100">{formattedTime}</p>
                 </div>
                 <div>
                     <span className="text-3xl">{weatherIcons[weather]}</span>

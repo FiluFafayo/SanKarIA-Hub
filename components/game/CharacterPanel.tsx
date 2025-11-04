@@ -2,7 +2,35 @@ import React, { useState } from 'react';
 import { Character, MonsterInstance, CharacterInventoryItem, SpellDefinition, Skill, SKILL_ABILITY_MAP } from '../../types';
 import { useCombatSystem } from '../../hooks/useCombatSystem';
 import { DeathSaveTracker } from './DeathSaveTracker';
-import { getAbilityModifier, getProficiencyBonus } from '../../utils';
+import { getAbilityModifier, getProficiencyBonus, xpToNextLevel } from '../../utils';
+
+// (Poin 7) XP Bar Component
+const XPBar: React.FC<{ currentXp: number, level: number }> = ({ currentXp, level }) => {
+    const xpForLastLevel = xpToNextLevel(level - 1);
+    const xpForNextLevel = xpToNextLevel(level);
+    
+    if (xpForNextLevel === 0) return null; // Max level
+
+    const xpInCurrentLevel = currentXp - xpForLastLevel;
+    const xpNeededForLevel = xpForNextLevel - xpForLastLevel;
+    const percentage = xpNeededForLevel > 0 ? (xpInCurrentLevel / xpNeededForLevel) * 100 : 0;
+
+    return (
+        <div className="mt-2">
+            <div className="flex justify-between text-xs text-gray-400 mb-0.5">
+                <span>XP: {currentXp} / {xpForNextLevel}</span>
+                <span>Lvl {level}</span>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-1.5">
+                <div 
+                    className="bg-purple-500 h-full rounded-full transition-all duration-500 ease-out" 
+                    style={{ width: `${percentage}%` }}
+                ></div>
+            </div>
+        </div>
+    );
+};
+
 
 interface CharacterPanelProps {
   character: Character;
@@ -54,6 +82,8 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
                     <span>Speed: {character.speed}ft</span>
                 </div>
                 {character.currentHp <= 0 && <DeathSaveTracker successes={character.deathSaves.successes} failures={character.deathSaves.failures} />}
+                {/* (Poin 7) Tampilkan XP Bar */}
+                <XPBar currentXp={character.xp} level={character.level} />
             </div>
             
             {/* Tabs */}

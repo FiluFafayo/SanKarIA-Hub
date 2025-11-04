@@ -150,9 +150,11 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             // Cek World Event (jika perlu)
             if (campaign.worldEventCounter >= WORLD_EVENT_THRESHOLD) {
                 // Gunakan generationService (G-2)
+                // (Poin 5) Ganti updateWorldState
                 const worldEventResult = await generationService.generateWorldEvent(campaign); 
                 campaignActions.logEvent({ type: 'system', text: worldEventResult.event }, turnId);
-                campaignActions.updateWorldState(worldEventResult.time, worldEventResult.weather);
+                campaignActions.advanceTime(worldEventResult.secondsToAdd); // Tambahkan waktu
+                campaignActions.setWeather(worldEventResult.nextWeather); // Atur cuaca
             }
 
             // ================== PANGGILAN ATOMIK G-2 ==================

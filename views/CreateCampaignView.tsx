@@ -35,21 +35,21 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
     pillars,
     framework,
     mapData,
-    campaignData,
+    // campaignData dihapus (Poin 10)
     setCampaignStep,
     setPillars,
     setFramework,
     setMapData,
-    setCampaignData,
+    // setCampaignData dihapus (Poin 10)
     resetCampaignCreation
-  } = useCreationStore(s => ({
+  } = useAppStore(s => ({
     ...s.campaignCreation,
-    setCampaignStep: s.actions.setCampaignStep,
+    step: s.campaignCreation.step,
     setPillars: s.actions.setPillars,
     setFramework: s.actions.setFramework,
     setMapData: s.actions.setMapData,
-    setCampaignData: s.actions.setCampaignData,
-    resetCampaignCreation: s.actions.resetCampaignCreation
+    resetCampaignCreation: s.actions.resetCampaignCreation,
+    setCampaignStep: s.actions.setCampaignStep,
   }));
 
   const handleClose = () => {
@@ -142,8 +142,7 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
             }
         });
 
-        const newCampaign: Campaign = {
-          id: generateId('campaign'),
+        const newCampaign: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | 'monsters' | 'players' | 'playerIds' | 'choices' | 'turnId' | 'initiativeOrder'> = {
           title: framework.proposedTitle,
           description: pillars.premise,
           mainGenre: 'Fantasi',
@@ -152,9 +151,10 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
           isNSFW: false,
           maxPlayers: 4,
           theme: 'Fantasi',
-          dmPersonality: campaignData.dmPersonality,
-          dmNarrationStyle: campaignData.dmNarrationStyle,
-          responseLength: campaignData.responseLength,
+          // (Poin 10) Hardcode baseline baru
+          dmPersonality: "DM yang suportif namun menantang, fokus pada cerita.",
+          dmNarrationStyle: 'Langsung & Percakapan',
+          responseLength: 'Standar',
           eventLog: [],
           turnId: null,
           longTermMemory: `Premis: ${pillars.premise}. Elemen Kunci: ${pillars.keyElements}. Tujuan Akhir: ${pillars.endGoal}. Misi Utama: ${framework.proposedMainQuest.title}.`,
@@ -167,9 +167,9 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
           initiativeOrder: [],
           choices: [],
           quests: initialQuests,
-          npcs: initialNpcs,
-          currentTime: 'Siang',
-          currentWeather: 'Cerah',
+            npcs: initialNpcs,
+            currentTime: 43200, // (Poin 5) 12:00 PM
+            currentWeather: 'Cerah',
           worldEventCounter: 0,
           mapImageUrl: mapData?.imageUrl,
           mapMarkers: mapData?.markers || [],
@@ -262,33 +262,10 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
         case 4:
              return (
                 <Page>
-                     <h2 className="font-cinzel text-3xl text-yellow-900 mb-4 border-b-2 border-yellow-800/20 pb-2">Langkah 4: Sentuhan Akhir</h2>
-                     <p className="mb-4 text-sm">Pilih beberapa pengaturan terakhir sebelum memulai petualangan Anda.</p>
+                     <h2 className="font-cinzel text-3xl text-yellow-900 mb-4 border-b-2 border-yellow-800/20 pb-2">Langkah 4: Finalisasi</h2>
+                     <p className="mb-4 text-sm">Pengaturan DM (Kepribadian, Gaya Narasi) sekarang telah diatur ke *baseline* standar baru untuk performa terbaik. Anda siap untuk mewujudkan dunia Anda.</p>
                      
-                    <label className="font-cinzel text-yellow-800 mt-6">Kepribadian DM</label>
-                     {/* REFAKTOR G-3: Gunakan setCampaignData */}
-                    <select name="dmPersonality" value={campaignData.dmPersonality} onChange={(e) => setCampaignData({...campaignData, dmPersonality: e.target.value})} className="w-full bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 mt-1 p-1">
-                        <option>Penyair Epik</option>
-                        <option>Sejarawan Bijak</option>
-                        <option>Pelawak Sarkastik</option>
-                        <option>Narator Misterius</option>
-                        <option>Kecerdasan Buatan yang Logis</option>
-                    </select>
-
-                    <label className="font-cinzel text-yellow-800 mt-6">Panjang Respons DM</label>
-                     {/* REFAKTOR G-3: Gunakan setCampaignData */}
-                    <select name="responseLength" value={campaignData.responseLength} onChange={(e) => setCampaignData({...campaignData, responseLength: e.target.value as Campaign['responseLength']})} className="w-full bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 mt-1 p-1">
-                        <option>Singkat</option>
-                        <option>Standar</option>
-                        <option>Rinci</option>
-                    </select>
-
-                    <label className="font-cinzel text-yellow-800 mt-6">Gaya Narasi DM</label>
-                     {/* REFAKTOR G-3: Gunakan setCampaignData */}
-                    <select name="dmNarrationStyle" value={campaignData.dmNarrationStyle} onChange={(e) => setCampaignData({...campaignData, dmNarrationStyle: e.target.value as Campaign['dmNarrationStyle']})} className="w-full bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 mt-1 p-1">
-                        <option value="Deskriptif">Deskriptif (Puitis & Rinci)</option>
-                        <option value="Langsung & Percakapan">Langsung & Percakapan (Sederhana)</option>
-                    </select>
+                    {/* (Poin 10) Opsi UI dihapus */}
 
                     <div className="flex-grow"></div>
                     <div className="flex justify-between items-center">

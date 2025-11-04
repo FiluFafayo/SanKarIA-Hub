@@ -45,7 +45,7 @@ export const DEFAULT_CAMPAIGNS: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | '
         interactionHistory: ['Mengantarkan para petualang ke Kuil A\'zoth.']
       }
     ],
-    currentTime: 'Siang',
+    currentTime: 43200, // (Poin 5) 12:00 PM
     currentWeather: 'Cerah',
     worldEventCounter: 0,
     mapImageUrl: 'https://picsum.photos/seed/map-sunken/800/600',
@@ -83,7 +83,7 @@ export const DEFAULT_CAMPAIGNS: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | '
       }
     ],
     npcs: [],
-    currentTime: 'Sore',
+    currentTime: 61200, // (Poin 5) 5:00 PM
     currentWeather: 'Berawan',
     worldEventCounter: 0,
     mapImageUrl: 'https://picsum.photos/seed/map-crimson/800/600',

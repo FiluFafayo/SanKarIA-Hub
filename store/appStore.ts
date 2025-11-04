@@ -131,29 +131,21 @@ interface CampaignCreationState {
     pillars: CampaignCreationPillars;
     framework: CampaignFramework | null;
     mapData: { imageUrl: string; markers: MapMarker[], startLocationId: string } | null;
-    campaignData: {
-        dmPersonality: string;
-        responseLength: Campaign['responseLength'];
-        dmNarrationStyle: Campaign['dmNarrationStyle'];
-    };
+    // campaignData dihapus (Poin 10)
 }
 const initialCampaignState: CampaignCreationState = {
     step: 0,
     pillars: { premise: '', keyElements: '', endGoal: '' },
     framework: null,
     mapData: null,
-    campaignData: {
-        dmPersonality: 'Penyair Epik',
-        responseLength: 'Standar',
-        dmNarrationStyle: 'Deskriptif',
-    },
+    // campaignData dihapus dan akan di-hardcode (Poin 10)
 };
 interface CampaignCreationActions {
     setCampaignStep: (step: number) => void;
     setPillars: (pillars: CampaignCreationPillars) => void;
     setFramework: (framework: CampaignFramework | null) => void;
     setMapData: (mapData: CampaignCreationState['mapData']) => void;
-    setCampaignData: (data: CampaignCreationState['campaignData']) => void;
+    // setCampaignData dihapus (Poin 10)
     resetCampaignCreation: () => void;
 }
 
@@ -374,7 +366,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         setPillars: (pillars) => set(state => ({ campaignCreation: { ...state.campaignCreation, pillars } })),
         setFramework: (framework) => set(state => ({ campaignCreation: { ...state.campaignCreation, framework } })),
         setMapData: (mapData) => set(state => ({ campaignCreation: { ...state.campaignCreation, mapData } })),
-        setCampaignData: (data) => set(state => ({ campaignCreation: { ...state.campaignCreation, campaignData: data } })),
+        // setCampaignData dihapus (Poin 10)
         resetCampaignCreation: () => set({ campaignCreation: { ...initialCampaignState, step: 0 } }),
     }
 }));

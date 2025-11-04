@@ -77,6 +77,7 @@ type LoggableGameEvent =
 	| Omit<PlayerActionEvent, "id" | "timestamp" | "turnId">
 	| Omit<DmNarrationEvent, "id" | "timestamp" | "turnId">
 	| Omit<DmReactionEvent, "id" | "timestamp" | "turnId">
+    | Omit<DmDialogueEvent, "id" | "timestamp" | "turnId"> // (Poin 3) Tambahkan DmDialogueEvent
 	| Omit<SystemMessageEvent, "id" | "timestamp" | "turnId">
 	| Omit<RollResultEvent, "id" | "timestamp" | "turnId">;
 
@@ -98,7 +99,9 @@ export interface CampaignActions {
 	addItemsToInventory: (payload: AddItemsPayload) => void;
 	updateQuestLog: (payload: UpdateQuestPayload) => void;
 	logNpcInteraction: (payload: LogNpcInteractionPayload) => void;
-	updateWorldState: (time: WorldTime, weather: WorldWeather) => void;
+	// (Poin 5) Ganti updateWorldState
+    advanceTime: (seconds: number) => void;
+    setWeather: (weather: WorldWeather) => void;
 }
 
 type Action =
@@ -116,9 +119,15 @@ type Action =
 	| { type: "UPDATE_QUEST_LOG"; payload: UpdateQuestPayload }
 	| { type: "LOG_NPC_INTERACTION"; payload: LogNpcInteractionPayload }
 	| {
-			type: "UPDATE_WORLD_STATE";
-			payload: { time: WorldTime; weather: WorldWeather };
-	  };
+            // (Poin 5) Ganti UPDATE_WORLD_STATE
+			type: "ADVANCE_TIME";
+			payload: number; // Detik yang ditambahkan
+	  }
+    | {
+            // (Poin 5) Aksi terpisah untuk cuaca
+            type: "SET_WEATHER";
+            payload: WorldWeather;
+    };
 
 const reducer = (state: CampaignState, action: Action): CampaignState => {
 	switch (action.type) {
@@ -306,14 +315,20 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
 			}
 			return { ...state, npcs };
 		}
-		case "UPDATE_WORLD_STATE": {
+        // (Poin 5) Ganti reducer UPDATE_WORLD_STATE
+		case "ADVANCE_TIME": {
 			return {
 				...state,
-				currentTime: action.payload.time,
-				currentWeather: action.payload.weather,
-				worldEventCounter: 0, // Reset counter after an event
+				currentTime: state.currentTime + action.payload,
+                worldEventCounter: 0, // Reset counter
 			};
 		}
+        case "SET_WEATHER": {
+            return {
+                ...state,
+                currentWeather: action.payload,
+            };
+        }
 		default:
 			return state;
 	}
@@ -385,8 +400,11 @@ export const useCampaign = (
 			dispatch({ type: "UPDATE_QUEST_LOG", payload });
 		const logNpcInteraction = (payload: LogNpcInteractionPayload) =>
 			dispatch({ type: "LOG_NPC_INTERACTION", payload });
-		const updateWorldState = (time: WorldTime, weather: WorldWeather) =>
-			dispatch({ type: "UPDATE_WORLD_STATE", payload: { time, weather } });
+        // (Poin 5) Ganti implementasi action
+		const advanceTime = (seconds: number) =>
+			dispatch({ type: "ADVANCE_TIME", payload: seconds });
+        const setWeather = (weather: WorldWeather) =>
+            dispatch({ type: "SET_WEATHER", payload: weather });
 
 		return {
 			logEvent,
@@ -398,7 +416,9 @@ export const useCampaign = (
 			addItemsToInventory,
 			updateQuestLog,
 			logNpcInteraction,
-			updateWorldState,
+            // (Poin 5) Ganti
+            advanceTime,
+            setWeather,
 			updateMonster: (monster) =>
 				dispatch({ type: "UPDATE_MONSTER", payload: monster }),
 			removeMonster: (monsterId) =>

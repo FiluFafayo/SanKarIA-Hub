@@ -18,6 +18,15 @@ export const getProficiencyBonus = (level: number): number => {
   return Math.floor((level - 1) / 4) + 2;
 };
 
+// (Poin 7) Helper XP
+export const xpToNextLevel = (level: number): number => {
+    const xpThresholds = [
+        0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000,
+        85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000
+    ];
+    return xpThresholds[level] || 0;
+};
+
 // Function to roll dice based on notation like "1d20+5" or "2d6-1"
 export const rollDice = (notation: string): { total: number; rolls: number[]; modifier: number } => {
     const diceRegex = /(\d+)d(\d+)([+-]\d+)?/;
@@ -59,7 +68,54 @@ export const rollOneAbilityScore = (): number => {
     return rolls.reduce((sum, roll) => sum + roll, 0);
 };
 
+// (Poin 7) Helper Roll HP dengan Safety Net
+export const rollHitDice = (hitDice: string, conMod: number, level: number): number => {
+    const match = hitDice.match(/d(\d+)/);
+    if (!match) return 1 + conMod; // Fallback
+    
+    const dieType = parseInt(match[1], 10);
+    const median = (dieType / 2) + 1; // Rata-rata roll (misal d8 = 4.5 -> 5)
+
+    if (level === 1) {
+        return dieType + conMod; // Selalu max HP di level 1
+    }
+
+    const roll = Math.floor(Math.random() * dieType) + 1;
+    // Safety Net: Jika roll di bawah rata-rata, ambil rata-rata
+    return (roll < median ? median : roll) + conMod;
+};
+
 export const rollInitiative = (dexScore: number): number => {
     const roll = Math.floor(Math.random() * 20) + 1;
     return roll + getAbilityModifier(dexScore);
 }
+
+// (Poin 5) Helper Waktu D&D
+export const formatDndTime = (totalSeconds: number): string => {
+    const secondsInDay = 86400;
+    const timeOfDay = totalSeconds % secondsInDay;
+    
+    const hours = Math.floor(timeOfDay / 3600);
+    const minutes = Math.floor((timeOfDay % 3600) / 60);
+    
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+    const displayMinutes = minutes < 10 ? `0${minutes}` : minutes;
+
+    let timeCategory = "Malam";
+    if (hours >= 6 && hours < 12) timeCategory = "Pagi";
+    else if (hours >= 12 && hours < 17) timeCategory = "Siang";
+    else if (hours >= 17 && hours < 21) timeCategory = "Sore";
+
+    return `${timeCategory} (${displayHours}:${displayMinutes} ${ampm})`;
+};
+
+export const addDndTime = (currentSeconds: number, unit: 'round' | 'minute' | 'hour', amount: number): number => {
+    let secondsToAdd = 0;
+    switch(unit) {
+        case 'round': secondsToAdd = 6 * amount; break;
+        case 'minute': secondsToAdd = 60 * amount; break;
+        case 'hour': secondsToAdd = 3600 * amount; break;
+    }
+    return currentSeconds + secondsToAdd;
+};

@@ -57,6 +57,18 @@ export const ChatLog: React.FC<ChatLogProps> = ({ events, players, characterId, 
                         );
                     }
                     case 'system':
+                    // (Poin 3) Render case baru untuk Dialog
+                    case 'dm_dialogue':
+                        return (
+                            <div key={event.id} className="flex flex-col items-start">
+                                <div className="text-xs text-purple-300 px-2 font-semibold">{event.npcName} berkata:</div>
+                                <div className="max-w-xl p-3 rounded-lg bg-gray-800 border border-purple-800/50">
+                                    <blockquote className="text-white whitespace-pre-wrap italic">
+                                        "{event.text}"
+                                    </blockquote>
+                                </div>
+                            </div>
+                        );
                     case 'roll_result':
                         return (
                              <div key={event.id} className="text-center text-sm text-gray-400 italic my-2">
