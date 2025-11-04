@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, ChangeEvent } from 'react'; // Import ChangeEvent
 import { ViewWrapper } from '../components/ViewWrapper';
 import { Campaign, Quest, NPC, MapMarker } from '../types';
 import { generateId, generateJoinCode } from '../utils';
-// REFAKTOR G-2: Impor generationService
 import { generationService } from '../services/ai/generationService';
 import { InteractiveMap } from '../components/game/InteractiveMap';
+import { useCreationStore } from '../store/creationStore'; // REFAKTOR G-3: Import store
 
 
 interface CreateCampaignViewProps {
@@ -25,34 +25,42 @@ const Page: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 
 export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose, onCreateCampaign }) => {
-  const [step, setStep] = useState(1);
+  // REFAKTOR G-3: State Ephemeral (Loading) tetap lokal
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
-  
-  // Step 1 State
-  const [pillars, setPillars] = useState({
-      premise: '',
-      keyElements: '',
-      endGoal: ''
-  });
-  
-  // Step 2 State
-  const [framework, setFramework] = useState<CampaignFramework | null>(null);
 
-  // Step 3 State
-  const [mapData, setMapData] = useState<{ imageUrl: string; markers: MapMarker[], startLocationId: string } | null>(null);
+  // REFAKTOR G-3: State Form Persisten dipindah ke Zustand
+  const {
+    step,
+    pillars,
+    framework,
+    mapData,
+    campaignData,
+    setCampaignStep,
+    setPillars,
+    setFramework,
+    setMapData,
+    setCampaignData,
+    resetCampaignCreation
+  } = useCreationStore(s => ({
+    ...s.campaignCreation,
+    setCampaignStep: s.actions.setCampaignStep,
+    setPillars: s.actions.setPillars,
+    setFramework: s.actions.setFramework,
+    setMapData: s.actions.setMapData,
+    setCampaignData: s.actions.setCampaignData,
+    resetCampaignCreation: s.actions.resetCampaignCreation
+  }));
 
-  // Step 4 (Final) State
-   const [campaignData, setCampaignData] = useState({
-    dmPersonality: 'Penyair Epik',
-    responseLength: 'Standar' as Campaign['responseLength'],
-    dmNarrationStyle: 'Deskriptif' as Campaign['dmNarrationStyle'],
-  });
+  // REFAKTOR G-3: Wrapper untuk onClose
+  const handleClose = () => {
+    resetCampaignCreation();
+    onClose();
+  };
 
-
-  const handlePillarChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handlePillarChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const { name, value } = e.target;
-      setPillars(prev => ({ ...prev, [name]: value }));
+      setPillars({ ...pillars, [name]: value });
   };
 
   const generateFramework = async () => {
@@ -63,10 +71,9 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
       setIsLoading(true);
       setLoadingMessage("Meminta visi dari para dewa cerita...");
       try {
-          // REFAKTOR G-2
           const result = await generationService.generateCampaignFramework(pillars);
           setFramework({ ...result, description: pillars.premise });
-          setStep(2);
+          setCampaignStep(2); // REFAKTOR G-3
       } catch (e) {
           console.error("Gagal membuat kerangka kampanye:", e);
           alert("Gagal berkomunikasi dengan AI untuk membuat kerangka. Coba lagi.");
@@ -85,20 +92,19 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
           const imageUrl = `data:image/png;base64,${imageB64}`;
 
           setLoadingMessage("Menandai tempat-tempat penting...");
-          // REFAKTOR G-2
           const markerData = await generationService.generateMapMarkers(framework);
           
-          setMapData({
+          setMapData({ // REFAKTOR G-3
               imageUrl,
               markers: markerData.markers,
               startLocationId: markerData.startLocationId
           });
-          setStep(4);
+          setCampaignStep(4); // REFAKTOR G-3
 
       } catch (e) {
           console.error("Gagal membuat peta:", e);
           alert("Gagal membuat peta kampanye. Anda dapat melanjutkan tanpa peta atau mencoba lagi.");
-          setStep(4); // Lanjutkan ke langkah berikutnya bahkan jika gagal
+          setCampaignStep(4); // REFAKTOR G-3
       } finally {
           setIsLoading(false);
       }
@@ -172,6 +178,7 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
         };
         
         await onCreateCampaign(newCampaign);
+        resetCampaignCreation(); // REFAKTOR G-3: Reset state on success
 
     } catch (e) {
         console.error("Gagal memekanisasi atau membuat kampanye:", e);
@@ -225,8 +232,9 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                     )}
                     <div className="flex-grow"></div>
                     <div className="flex justify-between">
-                         <button onClick={() => setStep(1)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
-                         <button onClick={() => setStep(3)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">Lanjutkan ke Pembuatan Peta &rarr;</button>
+                         {/* REFAKTOR G-3: Gunakan setCampaignStep */}
+                         <button onClick={() => setCampaignStep(1)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
+                         <button onClick={() => setCampaignStep(3)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">Lanjutkan ke Pembuatan Peta &rarr;</button>
                     </div>
                 </Page>
             );
@@ -242,11 +250,12 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                     )}
                     <div className="flex-grow"></div>
                     <div className="flex justify-between">
-                         <button onClick={() => setStep(2)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
+                         {/* REFAKTOR G-3: Gunakan setCampaignStep */}
+                         <button onClick={() => setCampaignStep(2)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
                          <button onClick={generateMap} className="font-cinzel bg-yellow-800 text-white px-6 py-2 rounded hover:bg-yellow-700 transition-colors">
                            {mapData ? 'Buat Ulang Peta' : 'Buat Peta'}
                          </button>
-                         <button onClick={() => setStep(4)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">Lanjutkan ke Sentuhan Akhir &rarr;</button>
+                         <button onClick={() => setCampaignStep(4)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">Lanjutkan ke Sentuhan Akhir &rarr;</button>
                     </div>
                 </Page>
             )
@@ -257,7 +266,8 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                      <p className="mb-4 text-sm">Pilih beberapa pengaturan terakhir sebelum memulai petualangan Anda.</p>
                      
                     <label className="font-cinzel text-yellow-800 mt-6">Kepribadian DM</label>
-                    <select name="dmPersonality" value={campaignData.dmPersonality} onChange={(e) => setCampaignData(p => ({...p, dmPersonality: e.target.value}))} className="w-full bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 mt-1 p-1">
+                     {/* REFAKTOR G-3: Gunakan setCampaignData */}
+                    <select name="dmPersonality" value={campaignData.dmPersonality} onChange={(e) => setCampaignData({...campaignData, dmPersonality: e.target.value})} className="w-full bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 mt-1 p-1">
                         <option>Penyair Epik</option>
                         <option>Sejarawan Bijak</option>
                         <option>Pelawak Sarkastik</option>
@@ -266,21 +276,24 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                     </select>
 
                     <label className="font-cinzel text-yellow-800 mt-6">Panjang Respons DM</label>
-                    <select name="responseLength" value={campaignData.responseLength} onChange={(e) => setCampaignData(p => ({...p, responseLength: e.target.value as Campaign['responseLength']}))} className="w-full bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 mt-1 p-1">
+                     {/* REFAKTOR G-3: Gunakan setCampaignData */}
+                    <select name="responseLength" value={campaignData.responseLength} onChange={(e) => setCampaignData({...campaignData, responseLength: e.target.value as Campaign['responseLength']})} className="w-full bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 mt-1 p-1">
                         <option>Singkat</option>
                         <option>Standar</option>
                         <option>Rinci</option>
                     </select>
 
                     <label className="font-cinzel text-yellow-800 mt-6">Gaya Narasi DM</label>
-                    <select name="dmNarrationStyle" value={campaignData.dmNarrationStyle} onChange={(e) => setCampaignData(p => ({...p, dmNarrationStyle: e.target.value as Campaign['dmNarrationStyle']}))} className="w-full bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 mt-1 p-1">
+                     {/* REFAKTOR G-3: Gunakan setCampaignData */}
+                    <select name="dmNarrationStyle" value={campaignData.dmNarrationStyle} onChange={(e) => setCampaignData({...campaignData, dmNarrationStyle: e.target.value as Campaign['dmNarrationStyle']})} className="w-full bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 mt-1 p-1">
                         <option value="Deskriptif">Deskriptif (Puitis & Rinci)</option>
                         <option value="Langsung & Percakapan">Langsung & Percakapan (Sederhana)</option>
                     </select>
 
                     <div className="flex-grow"></div>
                     <div className="flex justify-between items-center">
-                         <button onClick={() => setStep(3)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
+                         {/* REFAKTOR G-3: Gunakan setCampaignStep */}
+                         <button onClick={() => setCampaignStep(3)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
                          <button onClick={handleCreate} className="font-cinzel bg-yellow-800 text-white px-6 py-2 rounded hover:bg-yellow-700 transition-colors">
                            Buat Kampanye
                          </button>
@@ -293,7 +306,8 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
 
 
   return (
-    <ViewWrapper onClose={onClose} title="Puncak Pencerita - Kampanye Kustom">
+    // REFAKTOR G-3: Gunakan handleClose
+    <ViewWrapper onClose={handleClose} title="Puncak Pencerita - Kampanye Kustom"> 
         <div className="relative">
             {isLoading && renderLoadingOverlay()}
             {renderPage()}
