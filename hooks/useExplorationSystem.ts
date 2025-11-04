@@ -12,6 +12,35 @@ import { gameService } from '../services/ai/gameService';
 // Import service GENERASI (G-2)
 import { generationService } from '../services/ai/generationService';
 
+// (Poin 3) Helper baru untuk mem-parse [DIALOGUE]
+const parseAndLogNarration = (
+    narration: string, 
+    turnId: string, 
+    campaignActions: CampaignActions
+) => {
+    if (!narration || !narration.trim()) return;
+
+    const dialogueRegex = /\[DIALOGUE:([^|]+)\|([^\]]+)\]/g;
+    const parts = narration.split(dialogueRegex);
+
+    for (let i = 0; i < parts.length; i++) {
+        if (i % 3 === 0) {
+            // Ini adalah teks narasi biasa
+            if (parts[i] && parts[i].trim()) {
+                campaignActions.logEvent({ type: 'dm_narration', text: parts[i].trim() }, turnId);
+            }
+        } else if (i % 3 === 1) {
+            // Ini adalah tag [DIALOGUE]
+            const npcName = parts[i];
+            const text = parts[i + 1];
+            if (npcName && text) {
+                campaignActions.logEvent({ type: 'dm_dialogue', npcName: npcName.trim(), text: text.trim() }, turnId);
+            }
+            i++; // Loncat bagian text
+        }
+    }
+};
+
 const WORLD_EVENT_THRESHOLD = 5; // Trigger event every 5 player turns
 
 interface ExplorationSystemProps {
@@ -43,6 +72,14 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 case 'spawn_monsters':
                     campaignActions.spawnMonsters(call.args.monsters);
                     message = `Bahaya! Musuh muncul!`;
+                    break;
+                // (Poin 7) Tangani tool XP
+                case 'award_xp':
+                    const player = players.find(p => p.id === call.args.characterId);
+                    if (player) {
+                        campaignActions.awardXp(call.args.characterId, call.args.amount);
+                        message = `${player.name} menerima ${call.args.amount} XP untuk: ${call.args.reason}`;
+                    }
                     break;
             }
             if (message) {
@@ -146,6 +183,37 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: actionText }, turnId);
         campaignActions.clearChoices(); 
 
+        // (Poin 8) Cek Random Encounter (5% chance)
+        if (Math.random() < 0.05 && campaign.gameState === 'exploration') {
+            console.warn("[Fase 2] Random Encounter Terpicu!");
+            const encounterActionText = "Sedang bepergian, tiba-tiba ada ancaman baru muncul dari bayang-bayang...";
+            
+            try {
+                const response = await gameService.generateTurnResponse(
+                    campaign,
+                    players,
+                    encounterActionText, // Paksa prompt encounter
+                    campaignActions.setThinkingState
+                );
+                
+                // Log narasi encounter
+                parseAndLogNarration(response.narration, turnId, campaignActions);
+                if (response.reaction) {
+                    campaignActions.logEvent({ type: 'dm_reaction', text: response.reaction }, turnId);
+                }
+                
+                // Proses mekanik encounter (HARUSNYA spawn_monsters)
+                await processMechanics(turnId, response, encounterActionText);
+                
+            } catch (error) {
+                // Fallback jika AI random encounter gagal
+                console.error("[Fase 2] Gagal generate Random Encounter:", error);
+                // (Lanjutkan ke aksi normal pemain di bawah)
+            }
+            
+            return; // Hentikan eksekusi aksi asli pemain
+        }
+
         try {
             // Cek World Event (jika perlu)
             if (campaign.worldEventCounter >= WORLD_EVENT_THRESHOLD) {
@@ -171,9 +239,8 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             if (response.reaction) {
                 campaignActions.logEvent({ type: 'dm_reaction', text: response.reaction }, turnId);
             }
-            if (response.narration) {
-                campaignActions.logEvent({ type: 'dm_narration', text: response.narration }, turnId);
-            }
+            // (Poin 3) Gunakan parser baru untuk dialog
+            parseAndLogNarration(response.narration, turnId, campaignActions);
             
             // 2. Proses Mekanik (Sekarang dijamin ada atau fallback)
             await processMechanics(turnId, response, actionText);
@@ -221,7 +288,8 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
 
             // 1. Log Narasi
             if (response.reaction) { campaignActions.logEvent({ type: 'dm_reaction', text: response.reaction }, turnId); }
-            if (response.narration) { campaignActions.logEvent({ type: 'dm_narration', text: response.narration }, turnId); }
+            // (Poin 3) Gunakan parser baru untuk dialog
+            parseAndLogNarration(response.narration, turnId, campaignActions);
             
             // 2. Proses Mekanik
             await processMechanics(turnId, response, actionText);

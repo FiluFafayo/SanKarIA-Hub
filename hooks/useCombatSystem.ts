@@ -21,6 +21,34 @@ import {
 import { gameService } from "../services/ai/gameService";
 import { generationService } from "../services/ai/generationService";
 
+// (Poin 3) Impor helper dari hook tetangga
+// (Kita asumsikan helper ini diekspor atau didefinisikan secara global/dilewatkan)
+// Untuk kesederhanaan, kita duplikat saja helper-nya di sini.
+const parseAndLogNarration = (
+    narration: string, 
+    turnId: string, 
+    campaignActions: CampaignActions
+) => {
+    if (!narration || !narration.trim()) return;
+    const dialogueRegex = /\[DIALOGUE:([^|]+)\|([^\]]+)\]/g;
+    const parts = narration.split(dialogueRegex);
+    for (let i = 0; i < parts.length; i++) {
+        if (i % 3 === 0) {
+            if (parts[i] && parts[i].trim()) {
+                campaignActions.logEvent({ type: 'dm_narration', text: parts[i].trim() }, turnId);
+            }
+        } else if (i % 3 === 1) {
+            const npcName = parts[i];
+            const text = parts[i + 1];
+            if (npcName && text) {
+                campaignActions.logEvent({ type: 'dm_dialogue', npcName: npcName.trim(), text: text.trim() }, turnId);
+            }
+            i++;
+        }
+    }
+};
+
+
 interface CombatSystemProps {
 	campaign: CampaignState;
 	character: Character; // Karakter *kita*
@@ -56,10 +84,18 @@ export const useCombatSystem = ({
 						message = `Catatan NPC diperbarui: ${call.args.npcName}`;
 						break;
 					case "spawn_monsters":
-						campaignActions.spawnMonsters(call.args.monsters);
-						message = `Bahaya! Musuh baru muncul!`;
-						break;
-				}
+					campaignActions.spawnMonsters(call.args.monsters);
+					message = `Bahaya! Musuh baru muncul!`;
+					break;
+                // (Poin 7) Tangani tool XP
+                case 'award_xp':
+                    const player = players.find(p => p.id === call.args.characterId);
+                    if (player) {
+                        campaignActions.awardXp(call.args.characterId, call.args.amount);
+                        message = `${player.name} menerima ${call.args.amount} XP untuk: ${call.args.reason}`;
+                    }
+                    break;
+			}
 				if (message) {
 					campaignActions.logEvent(
 						{ type: "system", text: `--- ${message} ---` },
@@ -529,11 +565,8 @@ export const useCombatSystem = ({
 						{ type: "dm_reaction", text: response.reaction },
 						turnId
 					);
-				if (response.narration)
-					campaignActions.logEvent(
-						{ type: "dm_narration", text: response.narration },
-						turnId
-					);
+                // (Poin 3) Gunakan parser baru untuk dialog
+                parseAndLogNarration(response.narration, turnId, campaignActions);
 
 				// 2. Proses Mekanik
 				// PANGGILAN AMAN: advanceTurn -> processMechanics (tidak ada circular)
@@ -604,11 +637,8 @@ export const useCombatSystem = ({
 								{ type: "dm_reaction", text: response.reaction },
 								turnId
 							);
-						if (response.narration)
-							campaignActions.logEvent(
-								{ type: "dm_narration", text: response.narration },
-								turnId
-							);
+                        // (Poin 3) Gunakan parser baru untuk dialog
+                        parseAndLogNarration(response.narration, turnId, campaignActions);
 
 						// 2. Proses Mekanik (yang akan di-auto-roll)
 						// PANGGILAN AMAN: advanceTurn -> processMechanics

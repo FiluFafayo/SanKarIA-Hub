@@ -102,6 +102,7 @@ export interface CampaignActions {
 	// (Poin 5) Ganti updateWorldState
     advanceTime: (seconds: number) => void;
     setWeather: (weather: WorldWeather) => void;
+    awardXp: (characterId: string, amount: number) => void; // (Poin 7)
 }
 
 type Action =
@@ -119,10 +120,14 @@ type Action =
 	| { type: "UPDATE_QUEST_LOG"; payload: UpdateQuestPayload }
 	| { type: "LOG_NPC_INTERACTION"; payload: LogNpcInteractionPayload }
 	| {
-            // (Poin 5) Ganti UPDATE_WORLD_STATE
 			type: "ADVANCE_TIME";
 			payload: number; // Detik yang ditambahkan
 	  }
+    | {
+            // (Poin 7) Aksi baru untuk XP
+            type: "AWARD_XP";
+            payload: { characterId: string; amount: number };
+      }
     | {
             // (Poin 5) Aksi terpisah untuk cuaca
             type: "SET_WEATHER";
@@ -329,6 +334,18 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
                 currentWeather: action.payload,
             };
         }
+        // (Poin 7) Reducer untuk XP
+        case "AWARD_XP": {
+            const { characterId, amount } = action.payload;
+            return {
+                ...state,
+                players: state.players.map(p => 
+                    p.id === characterId 
+                        ? { ...p, xp: (p.xp || 0) + amount } 
+                        : p
+                ),
+            };
+        }
 		default:
 			return state;
 	}
@@ -405,6 +422,9 @@ export const useCampaign = (
 			dispatch({ type: "ADVANCE_TIME", payload: seconds });
         const setWeather = (weather: WorldWeather) =>
             dispatch({ type: "SET_WEATHER", payload: weather });
+        // (Poin 7)
+        const awardXp = (characterId: string, amount: number) =>
+            dispatch({ type: "AWARD_XP", payload: { characterId, amount } });
 
 		return {
 			logEvent,
@@ -419,6 +439,7 @@ export const useCampaign = (
             // (Poin 5) Ganti
             advanceTime,
             setWeather,
+            awardXp, // (Poin 7)
 			updateMonster: (monster) =>
 				dispatch({ type: "UPDATE_MONSTER", payload: monster }),
 			removeMonster: (monsterId) =>

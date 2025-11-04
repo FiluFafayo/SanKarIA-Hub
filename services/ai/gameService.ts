@@ -15,6 +15,10 @@ import { parseStructuredApiResponse } from "../responseParser"; // Import parser
 // SKEMA & TOOLS (Dipindah dari geminiService.ts)
 // =================================================================
 
+// (Poin 3) Tipe event baru untuk dialog NPC
+// Kita akan mem-parse ini dari string narasi, tapi kita definisikan di sini untuk referensi
+// Format yang diharapkan: [DIALOGUE:Nama NPC|Teks dialog]
+
 // SKEMA G-2 (BARU): Menggabungkan Narasi dan Mekanik menjadi SATU skema respons.
 // Ini adalah inti dari perbaikan 'AI DM STUCK'.
 export const COMBINED_RESPONSE_SCHEMA = {
@@ -146,6 +150,20 @@ const TOOLS: FunctionDeclaration[] = [
             },
             required: ['npcName', 'summary']
         }
+    },
+    // (Poin 7) Alat baru untuk XP
+    {
+        name: 'award_xp',
+        description: "Memberikan Poin Pengalaman (XP) kepada pemain atas pencapaian non-kombat (menyelesaikan quest, roleplay cerdas, menemukan rahasia).",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                characterId: { type: Type.STRING, description: "ID karakter yang menerima XP." },
+                amount: { type: Type.INTEGER, description: "Jumlah XP yang diberikan (misal: 50, 100, 250)." },
+                reason: { type: Type.STRING, description: "Alasan singkat pemberian XP (misal: 'Menyelesaikan Quest: Misteri Kuil')." }
+            },
+            required: ['characterId', 'amount', 'reason']
+        }
     }
 ];
 
@@ -206,17 +224,28 @@ class GameService {
             styleInstruction = 'Gaya narasimu HARUS langsung, sederhana, dan seperti percakapan.';
         }
 
-        const systemInstruction = `Anda adalah AI Dungeon Master (DM) TTRPG. Kepribadian Anda: ${campaign.dmPersonality}. Panjang respons: ${campaign.responseLength}. ${styleInstruction}
+        // (Poin 2 & 3) Instruksi baru untuk gaya, dialog, dan opsi
+        const systemInstruction = `Anda adalah AI Dungeon Master (DM) TTRPG.
+        Kepribadian Anda: DM yang suportif namun menantang, fokus pada cerita.
+        Panjang Respons: Standar.
         
-        ATURAN UTAMA (WAJIB DIPATUHI):
-        1.  Tugas Anda adalah merespons aksi pemain secara ATOMIK: Berikan Narasi DAN Mekanik selanjutnya dalam SATU respons.
-        2.  Respons HARUS berupa objek JSON tunggal yang valid sesuai skema 'COMBINED_RESPONSE_SCHEMA'.
-        3.  Tandai objek interaktif (peti, tuas, pintu) dalam 'narration' menggunakan format [OBJECT:nama-objek|id-unik].
-        4.  PENTING: Tentukan SATU MEKANIK UTAMA (choices, rollRequest, atau panggil alat 'spawn_monsters').
-        5.  ATURAN EKSPLORASI: Jika status game 'exploration' DAN Anda tidak memicu 'rollRequest' atau 'spawn_monsters', Anda WAJIB mengisi 'choices' (3-4 pilihan).
-        6.  ATURAN ALAT: Anda BISA memanggil alat sekunder (add_items, update_quest) BERSAMAAN dengan mekanik utama (choices/rollRequest).
-        7.  JANGAN panggil 'spawn_monsters' BERSAMAAN dengan 'choices' or 'rollRequest'.`;
-
+        ATURAN GAYA (WAJIB DIPATUHI - Poin 2):
+        1.  Gaya narasi HARUS langsung, sederhana, dan hidup (vivid). Gunakan kalimat aktif. Hindari frasa bertele-tele.
+        2.  Gunakan format markdown (*tebal* untuk penekanan, *italics* untuk pikiran internal).
+        
+        ATURAN DIALOG (WAJIB DIPATUHI - Poin 3):
+        1.  JANGAN PERNAH menulis dialog NPC (misal: "Elias berkata, 'Halo'") di dalam field 'narration' atau 'reaction'.
+        2.  UNTUK DIALOG NPC, SELALU gunakan format tag ini TEPAT di dalam string 'narration': [DIALOGUE:Nama NPC|Teks dialog mereka di sini]
+        3.  Contoh: Pintu berderit terbuka. [DIALOGUE:Elias|Siapa disana?] Dia mengangkat lentera.
+        
+        ATURAN MEKANIK (WAJIB DIPATUHI - Poin 2):
+        1.  Tugas Anda adalah merespons aksi pemain secara ATOMIK: Berikan Narasi DAN Mekanik selanjutnya dalam SATU respons JSON.
+        2.  Tentukan SATU MEKANIK UTAMA (choices, rollRequest, atau panggil alat 'spawn_monsters').
+        3.  ATURAN EKSPLORASI: Jika 'exploration', Anda WAJIB mengisi 'choices' (selalu 3 pilihan).
+        4.  PILIHAN KE-3: Pilihan 1 & 2 harus logis. Pilihan 3 harus sedikit 'brilian', berbahaya, atau acak/kreatif.
+        5.  ALAT SEKUNDER: Anda BISA memanggil 'add_items', 'update_quest', 'log_npc', atau 'award_xp' BERSAMAAN dengan mekanik utama.
+        6.  JANGAN panggil 'spawn_monsters' BERSAMAAN dengan 'choices' or 'rollRequest'.`;
+        
         const prompt = this.buildPrompt(campaign, players, playerAction);
 
         const call = async (client: any) => {
