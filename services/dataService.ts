@@ -781,43 +781,48 @@ class DataService {
     async saveCampaign(campaign: Campaign): Promise<Campaign> {
         const supabase = this.ensureSupabase();
 
+        // Destrukturisasi state runtime dan SSoT
         const { 
             eventLog, monsters, players, playerIds, 
             choices, turnId, thinkingState, activeRollRequest,
-            ownerId, id, ...coreData 
+            ownerId, id, 
+            // Ambil data SSoT (camelCase)
+            title, description, image, joinCode, isPublished, maxPlayers, theme,
+            mainGenre, subGenre, duration, isNSFW, dmPersonality, dmNarrationStyle,
+            responseLength, gameState, currentPlayerId, initiativeOrder, longTermMemory,
+            currentTime, currentWeather, worldEventCounter, mapImageUrl, mapMarkers,
+            currentPlayerLocation, quests, npcs
         } = campaign as CampaignState;
         
-        // =================================================================
-        // PERBAIKAN BUG CAMELCASE (saveCampaign)
-        // Petakan manual, hapus spread operator
-        // =================================================================
+        // BUGFIX G-1: Petakan manual camelCase (App) ke snake_case (DB)
+        // Penggunaan ...spread operator sebelumnya menyebabkan silent failure
         const dbCampaign: Omit<DbCampaign, 'id' | 'owner_id' | 'campaign_players'> = {
-            title: coreData.title,
-            description: coreData.description,
-            image: coreData.image,
-            join_code: coreData.joinCode,
-            is_published: coreData.isPublished,
-            maxPlayers: coreData.maxPlayers,
-            theme: coreData.theme,
-            mainGenre: coreData.mainGenre,
-            subGenre: coreData.subGenre,
-            duration: coreData.duration,
-            isNSFW: coreData.isNSFW,
-            dm_personality: coreData.dmPersonality,
-            dm_narration_style: coreData.dmNarrationStyle,
-            response_length: coreData.responseLength,
-            game_state: coreData.gameState,
-            current_player_id: coreData.currentPlayerId,
-            initiative_order: coreData.initiativeOrder,
-            long_term_memory: coreData.longTermMemory,
-            current_time: coreData.currentTime,
-            current_weather: coreData.currentWeather,
-            world_event_counter: coreData.worldEventCounter,
-            map_image_url: coreData.mapImageUrl,
-            map_markers: coreData.mapMarkers,
-            current_player_location: coreData.currentPlayerLocation,
-            quests: coreData.quests,
-            npcs: coreData.npcs,
+            title: title,
+            description: description,
+            image: image,
+            join_code: joinCode,
+            is_published: isPublished,
+            maxPlayers: maxPlayers,
+            theme: theme,
+            mainGenre: mainGenre,
+            subGenre: subGenre,
+            duration: duration,
+            isNSFW: isNSFW,
+            dm_personality: dmPersonality,
+            dm_narration_style: dmNarrationStyle,
+            response_length: responseLength,
+            game_state: gameState,
+            current_player_id: currentPlayerId,
+            initiative_order: initiativeOrder,
+            long_term_memory: longTermMemory,
+            current_time: currentTime,
+            current_weather: currentWeather,
+            world_event_counter: worldEventCounter,
+            map_image_url: mapImageUrl,
+            map_markers: mapMarkers,
+            current_player_location: currentPlayerLocation,
+            quests: quests,
+            npcs: npcs,
         };
         
         const { data, error } = await supabase
@@ -832,17 +837,16 @@ class DataService {
             throw error;
         }
         
+        // Map kembali ke camelCase untuk aplikasi
         return this.mapDbCampaign(data as any);
     }
     
-    async createCampaign(campaign: Omit<Campaign, 'id' | 'eventLog' | 'monsters' | 'players' | 'playerIds' | 'choices' | 'turnId' | 'initiativeOrder'>, ownerId: string): Promise<Campaign> {
+    async createCampaign(campaign: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | 'monsters' | 'players' | 'playerIds' | 'choices' | 'turnId' | 'initiativeOrder'>, ownerId: string): Promise<Campaign> {
         const supabase = this.ensureSupabase();
 
-        // =================================================================
-        // PERBAIKAN BUG CAMELCASE (createCampaign)
-        // Petakan manual, hapus spread operator
-        // =================================================================
-        const dbCampaign: Omit<DbCampaign, 'id' | 'owner_id' | 'campaign_players'> & { owner_id: string } = {
+        // BUGFIX G-1: Petakan manual camelCase (App) ke snake_case (DB)
+        // Penggunaan ...spread operator sebelumnya menyebabkan silent failure
+        const dbCampaign: Omit<DbCampaign, 'id' | 'campaign_players'> = {
             owner_id: ownerId,
             title: campaign.title,
             description: campaign.description,

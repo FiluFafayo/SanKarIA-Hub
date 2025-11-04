@@ -1,4 +1,5 @@
 import { useReducer, useMemo } from "react";
+import { dataService } from "../services/dataService"; // BUGFIX G-1: Impor dataService
 import {
 	Campaign,
 	GameEvent,
@@ -184,40 +185,43 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
 		case "SET_THINKING_STATE":
 			return { ...state, thinkingState: action.payload };
 		case "ADD_ITEMS_TO_INVENTORY": {
-			// Logika ini sekarang salah. Inventory adalah SSoT pada Character.
-			// Aksi ini seharusnya HANYA memicu event system log.
-			// Perubahan inventory aktual akan ditangani oleh 'saveCharacter' di 'App.tsx'.
-			// TAPI, untuk sinkronisasi state di 'GameScreen', kita HARUS update state 'players' di sini.
-			// Ini adalah SINKRONISASI RUNTIME, bukan SSoT.
+			// BUGFIX G-1: Logika ini diperbaiki untuk menggunakan SSoT dari cache dataService
+			// alih-alih membuat item placeholder palsu.
+			// Ini adalah SINKRONISASI RUNTIME untuk UI GameScreen.
+			// Penyimpanan SSoT permanen ditangani oleh handleUpdateCharacter di App.tsx.
 
 			const { characterId, items } = action.payload;
 
-			// (Kita butuh data/items.ts di sini. Untuk sekarang, kita buat item placeholder)
 			const newPlayers = state.players.map((p) => {
 				if (p.id === characterId) {
 					const newInventory = [...p.inventory];
 					items.forEach((itemToAdd) => {
 						const existingItemIndex = newInventory.findIndex(
-							(i) => i.item.name === itemToAdd.name
+							(i) => i.item.name.toLowerCase() === itemToAdd.name.toLowerCase()
 						);
+						
 						if (existingItemIndex > -1) {
-							newInventory[existingItemIndex].quantity += itemToAdd.quantity;
-						} else {
-							// Buat item placeholder karena kita tidak punya akses ke data/items.ts di sini
-							const placeholderItem: ItemDefinition = {
-								id: generateId("item"),
-								name: itemToAdd.name,
-								type: "other",
-								isMagical: false,
-								rarity: "common",
-								requiresAttunement: false,
+							// Item sudah ada, tambahkan kuantitas
+							newInventory[existingItemIndex] = {
+								...newInventory[existingItemIndex],
+								quantity: newInventory[existingItemIndex].quantity + itemToAdd.quantity,
 							};
-							newInventory.push({
-								instanceId: generateId("inv"),
-								item: placeholderItem,
-								quantity: itemToAdd.quantity,
-								isEquipped: false,
-							});
+						} else {
+							// Item baru, cari definisi SSoT dari cache dataService
+							const definition = dataService.findItemDefinition(itemToAdd.name);
+							
+							if (!definition) {
+								// Fallback pesimis jika cache gagal (seharusnya tidak terjadi)
+								console.error(`BUG G-1 FALLBACK: ItemDefinition tidak ditemukan di cache untuk: ${itemToAdd.name}. Item tidak akan ditambahkan ke state runtime.`);
+							} else {
+								// Definisi SSoT ditemukan, buat item inventaris baru
+								newInventory.push({
+									instanceId: generateId("inv-runtime"), // ID runtime sementara
+									item: definition, // Gunakan SSoT Definition
+									quantity: itemToAdd.quantity,
+									isEquipped: false,
+								});
+							}
 						}
 					});
 					return { ...p, inventory: newInventory };
