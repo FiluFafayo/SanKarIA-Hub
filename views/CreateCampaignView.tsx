@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { ViewWrapper } from '../components/ViewWrapper';
 import { Campaign, Quest, NPC, MapMarker } from '../types';
 import { generateId, generateJoinCode } from '../utils';
-import { geminiService } from '../services/geminiService';
+// REFAKTOR G-2: Impor generationService
+import { generationService } from '../services/ai/generationService';
 import { InteractiveMap } from '../components/game/InteractiveMap';
 
 
@@ -62,7 +63,8 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
       setIsLoading(true);
       setLoadingMessage("Meminta visi dari para dewa cerita...");
       try {
-          const result = await geminiService.generateCampaignFramework(pillars);
+          // REFAKTOR G-2
+          const result = await generationService.generateCampaignFramework(pillars);
           setFramework({ ...result, description: pillars.premise });
           setStep(2);
       } catch (e) {
@@ -78,11 +80,13 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
       setIsLoading(true);
       try {
           setLoadingMessage("Menggambar peta dunia...");
-          const imageB64 = await geminiService.generateMapImage(framework.description);
+          // REFAKTOR G-2
+          const imageB64 = await generationService.generateMapImage(framework.description);
           const imageUrl = `data:image/png;base64,${imageB64}`;
 
           setLoadingMessage("Menandai tempat-tempat penting...");
-          const markerData = await geminiService.generateMapMarkers(framework);
+          // REFAKTOR G-2
+          const markerData = await generationService.generateMapMarkers(framework);
           
           setMapData({
               imageUrl,
@@ -106,7 +110,8 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
     setLoadingMessage("Mewujudkan dunia...");
 
     try {
-        const toolCalls = await geminiService.mechanizeCampaignFramework(framework);
+        // REFAKTOR G-2
+        const toolCalls = await generationService.mechanizeCampaignFramework(framework);
         
         const initialQuests: Quest[] = [];
         const initialNpcs: NPC[] = [];

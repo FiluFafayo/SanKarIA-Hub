@@ -5,7 +5,10 @@ import {
     StructuredApiResponse, ToolCall, Ability
 } from '../types';
 import { rollInitiative, rollDice, getAbilityModifier, getProficiencyBonus } from '../utils';
-import { geminiService } from '../services/geminiService';
+// REFAKTOR G-2: Ganti impor geminiService
+import { gameService } from '../services/ai/gameService';
+import { generationService } from '../services/ai/generationService';
+
 
 interface CombatSystemProps {
     campaign: CampaignState;
@@ -304,20 +307,19 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
             try {
                 const actionText = "Pertarungan telah berakhir. Apa yang terjadi selanjutnya?";
                 
-                // PANGGILAN 1: Dapatkan Narasi Akhir Kombat
-                const narrationResult = await geminiService.generateNarration(campaign, players, actionText, campaignActions.setThinkingState);
-                if (narrationResult.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: narrationResult.reaction }, turnId);
-                if (narrationResult.narration) campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
-                
-                const contextNarration = narrationResult.narration || narrationResult.reaction || "Pertarungan berakhir.";
-
-                // PANGGILAN 2: Dapatkan Mekanik (loot, quest, dll)
-                const mechanicsResult = await geminiService.determineNextStep(
-                    campaign, players, actionText, contextNarration, campaignActions.setThinkingState
+                // REFAKTOR G-2: Ganti Panggilan "Two-Step" menjadi "One-Step"
+                // PANGGILAN ATOMIK: Dapatkan Narasi Akhir Kombat + Mekanik (loot, quest, dll)
+                const response = await gameService.generateTurnResponse(
+                    campaign, players, actionText, campaignActions.setThinkingState
                 );
 
+                // 1. Log Narasi
+                if (response.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: response.reaction }, turnId);
+                if (response.narration) campaignActions.logEvent({ type: 'dm_narration', text: response.narration }, turnId);
+
+                // 2. Proses Mekanik
                 // PANGGILAN AMAN: advanceTurn -> processMechanics (tidak ada circular)
-                processMechanics(turnId, mechanicsResult, actionText);
+                processMechanics(turnId, response, actionText);
                 
                 // Jika tidak ada roll/choice, mechanics akan panggil endTurn()
                 // Jika ada choice, turnId akan tetap aktif
@@ -358,22 +360,19 @@ export const useCombatSystem = ({ campaign, character, players, campaignActions,
                     if (target) {
                         const actionText = `${nextCombatant.name} menyerang ${target.name}.`;
 
-                        // PANGGILAN 1: Dapatkan Narasi Aksi Monster
-                        const narrationResult = await geminiService.generateNarration(
+                        // REFAKTOR G-2: Ganti Panggilan "Two-Step" menjadi "One-Step"
+                        // PANGGILAN ATOMIK: Dapatkan Narasi Aksi Monster + Mekanik
+                        const response = await gameService.generateTurnResponse(
                             campaign, players, actionText, campaignActions.setThinkingState
                         );
-                        if (narrationResult.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: narrationResult.reaction }, turnId);
-                        if (narrationResult.narration) campaignActions.logEvent({ type: 'dm_narration', text: narrationResult.narration }, turnId);
-                        
-                        const contextNarration = narrationResult.narration || narrationResult.reaction || "Monster itu bertindak.";
 
-                        // PANGGILAN 2: Dapatkan Mekanik (yang akan di-auto-roll)
-                        const mechanicsResult = await geminiService.determineNextStep(
-                            campaign, players, actionText, contextNarration, campaignActions.setThinkingState
-                        );
+                        // 1. Log Narasi
+                        if (response.reaction) campaignActions.logEvent({ type: 'dm_reaction', text: response.reaction }, turnId);
+                        if (response.narration) campaignActions.logEvent({ type: 'dm_narration', text: response.narration }, turnId);
                         
+                        // 2. Proses Mekanik (yang akan di-auto-roll)
                         // PANGGILAN AMAN: advanceTurn -> processMechanics
-                        processMechanics(turnId, mechanicsResult, actionText);
+                        processMechanics(turnId, response, actionText);
                     } else {
                         campaignActions.logEvent({ type: 'dm_narration', text: `${nextCombatant.name} tidak menemukan target.` }, turnId);
                         campaignActions.endTurn();

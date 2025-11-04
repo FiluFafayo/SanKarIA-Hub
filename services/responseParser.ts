@@ -1,58 +1,11 @@
-import { Type } from "@google/genai";
+// REFAKTOR G-2: File ini disederhanakan.
+// Skema sekarang hidup di service (gameService.ts / generationService.ts).
+// File ini HANYA bertanggung jawab untuk mem-parsing respons JSON tunggal
+// dari 'generateTurnResponse' (gameService.ts).
+
 import { StructuredApiResponse } from "../types";
 
-// This schema is used for the NARRATION call.
-export const RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    reaction: {
-      type: Type.STRING,
-      description: "Reaksi langsung yang singkat dan cepat terhadap tindakan pemain (1-2 kalimat). Ini adalah dampak langsung. Opsional.",
-      nullable: true,
-    },
-    narration: {
-      type: Type.STRING,
-      description: "Narasi cerita yang lebih rinci yang mengikuti reaksi. Ini menjelaskan dunia dan apa yang terjadi selanjutnya. WAJIB ADA.",
-    },
-  },
-  required: ['narration']
-};
-
-// This schema is used for the MECHANICS call.
-export const MECHANICS_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-     choices: {
-      type: Type.ARRAY,
-      description: "Daftar 3-4 tindakan yang dapat diambil pemain. Harus kosong jika ada rollRequest.",
-      items: {
-        type: Type.STRING,
-      }
-    },
-    rollRequest: {
-      type: Type.OBJECT,
-      description: "Permintaan bagi pemain untuk melempar dadu. Harus null jika ada pilihan.",
-      nullable: true,
-      properties: {
-        type: { type: Type.STRING, enum: ['skill', 'savingThrow', 'attack'] },
-        reason: { type: Type.STRING },
-        skill: { type: Type.STRING, nullable: true },
-        ability: { type: Type.STRING, enum: ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'], nullable: true },
-        dc: { type: Type.INTEGER, description: "Wajib diisi untuk tipe 'skill' dan 'savingThrow'. Menentukan tingkat kesulitan.", nullable: true },
-        target: {
-          type: Type.OBJECT,
-          description: "Wajib untuk tipe 'attack'. Menjelaskan target.",
-          nullable: true,
-          properties: {
-              name: { type: Type.STRING, description: "Nama NPC atau makhluk target." },
-              ac: { type: Type.INTEGER, description: "Armor Class target." }
-          }
-        }
-      },
-      required: ['type', 'reason']
-    }
-  }
-}
+// (SKEMA DIHAPUS, dipindah ke service terkait)
 
 function safeJsonParse<T>(text: string, fallback: T): T {
     if (typeof text !== 'string' || !text.trim()) {
@@ -76,41 +29,37 @@ function safeJsonParse<T>(text: string, fallback: T): T {
 
 
 /**
- * Safely parses the JSON string from the NARRATION API call.
+ * REFAKTOR G-2: Sekarang mem-parsing OBJEK RESPON LENGKAP (ATOMIK).
  * @param responseText The raw text string from the Gemini API response.
- * @returns An object with reaction and narration.
+ * @returns An object with reaction, narration, choices, and rollRequest.
  */
-export const parseStructuredApiResponse = (responseText: string): Omit<StructuredApiResponse, 'tool_calls' | 'choices' | 'rollRequest'> => {
+export const parseStructuredApiResponse = (responseText: string): Omit<StructuredApiResponse, 'tool_calls'> => {
     const fallbackNarration = "DM terdiam sejenak, mungkin kehilangan kata-kata...";
+    
     // Fallback awal jika parsing gagal total
-    const fallbackResult = { reaction: undefined, narration: fallbackNarration };
+    const fallbackResult: Omit<StructuredApiResponse, 'tool_calls'> = { 
+        reaction: undefined, 
+        narration: fallbackNarration,
+        choices: ["Coba lagi...", "Lihat sekeliling"], // Fallback mekanik yang aman
+        rollRequest: undefined,
+    };
 
     if (!responseText || typeof responseText !== 'string' || !responseText.trim()) {
-        console.warn("Menerima responseText kosong atau tidak valid dari API narasi.");
+        console.warn("[G-2] Menerima responseText kosong atau tidak valid dari API.");
         return fallbackResult;
     }
 
-    const parsed = safeJsonParse(responseText, { reaction: undefined, narration: undefined }); // Coba parse tanpa fallback teks
+    // Coba parse JSON lengkap
+    const parsed = safeJsonParse(responseText, fallbackResult);
 
     const reaction = parsed.reaction || undefined;
     // Pastikan narasi tidak pernah string kosong
     const narration = parsed.narration && parsed.narration.trim() ? parsed.narration.trim() : fallbackNarration;
+    
+    const choices = parsed.choices || undefined;
+    const rollRequest = parsed.rollRequest || undefined;
 
-    return { reaction, narration };
+    return { reaction, narration, choices, rollRequest };
 };
 
-/**
- * Safely parses the JSON string from the MECHANICS API call.
- * @param responseText The raw text string from the Gemini API response.
- * @returns An object with choices and rollRequest.
- */
-export const parseMechanicsResponse = (responseText: string): Omit<StructuredApiResponse, 'tool_calls' | 'reaction' | 'narration'> => {
-     // FIX: Add `rollRequest` to the fallback object to ensure `parsed` has the correct type shape.
-     const fallback = { choices: ["Lanjutkan...", "Amati sekeliling"], rollRequest: undefined };
-     const parsed = safeJsonParse(responseText, fallback);
-
-     return {
-         choices: parsed.choices || undefined,
-         rollRequest: parsed.rollRequest || undefined,
-     };
-}
+// (FungSI parseMechanicsResponse DIHAPUS karena digabung ke parseStructuredApiResponse)

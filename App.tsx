@@ -11,7 +11,9 @@ import { CharacterSelectionView } from './views/CharacterSelectionView';
 import { GameScreen } from './components/GameScreen';
 import { Location, Campaign, Character, GameEvent, CampaignState } from './types'; // Tipe baru
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { geminiService } from './services/geminiService';
+// REFAKTOR G-2: Impor generationService, bukan geminiService
+import { generationService } from './services/ai/generationService';
+import { geminiService } from './services/geminiService'; // (Masih dibutuhkan untuk updateKeys)
 import { dataService } from './services/dataService';
 import { generateId } from './utils';
 // DEFAULT_CAMPAIGNS dan DEFAULT_CHARACTERS tidak lagi di-seed dari sini
@@ -256,7 +258,8 @@ const App: React.FC = () => {
     try {
       const newCampaign = await dataService.createCampaign(campaignData, userId);
       
-      const openingScene = await geminiService.generateOpeningScene(newCampaign);
+      // REFAKTOR G-2: Gunakan generationService
+      const openingScene = await generationService.generateOpeningScene(newCampaign);
       
       // Simpan event pembuka ke DB
       const openingEvent: Omit<GameEvent, 'id' | 'timestamp'> & { campaignId: string } = {
