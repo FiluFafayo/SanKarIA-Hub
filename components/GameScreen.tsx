@@ -49,11 +49,39 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		(s) => s.actions
 	);
 
+	// Ambil SSoT updater dari dataStore
+	const { updateCharacter } = useDataStore((s) => s.actions);
+	// F3.1: Ambil SSoT characters (untuk mendeteksi data basi)
+	const ssotCharacters = useDataStore((s) => s.state.characters);
+
 	// Inisialisasi useCampaign dengan state SSoT
 	const { campaign, campaignActions } = useCampaign(initialCampaign, players);
 
-	// Ambil SSoT updater dari dataStore
-	const { updateCharacter } = useDataStore((s) => s.actions);
+	// F3.2: Sinkronisasi Stale State (SSoT -> Runtime)
+	// Mendengarkan SSoT (dataStore) dan memaksa update ke state runtime (useCampaign)
+	// Ini penting jika HP/Inventaris pemain lain berubah (misal: multiplayer)
+	useEffect(() => {
+		// Ambil ID pemain yang ada di state runtime (useCampaign)
+		const runtimePlayerIds = new Set(campaign.players.map((p) => p.id));
+
+		// Filter SSoT global hanya untuk karakter yang relevan dengan campaign ini
+		const relevantSsotChars = ssotCharacters.filter((c) =>
+			runtimePlayerIds.has(c.id)
+		);
+
+		relevantSsotChars.forEach((ssotChar) => {
+			const runtimeChar = campaign.players.find((p) => p.id === ssotChar.id);
+
+			// Jika SSoT (dataStore) berbeda dari runtime (useCampaign)
+			// (Kita gunakan perbandingan JSON string untuk deteksi perubahan apa pun)
+			if (runtimeChar && JSON.stringify(runtimeChar) !== JSON.stringify(ssotChar)) {
+				// Update state runtime lokal (useCampaign)
+				// Ini akan me-refresh UI (CombatTracker, InfoPanel)
+				campaignActions.updateCharacterInCampaign(ssotChar);
+			}
+		});
+		// Kita hanya peduli jika SSoT (dari luar) berubah.
+	}, [ssotCharacters, campaignActions, campaign.players]);
 
 	// REFAKTOR G-4-R1: Sync state internal useCampaign -> ke state runtime global (appStore)
 	// Ini penting agar saat 'exitGame' dipanggil, state terbaru-lah yang disimpan.
