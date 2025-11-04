@@ -14,13 +14,15 @@ import { LoginView } from './views/LoginView';
 import { useDataStore } from './store/dataStore'; // G-4
 import { AppLayout } from './components/AppLayout'; // G-4
 
-// (Fase 1.E Hotfix) Muat data definisi ke global scope
-import { RACES } from './data/races';
-import { CLASS_DEFINITIONS } from './data/classes';
-import { BACKGROUNDS } from './data/backgrounds';
-(window as any).RACES_DATA = RACES;
-(window as any).CLASS_DEFINITIONS_DATA = CLASS_DEFINITIONS;
-(window as any).BACKGROUNDS_DATA = BACKGROUNDS;
+// REFAKTOR G-5: (Fase 1.E Hotfix) Dihapus.
+// Data statis sekarang diakses melalui data/registry.ts,
+// bukan di-load ke (window).
+// import { RACES } from './data/races'; // (Dihapus)
+// import { CLASS_DEFINITIONS } from './data/classes'; // (Dihapus)
+// import { BACKGROUNDS } from './data/backgrounds'; // (Dihapus)
+// (window as any).RACES_DATA = RACES; // (Dihapus)
+// (window as any).CLASS_DEFINITIONS_DATA = CLASS_DEFINITIONS; // (Dihapus)
+// (window as any).BACKGROUNDS_DATA = BACKGROUNDS; // (Dihapus)
 
 const App: React.FC = () => {
   const [theme, setTheme] = useLocalStorage<string>('sankaria-hub-theme', 'theme-sanc');

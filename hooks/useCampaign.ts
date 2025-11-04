@@ -1,5 +1,7 @@
 import { useReducer, useMemo } from "react";
-import { dataService } from "../services/dataService"; // BUGFIX G-1: Impor dataService
+// REFAKTOR G-5: Hapus dataService, ganti dengan registry
+// import { dataService } from "../services/dataService"; 
+import { findItem } from "../data/registry"; // REFAKTOR G-5
 import {
 	Campaign,
 	GameEvent,
@@ -185,7 +187,7 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
 		case "SET_THINKING_STATE":
 			return { ...state, thinkingState: action.payload };
 		case "ADD_ITEMS_TO_INVENTORY": {
-			// BUGFIX G-1: Logika ini diperbaiki untuk menggunakan SSoT dari cache dataService
+			// BUGFIX G-1/G-5: Logika ini diperbaiki untuk menggunakan SSoT dari registry
 			// alih-alih membuat item placeholder palsu.
 			// Ini adalah SINKRONISASI RUNTIME untuk UI GameScreen.
 			// Penyimpanan SSoT permanen ditangani oleh handleUpdateCharacter di App.tsx.
@@ -207,8 +209,8 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
 								quantity: newInventory[existingItemIndex].quantity + itemToAdd.quantity,
 							};
 						} else {
-							// Item baru, cari definisi SSoT dari cache dataService
-							const definition = dataService.findItemDefinition(itemToAdd.name);
+							// Item baru, cari definisi SSoT dari registry (G-5)
+							const definition = findItem(itemToAdd.name); // REFAKTOR G-5
 							
 							if (!definition) {
 								// Fallback pesimis jika cache gagal (seharusnya tidak terjadi)

@@ -1,6 +1,8 @@
 // data/defaultCharacters.ts
 import { Character, Ability, Skill, AbilityScores, CharacterSpellSlot, CharacterInventoryItem, ItemDefinition, SpellDefinition, CharacterFeature } from '../types';
 import { generateId } from '../utils';
+// REFAKTOR G-5: File data statis tidak boleh saling impor, 
+// tapi karena ini adalah file definisi, kita izinkan impor definisi dasar.
 import { ITEM_DEFINITIONS } from './items';
 import { SPELL_DEFINITIONS } from './spells';
 import { CLASS_DEFINITIONS } from './classes';
@@ -8,26 +10,23 @@ import { RACES } from './races';
 
 // Helper untuk mengambil definisi item berdasarkan nama
 const item = (name: string): ItemDefinition => {
-    const definition = ITEM_DEFINITIONS.find(i => i.name === name);
+    const definition = ITEM_DEFINITIONS.find(i => i.name.toLowerCase() === name.toLowerCase());
     if (!definition) {
-        console.warn(`ItemDefinition not found for seeding: ${name}. Using a placeholder.`);
+        console.warn(`[G-5 DefaultChars] ItemDefinition not found for seeding: ${name}. Using a placeholder.`);
         return { 
             id: generateId('item-fallback'), 
-            name: name, 
-            type: 'other', 
-            isMagical: false, 
-            rarity: 'common', 
-            requiresAttunement: false 
+            name: name, type: 'other', isMagical: false, 
+            rarity: 'common', requiresAttunement: false 
         };
     }
-    return { ...definition, id: definition.name }; // Gunakan nama sebagai ID sementara
+    return { ...definition, id: definition.id || name };
 };
 
 // Helper untuk mengambil definisi spell berdasarkan nama
 const spell = (name: string): SpellDefinition => {
-    const definition = SPELL_DEFINITIONS.find(s => s.name === name);
-    if (!definition) throw new Error(`SpellDefinition not found for seeding: ${name}`);
-    return { ...definition, id: definition.name };
+    const definition = SPELL_DEFINITIONS.find(s => s.name.toLowerCase() === name.toLowerCase());
+    if (!definition) throw new Error(`[G-5 DefaultChars] SpellDefinition not found for seeding: ${name}`);
+    return { ...definition, id: definition.id || name };
 };
 
 // Helper untuk membuat item inventory

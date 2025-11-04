@@ -6,24 +6,23 @@ import {
     Ability, Skill, AbilityScores, CharacterInventoryItem, SpellDefinition, 
     Character, MapMarker, Campaign, ItemDefinition
 } from '../types';
-import { RACES, RaceData } from '../data/races';
-import { CLASS_DEFINITIONS, ClassData, EquipmentChoice } from '../data/classes';
-import { BACKGROUNDS, BackgroundData } from '../data/backgrounds';
+// REFAKTOR G-5: Impor SSoT data statis dari registry
+import { 
+    getAllRaces, findRace, // (findRace tidak dipakai di sini, tapi konsisten)
+    getAllClasses, findClass,
+    getAllBackgrounds, findBackground,
+    getItemDef, // (helper getItemDef sekarang ada di registry)
+    RaceData, ClassData, BackgroundData, EquipmentChoice // (Ekspor tipe dari registry jika perlu, tapi kita impor dari types)
+} from '../data/registry';
 import { getAbilityModifier } from '../utils';
-import { dataService } from '../services/dataService';
+// import { dataService } from '../services/dataService'; // (Dihapus)
 import { useDataStore } from './dataStore'; // Import dataStore
 
 // =================================================================
 // Tipe Helper
 // =================================================================
-const getItemDef = (name: string): ItemDefinition => {
-    const definition = dataService.findItemDefinition(name);
-    if (!definition) {
-        console.error(`ItemDefinition not found in cache: ${name}`);
-        return { id: name, name, type: 'other', isMagical: false, rarity: 'common', requiresAttunement: false };
-    }
-    return definition;
-};
+// (Helper getItemDef dan createInvItem sekarang menggunakan registry)
+
 const createInvItem = (def: ItemDefinition, qty = 1, equipped = false): Omit<CharacterInventoryItem, 'instanceId'> => ({
     item: def,
     quantity: qty,
@@ -70,15 +69,16 @@ const getDefaultEquipment = (charClass: ClassData): Record<number, EquipmentChoi
     });
     return initialEquipment;
 };
+// REFAKTOR G-5: Ambil default dari registry
 const initialCharacterState: CharacterCreationState = {
     step: 0, // 0 = tidak aktif
     name: '',
-    selectedRace: RACES[0],
-    selectedClass: CLASS_DEFINITIONS['Fighter'],
+    selectedRace: getAllRaces()[0],
+    selectedClass: getAllClasses()['Fighter'],
     abilityScores: {},
-    selectedBackground: BACKGROUNDS[0],
+    selectedBackground: getAllBackgrounds()[0],
     selectedSkills: [],
-    selectedEquipment: getDefaultEquipment(CLASS_DEFINITIONS['Fighter']),
+    selectedEquipment: getDefaultEquipment(getAllClasses()['Fighter']),
     isSaving: false,
 };
 interface CharacterCreationActions {

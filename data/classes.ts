@@ -1,20 +1,23 @@
 // data/classes.ts
 import { Ability, Skill, CharacterFeature, ItemDefinition, SpellDefinition, CharacterSpellSlot } from '../types';
+// REFAKTOR G-5: File data statis tidak boleh saling impor, 
+// tapi karena ini adalah file definisi, kita izinkan impor definisi dasar (items, spells)
+// Registry tidak bisa dipakai di sini karena akan menyebabkan circular dependency.
 import { ITEM_DEFINITIONS } from './items';
 import { SPELL_DEFINITIONS } from './spells';
 
 // Helper untuk mengambil definisi item berdasarkan nama
 const item = (name: string): ItemDefinition => {
-    const definition = ITEM_DEFINITIONS.find(i => i.name === name);
-    if (!definition) throw new Error(`ItemDefinition not found: ${name}`);
-    return { ...definition, id: name }; // Gunakan nama sebagai ID sementara
+    const definition = ITEM_DEFINITIONS.find(i => i.name.toLowerCase() === name.toLowerCase());
+    if (!definition) throw new Error(`[G-5 Classes] ItemDefinition not found: ${name}`);
+    return { ...definition, id: definition.id || name }; // Gunakan ID asli jika ada
 };
 
 // Helper untuk mengambil definisi spell berdasarkan nama
 const spell = (name: string): SpellDefinition => {
-    const definition = SPELL_DEFINITIONS.find(s => s.name === name);
-    if (!definition) throw new Error(`SpellDefinition not found: ${name}`);
-    return { ...definition, id: name }; // Gunakan nama sebagai ID sementara
+    const definition = SPELL_DEFINITIONS.find(s => s.name.toLowerCase() === name.toLowerCase());
+    if (!definition) throw new Error(`[G-5 Classes] SpellDefinition not found: ${name}`);
+    return { ...definition, id: definition.id || name }; // Gunakan ID asli jika ada
 };
 
 // Tipe untuk Pilihan
