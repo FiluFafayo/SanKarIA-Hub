@@ -1,28 +1,26 @@
-// REFAKTOR G-4: Menggantikan creationStore.ts
-// Store ini sekarang mengelola SEMUA state UI global, termasuk Navigasi dan Form.
+// REFAKTOR G-4/G-3: Store ini sekarang mengelola SEMUA state UI global, 
+// Navigasi, Form, DAN Sesi Game Runtime.
 
 import { create } from 'zustand';
 import { 
     Ability, Skill, AbilityScores, CharacterInventoryItem, SpellDefinition, 
-    Character, MapMarker, Campaign, ItemDefinition
+    Character, MapMarker, Campaign, ItemDefinition, CampaignState
 } from '../types';
 // REFAKTOR G-5: Impor SSoT data statis dari registry
 import { 
-    getAllRaces, findRace, // (findRace tidak dipakai di sini, tapi konsisten)
-    getAllClasses, findClass,
-    getAllBackgrounds, findBackground,
+    getAllRaces,
+    getAllClasses,
+    getAllBackgrounds,
     getItemDef, // (helper getItemDef sekarang ada di registry)
     RaceData, ClassData, BackgroundData, EquipmentChoice // (Ekspor tipe dari registry jika perlu, tapi kita impor dari types)
 } from '../data/registry';
 import { getAbilityModifier } from '../utils';
-// import { dataService } from '../services/dataService'; // (Dihapus)
-import { useDataStore } from './dataStore'; // Import dataStore
+import { dataService } from '../services/dataService';
+import { useDataStore } from './dataStore';
 
 // =================================================================
 // Tipe Helper
 // =================================================================
-// (Helper getItemDef dan createInvItem sekarang menggunakan registry)
-
 const createInvItem = (def: ItemDefinition, qty = 1, equipped = false): Omit<CharacterInventoryItem, 'instanceId'> => ({
     item: def,
     quantity: qty,
@@ -50,7 +48,27 @@ interface NavigationActions {
     startJoinFlow: (campaign: Campaign) => void;
 }
 
-// --- Slice 2: Character Creation ---
+// --- Slice 2: Game Runtime (G-4-R1) ---
+interface RuntimeState {
+    playingCampaign: CampaignState | null;
+    playingCharacter: Character | null;
+    isGameLoading: boolean;
+}
+const initialRuntimeState: RuntimeState = {
+    playingCampaign: null,
+    playingCharacter: null,
+    isGameLoading: false,
+};
+interface RuntimeActions {
+    loadGameSession: (campaign: Campaign, character: Character) => Promise<void>;
+    exitGameSession: () => void;
+    // Aksi internal yang dipanggil oleh GameScreen/Hooks
+    _setRuntimeCampaignState: (campaignState: CampaignState) => void;
+    _setRuntimeCharacterState: (character: Character) => void;
+}
+
+
+// --- Slice 3: Character Creation ---
 interface CharacterCreationState {
     step: number;
     name: string;
@@ -69,7 +87,6 @@ const getDefaultEquipment = (charClass: ClassData): Record<number, EquipmentChoi
     });
     return initialEquipment;
 };
-// REFAKTOR G-5: Ambil default dari registry
 const initialCharacterState: CharacterCreationState = {
     step: 0, // 0 = tidak aktif
     name: '',
@@ -92,10 +109,11 @@ interface CharacterCreationActions {
     toggleSkill: (skill: Skill) => void;
     setSelectedEquipment: (choiceIndex: number, option: EquipmentChoice['options'][0]) => void;
     resetCharacterCreation: () => void;
-    finalizeCharacter: (userId: string) => Promise<void>; // (Logika dipindah)
+    finalizeCharacter: (userId: string) => Promise<void>;
 }
 
-// --- Slice 3: Campaign Creation ---
+// --- Slice 4: Campaign Creation ---
+// (Tidak berubah dari G-3)
 interface CampaignCreationPillars {
     premise: string;
     keyElements: string;
@@ -142,9 +160,10 @@ interface CampaignCreationActions {
 // --- Gabungan Store ---
 type AppStore = {
     navigation: NavigationState;
+    runtime: RuntimeState; // G-4-R1
     characterCreation: CharacterCreationState;
     campaignCreation: CampaignCreationState;
-    actions: NavigationActions & CharacterCreationActions & CampaignCreationActions;
+    actions: NavigationActions & RuntimeActions & CharacterCreationActions & CampaignCreationActions;
 }
 
 // =================================================================
@@ -153,6 +172,7 @@ type AppStore = {
 export const useAppStore = create<AppStore>((set, get) => ({
     // === STATE ===
     navigation: initialNavigationState,
+    runtime: initialRuntimeState,
     characterCreation: initialCharacterState,
     campaignCreation: initialCampaignState,
 
@@ -160,21 +180,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     actions: {
         // --- Navigation Actions ---
         navigateTo: (view) => {
-            // Saat menavigasi, reset state form jika kita TIDAK ke view itu
-            if (view !== Location.MirrorOfSouls) {
-                get().actions.resetCharacterCreation();
-            }
-            if (view !== Location.StorytellersSpire) {
-                get().actions.resetCampaignCreation();
-            }
-            // Mulai step 1 jika kita navigasi ke view tersebut
+            if (view !== Location.MirrorOfSouls) get().actions.resetCharacterCreation();
+            if (view !== Location.StorytellersSpire) get().actions.resetCampaignCreation();
             if (view === Location.MirrorOfSouls) {
                 set(state => ({ characterCreation: { ...state.characterCreation, step: 1 } }));
             }
             if (view === Location.StorytellersSpire) {
                 set(state => ({ campaignCreation: { ...state.campaignCreation, step: 1 } }));
             }
-            
             set(state => ({ navigation: { ...state.navigation, currentView: view } }));
         },
         returnToNexus: () => {
@@ -185,6 +198,56 @@ export const useAppStore = create<AppStore>((set, get) => ({
         startJoinFlow: (campaign) => set(state => ({
             navigation: { ...state.navigation, currentView: 'character-selection', campaignToJoinOrStart: campaign }
         })),
+
+        // --- Runtime Actions (G-4-R1) ---
+        loadGameSession: async (campaign, character) => {
+            set(state => ({ runtime: { ...state.runtime, isGameLoading: true } }));
+            try {
+                const { eventLog, monsters, players } = await dataService.loadCampaignRuntimeData(campaign.id, campaign.playerIds);
+                
+                const campaignState: CampaignState = {
+                    ...campaign, eventLog, monsters, players,
+                    thinkingState: 'idle', activeRollRequest: null,
+                    choices: [], turnId: null,
+                };
+                
+                set({ 
+                    runtime: { 
+                        playingCampaign: campaignState, 
+                        playingCharacter: character, 
+                        isGameLoading: false 
+                    }
+                });
+            } catch (e) {
+                console.error("Gagal memuat data runtime campaign:", e);
+                alert("Gagal memuat sesi permainan. Coba lagi.");
+                set(state => ({ runtime: { ...state.runtime, isGameLoading: false } }));
+            }
+        },
+        exitGameSession: () => {
+            const { playingCampaign, playingCharacter } = get().runtime;
+            
+            if (playingCampaign) {
+                // Simpan SSoT Campaign
+                useDataStore.getState().actions.saveCampaign(playingCampaign);
+            }
+            if (playingCharacter) {
+                // Simpan SSoT Karakter (ambil state terbaru dari dalam campaign)
+                const finalCharacterState = playingCampaign?.players.find(p => p.id === playingCharacter.id);
+                if (finalCharacterState) {
+                    useDataStore.getState().actions.updateCharacter(finalCharacterState);
+                }
+            }
+            
+            // Reset state runtime
+            set({ runtime: initialRuntimeState, navigation: initialNavigationState });
+        },
+        _setRuntimeCampaignState: (campaignState) => {
+            set(state => ({ runtime: { ...state.runtime, playingCampaign: campaignState } }));
+        },
+        _setRuntimeCharacterState: (character) => {
+            set(state => ({ runtime: { ...state.runtime, playingCharacter: character } }));
+        },
 
         // --- Character Actions ---
         setCharacterStep: (step) => set(state => ({ characterCreation: { ...state.characterCreation, step } })),
@@ -227,7 +290,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 selectedEquipment: { ...state.characterCreation.selectedEquipment, [choiceIndex]: option }
             }
         })),
-        resetCharacterCreation: () => set({ characterCreation: { ...initialCharacterState, step: 0 } }), // Set step ke 0
+        resetCharacterCreation: () => set({ characterCreation: { ...initialCharacterState, step: 0 } }),
         
         finalizeCharacter: async (userId) => {
             const { characterCreation } = get();
@@ -240,7 +303,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
             set(state => ({ characterCreation: { ...state.characterCreation, isSaving: true } }));
 
             try {
-                // (Logika G-3 dari ProfileModal dipindah ke sini)
                 const baseScores = abilityScores as AbilityScores;
                 const finalScores = { ...baseScores };
                 for (const [ability, bonus] of Object.entries(selectedRace.abilityScoreBonuses)) {
@@ -294,12 +356,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
                     spellSlots: spellSlots,
                 };
 
-                // Panggil aksi SSoT dari dataStore (G-4)
                 await useDataStore.getState().actions.saveNewCharacter(newCharData, inventoryData, spellData, userId);
                 
-                // Reset state G-3 setelah sukses
                 get().actions.resetCharacterCreation();
-                // Pindah kembali ke Nexus (G-4)
                 get().actions.returnToNexus();
 
             } catch (e) {

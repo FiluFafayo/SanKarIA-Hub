@@ -210,7 +210,7 @@ class DataService {
         if (url && anonKey && (!this.supabase || this.supabase.supabaseUrl !== url)) {
             try {
                 this.supabase = createClient(url, anonKey);
-                console.log("Koneksi Supabase berhasil diinisialisasi.");
+                // console.log("Koneksi Supabase berhasil diinisialisasi."); // Dihapus (Pembersihan)
             } catch (e) {
                 console.error("Gagal menginisialisasi klien Supabase:", e);
                 this.supabase = null;
@@ -333,20 +333,19 @@ class DataService {
         return this.monsterDefinitions;
     }
     
-    // Helper untuk FIND (Sudah Benar)
-    public findItemDefinition(name: string): ItemDefinition | undefined {
-        if (!this.hasLoadedCache) console.warn(`Cache 'items' belum siap saat mencari: ${name}`);
-        return this.itemDefinitions.find(i => i.name.toLowerCase() === name.toLowerCase());
-    }
-    public findSpellDefinition(name: string): SpellDefinition | undefined {
-        if (!this.hasLoadedCache) console.warn(`Cache 'spells' belum siap saat mencari: ${name}`);
-        return this.spellDefinitions.find(s => s.name.toLowerCase() === name.toLowerCase());
-    }
-    public findMonsterDefinition(name: string): MonsterDefinition | undefined {
-        if (!this.hasLoadedCache) console.warn(`Cache 'monsters' belum siap saat mencari: ${name}`);
-        return this.monsterDefinitions.find(m => m.name.toLowerCase() === name.toLowerCase());
-    }
-
+    // REFAKTOR G-5/Pembersihan: Fungsi-fungsi ini digantikan oleh data/registry.ts
+    // public findItemDefinition(name: string): ItemDefinition | undefined {
+    //     if (!this.hasLoadedCache) console.warn(`Cache 'items' belum siap saat mencari: ${name}`);
+    //     return this.itemDefinitions.find(i => i.name.toLowerCase() === name.toLowerCase());
+    // }
+    // public findSpellDefinition(name: string): SpellDefinition | undefined {
+    //     if (!this.hasLoadedCache) console.warn(`Cache 'spells' belum siap saat mencari: ${name}`);
+    //     return this.spellDefinitions.find(s => s.name.toLowerCase() === name.toLowerCase());
+    // }
+    // public findMonsterDefinition(name: string): MonsterDefinition | undefined {
+    //     if (!this.hasLoadedCache) console.warn(`Cache 'monsters' belum siap saat mencari: ${name}`);
+    //     return this.monsterDefinitions.find(m => m.name.toLowerCase() === name.toLowerCase());
+    // }
 
     // =================================================================
     // METODE OTENTIKASI & PROFIL (Sudah Benar)
@@ -376,22 +375,23 @@ class DataService {
         return this.supabase.auth.getSession();
     }
     
-    public async getProfile(userId: string): Promise<DbProfile | null> {
-        const supabase = this.ensureSupabase();
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
+    // REFAKTOR G-4/Pembersihan: Fungsi ini tidak (lagi) digunakan.
+    // public async getProfile(userId: string): Promise<DbProfile | null> {
+    //     const supabase = this.ensureSupabase();
+    //     const { data, error } = await supabase
+    //         .from('profiles')
+    //         .select('*')
+    //         .eq('id', userId)
+    //         .single();
             
-        if (error) {
-            if (error.code !== 'PGRST116') {
-                console.error('Gagal mengambil profil:', error);
-            }
-            return null;
-        }
-        return data;
-    }
+    //     if (error) {
+    //         if (error.code !== 'PGRST116') {
+    //             console.error('Gagal mengambil profil:', error);
+    //         }
+    //         return null;
+    //     }
+    //     return data;
+    // }
 
     public onAuthStateChange(callback: (event: string, session: Session | null) => void) {
         if (!this.supabase) {

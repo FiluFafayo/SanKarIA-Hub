@@ -5,7 +5,7 @@
 // 2. GameScreen (jika ada state game aktif)
 // 3. Tampilan Nexus/View (jika tidak sedang bermain)
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback } from 'react'; // Hapus useState
 import { GameScreen } from './GameScreen';
 import { NexusSanctum } from './NexusSanctum';
 import { ViewManager } from './ViewManager';
@@ -25,52 +25,34 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
     
     // State SSoT (dari dataStore)
     const { isLoading, hasLoaded, characters } = useDataStore(s => s.state);
-    const { saveCampaign, updateCharacter, addPlayerToCampaign } = useDataStore(s => s.actions);
+    const { addPlayerToCampaign } = useDataStore(s => s.actions); // Ambil aksi
 
     // State Navigasi (dari appStore)
     const { currentView, campaignToJoinOrStart, returnToNexus, startJoinFlow } = useAppStore(s => ({
         ...s.navigation,
         ...s.actions
     }));
-
-    // State Runtime (LOKAL di AppLayout, karena ini merepresentasikan SESI AKTIF)
-    const [playingCampaign, setPlayingCampaign] = useState<CampaignState | null>(null);
-    const [playingCharacter, setPlayingCharacter] = useState<Character | null>(null);
-    const [isGameLoading, setIsGameLoading] = useState(false);
+    
+    // REFAKTOR G-4-R1: State Runtime sekarang diambil dari appStore
+    const { playingCampaign, playingCharacter, isGameLoading, loadGameSession, exitGameSession } = useAppStore(s => ({
+        ...s.runtime,
+        ...s.actions
+    }));
 
     // =================================================================
     // Handler Sesi Game (Logika yang dulu ada di App.tsx)
     // =================================================================
 
     const handleSelectCampaign = async (campaign: Campaign) => {
-        setIsGameLoading(true);
-        try {
-            const myCharacterInCampaign = characters.find(c => campaign.playerIds.includes(c.id));
-            
-            if (!myCharacterInCampaign) {
-                // Alur 'Join': Buka character selection
-                startJoinFlow(campaign);
-                setIsGameLoading(false);
-                return;
-            }
-            
-            // Alur 'Load': Muat data runtime
-            const { eventLog, monsters, players } = await dataService.loadCampaignRuntimeData(campaign.id, campaign.playerIds);
-            
-            const campaignState: CampaignState = {
-                ...campaign, eventLog, monsters, players,
-                thinkingState: 'idle', activeRollRequest: null,
-                choices: [], turnId: null,
-            };
-            
-            setPlayingCampaign(campaignState);
-            setPlayingCharacter(myCharacterInCampaign);
+        // Cek SSoT karakter dari dataStore
+        const myCharacterInCampaign = characters.find(c => campaign.playerIds.includes(c.id));
         
-        } catch (e) {
-            console.error("Gagal memuat data runtime campaign:", e);
-            alert("Gagal memuat sesi permainan. Coba lagi.");
-        } finally {
-            setIsGameLoading(false);
+        if (!myCharacterInCampaign) {
+            // Alur 'Join': Buka character selection
+            startJoinFlow(campaign);
+        } else {
+            // Alur 'Load': Panggil aksi store
+            await loadGameSession(campaign, myCharacterInCampaign);
         }
     };
     
@@ -79,15 +61,19 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
         const campaign = campaignToJoinOrStart;
 
         try {
-            // Tambah player ke SSoT (via dataStore)
+            // 1. Tambah player ke SSoT DB (via dataStore)
             await addPlayerToCampaign(campaign.id, character.id);
-            // Ambil campaign yang sudah ter-update dari store
+            
+            // 2. Ambil campaign yang sudah ter-update dari SSoT store
             const updatedCampaign = useDataStore.getState().state.campaigns.find(c => c.id === campaign.id);
             
             if (!updatedCampaign) throw new Error("Gagal menyinkronkan campaign setelah join.");
 
-            returnToNexus(); // Tutup view 'character-selection'
-            await handleSelectCampaign(updatedCampaign); // Langsung muat game
+            // 3. Tutup view 'character-selection'
+            returnToNexus(); 
+            
+            // 4. Langsung muat game
+            await loadGameSession(updatedCampaign, character);
 
         } catch (e) {
              console.error("Gagal join campaign:", e);
@@ -96,23 +82,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
         }
     };
 
+    // REFAKTOR G-4-R1: handleExitGame sekarang hanya memanggil aksi store
     const handleExitGame = (finalCampaignState: CampaignState) => {
-        // 1. Simpan SSoT Campaign (state non-player)
-        saveCampaign(finalCampaignState);
-        
-        // 2. Simpan SSoT Karakter kita
-        if (playingCharacter) {
-            // Ambil state karakter terbaru dari dalam finalCampaignState
-            const finalCharacterState = finalCampaignState.players.find(p => p.id === playingCharacter.id);
-            if (finalCharacterState) {
-                updateCharacter(finalCharacterState);
-            }
-        }
-        
-        // 3. Reset state runtime
-        setPlayingCampaign(null);
-        setPlayingCharacter(null);
-        returnToNexus(); // Kembali ke Nexus
+        // Aksi exitGameSession di store SEKARANG menangani
+        // penyimpanan SSoT (Campaign + Character) DAN reset state runtime.
+        exitGameSession(); 
     };
 
     // =================================================================
@@ -134,12 +108,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
     // 2. Tampilkan GameScreen jika sesi game aktif
     if (playingCampaign && playingCharacter) {
         return (
-            <GameScreen 
+            <GameScreen
               key={playingCampaign.id}
               initialCampaign={playingCampaign} 
               character={playingCharacter} 
               players={playingCampaign.players}
-              onExit={handleExitGame}
+              onExit={handleExitGame} // Handler baru
               // updateCharacter (SSoT) sekarang dipanggil DARI DALAM GameScreen
               // (Lihat modifikasi GameScreen)
               userId={userId}
