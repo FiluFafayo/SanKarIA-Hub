@@ -215,21 +215,14 @@ class GenerationService {
     }
 
     async generateMapImage(description: string): Promise<string> {
-        const prompt = `Buat peta fantasi dunia 2D top-down, gaya perkamen antik, untuk kampanye TTRPG berdasarkan deskripsi ini: "${description}". Fokus pada geografi yang jelas seperti hutan, gunung, sungai, dan kota.`;
-        const call = async (client: any) => {
-            const response = await client.models.generateContent({
-                model: 'gemini-pro-vision', // TODO: Pastikan model ini diizinkan untuk image gen
-                contents: { parts: [{ text: prompt }] },
-                config: { responseModalities: [Modality.IMAGE] },
-            });
-            for (const part of response.candidates[0].content.parts) {
-                if (part.inlineData) {
-                    return part.inlineData.data; // base64 string
-                }
-            }
-            throw new Error("Tidak ada gambar yang dihasilkan untuk peta.");
-        };
-        return geminiService.makeApiCall(call);
+        // (P0 FIX) Pelanggaran Visi Free Tier. Ganti ke placeholder Non-AI.
+        console.warn("[FIX P0] generateMapImage dialihkan ke placeholder `picsum.photos` (Prinsip Non-AI).");
+        const seed = description.trim().split(' ')[0] || 'map-fallback';
+        const url = `https://picsum.photos/seed/${seed}/800/600`;
+        // Kita tidak bisa mengembalikan B64, jadi kita kembalikan URL.
+        // Ini akan merusak 'imageUrl = `data:image/png;base64,${imageB64}`;'
+        // Kita harus memperbaiki `views/CreateCampaignView.tsx` juga.
+        return url;
     }
 
     async generateMapMarkers(campaignFramework: any): Promise<{ markers: MapMarker[], startLocationId: string }> {

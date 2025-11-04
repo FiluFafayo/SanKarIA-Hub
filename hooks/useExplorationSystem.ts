@@ -11,35 +11,8 @@ import {
 import { gameService } from '../services/ai/gameService';
 // Import service GENERASI (G-2)
 import { generationService } from '../services/ai/generationService';
-
-// (Poin 3) Helper baru untuk mem-parse [DIALOGUE]
-const parseAndLogNarration = (
-    narration: string, 
-    turnId: string, 
-    campaignActions: CampaignActions
-) => {
-    if (!narration || !narration.trim()) return;
-
-    const dialogueRegex = /\[DIALOGUE:([^|]+)\|([^\]]+)\]/g;
-    const parts = narration.split(dialogueRegex);
-
-    for (let i = 0; i < parts.length; i++) {
-        if (i % 3 === 0) {
-            // Ini adalah teks narasi biasa
-            if (parts[i] && parts[i].trim()) {
-                campaignActions.logEvent({ type: 'dm_narration', text: parts[i].trim() }, turnId);
-            }
-        } else if (i % 3 === 1) {
-            // Ini adalah tag [DIALOGUE]
-            const npcName = parts[i];
-            const text = parts[i + 1];
-            if (npcName && text) {
-                campaignActions.logEvent({ type: 'dm_dialogue', npcName: npcName.trim(), text: text.trim() }, turnId);
-            }
-            i++; // Loncat bagian text
-        }
-    }
-};
+// (Cleanup DRY) Impor dari utils
+import { parseAndLogNarration } from '../utils';
 
 const WORLD_EVENT_THRESHOLD = 5; // Trigger event every 5 player turns
 

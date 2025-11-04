@@ -119,3 +119,32 @@ export const addDndTime = (currentSeconds: number, unit: 'round' | 'minute' | 'h
     }
     return currentSeconds + secondsToAdd;
 };
+
+// (Poin 3 / Cleanup DRY) Pindahkan parser dialog ke sini
+export const parseAndLogNarration = (
+    narration: string, 
+    turnId: string, 
+    campaignActions: any // Gunakan 'any' untuk menghindari impor circular 'CampaignActions'
+) => {
+    if (!narration || !narration.trim()) return;
+
+    const dialogueRegex = /\[DIALOGUE:([^|]+)\|([^\]]+)\]/g;
+    const parts = narration.split(dialogueRegex); // Perbaiki typo: dialogueRegex
+
+    for (let i = 0; i < parts.length; i++) {
+        if (i % 3 === 0) {
+            // Ini adalah teks narasi biasa
+            if (parts[i] && parts[i].trim()) {
+                campaignActions.logEvent({ type: 'dm_narration', text: parts[i].trim() }, turnId);
+            }
+        } else if (i % 3 === 1) {
+            // Ini adalah tag [DIALOGUE]
+            const npcName = parts[i];
+            const text = parts[i + 1];
+            if (npcName && text) {
+                campaignActions.logEvent({ type: 'dm_dialogue', npcName: npcName.trim(), text: text.trim() }, turnId);
+            }
+            i++; // Loncat bagian text
+        }
+    }
+};

@@ -12,6 +12,9 @@ import {
     getAllClasses,
     getAllBackgrounds,
     getItemDef, // (helper getItemDef sekarang ada di registry)
+    findRace, // (P0 FIX) Impor finder
+    findClass, // (P0 FIX) Impor finder
+    findBackground, // (P0 FIX) Impor finder
     RaceData, ClassData, BackgroundData, EquipmentChoice // (Ekspor tipe dari registry jika perlu, tapi kita impor dari types)
 } from '../data/registry';
 import { getAbilityModifier } from '../utils';
@@ -90,12 +93,13 @@ const getDefaultEquipment = (charClass: ClassData): Record<number, EquipmentChoi
 const initialCharacterState: CharacterCreationState = {
     step: 0, // 0 = tidak aktif
     name: '',
-    selectedRace: getAllRaces()[0],
-    selectedClass: getAllClasses()['Fighter'],
+    // (P0 FIX) Gunakan finder untuk memastikan referensi yang aman
+    selectedRace: findRace('Human') || getAllRaces()[0],
+    selectedClass: findClass('Fighter') || Object.values(getAllClasses())[0],
     abilityScores: {},
-    selectedBackground: getAllBackgrounds()[0],
+    selectedBackground: findBackground('Acolyte') || getAllBackgrounds()[0],
     selectedSkills: [],
-    selectedEquipment: getDefaultEquipment(getAllClasses()['Fighter']),
+    selectedEquipment: getDefaultEquipment(findClass('Fighter') || Object.values(getAllClasses())[0]),
     isSaving: false,
 };
 interface CharacterCreationActions {
@@ -284,7 +288,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
         })),
         resetCharacterCreation: () => set({ characterCreation: { ...initialCharacterState, step: 0 } }),
         
-        finalizeCharacter: async (userId) => {
+        finalizeCharacter: async (userId: string, onSaveNewCharacter: (
+            charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+            inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+            spellData: SpellDefinition[],
+            userId: string
+        ) => Promise<void>) => { // (P0 FIX) Terima callback onSaveNewCharacter dari ProfileModal
             const { characterCreation } = get();
             const { name, selectedRace, selectedClass, abilityScores, selectedBackground, selectedSkills, selectedEquipment } = characterCreation;
 
@@ -347,8 +356,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
                     proficientSavingThrows: selectedClass.proficiencies.savingThrows,
                     spellSlots: spellSlots,
                 };
-
-                await useDataStore.getState().actions.saveNewCharacter(newCharData, inventoryData, spellData, userId);
+                
+                // (P0 FIX) Panggil callback yang dilewatkan, jangan panggil dataStore langsung
+                await onSaveNewCharacter(newCharData, inventoryData, spellData, userId);
                 
                 get().actions.resetCharacterCreation();
                 get().actions.returnToNexus();

@@ -87,8 +87,9 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
       try {
           setLoadingMessage("Menggambar peta dunia...");
           // REFAKTOR G-2
-          const imageB64 = await generationService.generateMapImage(framework.description);
-          const imageUrl = `data:image/png;base64,${imageB64}`;
+          // (P0 FIX) generateMapImage sekarang mengembalikan URL, bukan B64
+          const imageUrl = await generationService.generateMapImage(framework.description);
+          // const imageUrl = `data:image/png;base64,${imageB64}`; // Dihapus
 
           setLoadingMessage("Menandai tempat-tempat penting...");
           const markerData = await generationService.generateMapMarkers(framework);

@@ -176,15 +176,11 @@ const AbilityRoller: React.FC<{
 // REFAKTOR G-3: Seluruh state lokal wizard dipindah ke zustand
 // Logika handleSave juga dipindah ke store (finalizeCharacter)
 
+// (P0 FIX) Hapus 'onSave' dari props wizard, karena akan dipanggil oleh handleSave di level atas
 const CreateCharacterWizard: React.FC<{
-	onSave: (
-		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
-		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
-		spellData: SpellDefinition[]
-	) => Promise<void>;
 	onCancel: () => void;
 	userId: string;
-}> = ({ onSave, onCancel, userId }) => {
+}> = ({ onCancel, userId }) => {
 	// Ambil data SSoT statis (RACES, CLASSES, BACKGROUNDS) dari global (dimuat di App.tsx)
 	const RACES: RaceData[] = useMemo(() => (window as any).RACES_DATA || [], []);
 	const CLASS_DEFINITIONS: Record<string, ClassData> = useMemo(
@@ -197,6 +193,7 @@ const CreateCharacterWizard: React.FC<{
 	);
 
 	// REFAKTOR G-3: Ambil state dari Zustand Store
+    // FIX (P0 Regresi): Ganti useCreationStore (mati) ke useAppStore (hidup)
 	const {
 		step,
 		name,
@@ -216,11 +213,10 @@ const CreateCharacterWizard: React.FC<{
 		setSelectedEquipment,
 		resetCharacterCreation,
 		finalizeCharacter,
-	} = useCreationStore((s) => ({
+	} = useAppStore((s) => ({ // <-- FIX
 		...s.characterCreation,
 		...s.actions,
 	}));
-
 	const abilitiesToRoll = useMemo(() => ALL_ABILITIES, []);
 	const currentAbilityIndex = Object.keys(abilityScores).length;
 
@@ -234,7 +230,8 @@ const CreateCharacterWizard: React.FC<{
 
 	// REFAKTOR G-3: handleSave sekarang hanya delegasi ke store
 	const handleSave = async () => {
-		await finalizeCharacter(userId, onSave);
+        // (P0 FIX) Kirim callback 'onSaveNewCharacter' dari props ke 'finalizeCharacter'
+		await finalizeCharacter(userId, onSaveNewCharacter);
 	};
 
 	const handleBack = () => {
@@ -587,12 +584,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 	const myCharacters = characters;
 	const [selectedChar, setSelectedChar] = useState<Character | null>(null);
 	// REFAKTOR G-3: 'isCreating' sekarang dikontrol oleh state 'step' di store
-	const isCreating = useCreationStore((s) => s.characterCreation.step > 0);
+    // FIX (P0 Regresi): Ganti useCreationStore (mati) ke useAppStore (hidup)
+	const isCreating = useAppStore((s) => s.characterCreation.step > 0); // <-- FIX
 	// Ambil aksi reset
-	const resetCharacterCreation = useCreationStore(
+	const resetCharacterCreation = useAppStore( // <-- FIX
 		(s) => s.actions.resetCharacterCreation
 	);
-	const setCharacterStep = useCreationStore((s) => s.actions.setCharacterStep);
+	const setCharacterStep = useAppStore((s) => s.actions.setCharacterStep); // <-- FIX
 
 	useEffect(() => {
 		if (!isCreating && !selectedChar && myCharacters.length > 0) {
@@ -634,8 +632,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 					<div className="w-full h-full bg-black/30 border-2 border-blue-300/50 rounded-lg p-4 flex flex-col">
 						{isCreating ? (
 							// REFAKTOR G-3: onCancel sekarang mereset store
+                            // (P0 FIX) Hapus prop onSave
 							<CreateCharacterWizard
-								onSave={handleCreateCharacter}
 								onCancel={() => resetCharacterCreation()}
 								userId={userId}
 							/>

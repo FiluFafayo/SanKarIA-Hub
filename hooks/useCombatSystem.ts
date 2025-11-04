@@ -20,33 +20,8 @@ import {
 // REFAKTOR G-2: Ganti impor geminiService
 import { gameService } from "../services/ai/gameService";
 import { generationService } from "../services/ai/generationService";
-
-// (Poin 3) Impor helper dari hook tetangga
-// (Kita asumsikan helper ini diekspor atau didefinisikan secara global/dilewatkan)
-// Untuk kesederhanaan, kita duplikat saja helper-nya di sini.
-const parseAndLogNarration = (
-    narration: string, 
-    turnId: string, 
-    campaignActions: CampaignActions
-) => {
-    if (!narration || !narration.trim()) return;
-    const dialogueRegex = /\[DIALOGUE:([^|]+)\|([^\]]+)\]/g;
-    const parts = narration.split(dialogueRegex);
-    for (let i = 0; i < parts.length; i++) {
-        if (i % 3 === 0) {
-            if (parts[i] && parts[i].trim()) {
-                campaignActions.logEvent({ type: 'dm_narration', text: parts[i].trim() }, turnId);
-            }
-        } else if (i % 3 === 1) {
-            const npcName = parts[i];
-            const text = parts[i + 1];
-            if (npcName && text) {
-                campaignActions.logEvent({ type: 'dm_dialogue', npcName: npcName.trim(), text: text.trim() }, turnId);
-            }
-            i++;
-        }
-    }
-};
+// (Cleanup DRY) Impor dari utils
+import { parseAndLogNarration } from "../utils";
 
 
 interface CombatSystemProps {
