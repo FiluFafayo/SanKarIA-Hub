@@ -24,6 +24,12 @@ import {
 	CharacterInventoryItem,
 	ItemDefinition,
 	SpellDefinition,
+    // BARU: Impor tipe dari Fase 1
+    BattleState,
+    BattleStatus,
+    GridCell,
+    TerrainType,
+    Unit,
 } from "../types";
 import { generateId } from "../utils";
 import { MONSTER_DEFINITIONS } from "../data/monsters"; // <-- FIX: Import name yang benar
@@ -99,6 +105,15 @@ export interface CampaignActions {
 	addItemsToInventory: (payload: AddItemsPayload) => void;
 	updateQuestLog: (payload: UpdateQuestPayload) => void;
 	logNpcInteraction: (payload: LogNpcInteractionPayload) => void;
+    
+    // BARU: Aksi Battle State
+    setBattleState: (state: BattleState | null) => void;
+    setBattleGrid: (grid: GridCell[][]) => void;
+    setBattleMapImage: (url: string) => void;
+    setBattleUnits: (units: Unit[]) => void;
+    setActiveBattleUnit: (id: string | null) => void;
+    moveUnit: (payload: { unitId: string; newPosition: { x: number; y: number }; cost: number }) => void;
+
 	// (Poin 5) Ganti updateWorldState
     advanceTime: (seconds: number) => void;
     setWeather: (weather: WorldWeather) => void;
@@ -120,6 +135,13 @@ type Action =
 	| { type: "ADD_ITEMS_TO_INVENTORY"; payload: AddItemsPayload }
 	| { type: "UPDATE_QUEST_LOG"; payload: UpdateQuestPayload }
 	| { type: "LOG_NPC_INTERACTION"; payload: LogNpcInteractionPayload }
+    // BARU: Aksi untuk mengelola Battle State
+    | { type: "SET_BATTLE_STATE"; payload: BattleState | null }
+    | { type: "SET_BATTLE_GRID"; payload: GridCell[][] }
+    | { type: "SET_BATTLE_MAP_IMAGE"; payload: string }
+    | { type: "SET_BATTLE_UNITS"; payload: Unit[] }
+    | { type: "SET_ACTIVE_BATTLE_UNIT"; payload: string | null }
+    | { type: "MOVE_UNIT"; payload: { unitId: string; newPosition: { x: number; y: number }; cost: number } }
 	| {
 			type: "ADVANCE_TIME";
 			payload: number; // Detik yang ditambahkan
@@ -143,7 +165,12 @@ type Action =
 const reducer = (state: CampaignState, action: Action): CampaignState => {
 	switch (action.type) {
 		case "SET_STATE":
-			return { ...state, ...action.payload };
+            // Pastikan battleState tidak terhapus secara tidak sengaja oleh SET_STATE parsial
+			return { 
+                ...state, 
+                ...action.payload,
+                battleState: action.payload.battleState !== undefined ? action.payload.battleState : state.battleState
+            };
 		case "ADD_EVENT":
 			const worldEventCounter =
 				action.payload.type === "player_action"
@@ -373,6 +400,42 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
                 })
             };
         }
+        
+        // --- Reducer Battle State BARU ---
+        case "SET_BATTLE_STATE":
+            return { ...state, battleState: action.payload };
+        
+        case "SET_BATTLE_GRID":
+            if (!state.battleState) return state;
+            return { ...state, battleState: { ...state.battleState, gridMap: action.payload } };
+            
+        case "SET_BATTLE_MAP_IMAGE":
+            if (!state.battleState) return state;
+            return { ...state, battleState: { ...state.battleState, mapImageUrl: action.payload } };
+
+        case "SET_BATTLE_UNITS":
+            if (!state.battleState) return state;
+            return { ...state, battleState: { ...state.battleState, units: action.payload } };
+
+        case "SET_ACTIVE_BATTLE_UNIT":
+            if (!state.battleState) return state;
+            return { ...state, battleState: { ...state.battleState, activeUnitId: action.payload } };
+
+        case "MOVE_UNIT": {
+            // Diadaptasi dari P2 (ai-native...)
+            if (!state.battleState) return state;
+            const { unitId, newPosition, cost } = action.payload;
+            return {
+                ...state,
+                battleState: {
+                    ...state.battleState,
+                    units: state.battleState.units.map(u =>
+                        u.id === unitId ? { ...u, gridPosition: newPosition, remainingMovement: u.remainingMovement - cost } : u
+                    ),
+                },
+            };
+        }
+
 		default:
 			return state;
 	}
@@ -388,6 +451,7 @@ export const useCampaign = (
 		activeRollRequest: null,
 		players: initialPlayers, // SSoT Karakter di-pass saat inisialisasi
 		turnId: null,
+        battleState: null, // BARU: Inisialisasi battleState
 	});
 
 	const actions: CampaignActions = useMemo(() => {
@@ -444,6 +508,21 @@ export const useCampaign = (
 			dispatch({ type: "UPDATE_QUEST_LOG", payload });
 		const logNpcInteraction = (payload: LogNpcInteractionPayload) =>
 			dispatch({ type: "LOG_NPC_INTERACTION", payload });
+        
+        // --- Implementasi Aksi Battle State BARU ---
+        const setBattleState = (state: BattleState | null) =>
+            dispatch({ type: "SET_BATTLE_STATE", payload: state });
+        const setBattleGrid = (grid: GridCell[][]) =>
+            dispatch({ type: "SET_BATTLE_GRID", payload: grid });
+        const setBattleMapImage = (url: string) =>
+            dispatch({ type: "SET_BATTLE_MAP_IMAGE", payload: url });
+        const setBattleUnits = (units: Unit[]) =>
+            dispatch({ type: "SET_BATTLE_UNITS", payload: units });
+        const setActiveBattleUnit = (id: string | null) =>
+            dispatch({ type: "SET_ACTIVE_BATTLE_UNIT", payload: id });
+        const moveUnit = (payload: { unitId: string; newPosition: { x: number; y: number }; cost: number }) =>
+            dispatch({ type: "MOVE_UNIT", payload });
+
         // (Poin 5) Ganti implementasi action
 		const advanceTime = (seconds: number) =>
 			dispatch({ type: "ADVANCE_TIME", payload: seconds });
@@ -466,6 +545,15 @@ export const useCampaign = (
 			addItemsToInventory,
 			updateQuestLog,
 			logNpcInteraction,
+            
+            // BARU
+            setBattleState,
+            setBattleGrid,
+            setBattleMapImage,
+            setBattleUnits,
+            setActiveBattleUnit,
+            moveUnit,
+
             // (Poin 5) Ganti
             advanceTime,
             setWeather,

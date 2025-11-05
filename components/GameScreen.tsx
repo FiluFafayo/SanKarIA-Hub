@@ -5,7 +5,8 @@ import { useCombatSystem } from "../hooks/useCombatSystem";
 import { useExplorationSystem } from "../hooks/useExplorationSystem";
 
 // Import modular components
-import { MobileNavBar } from "./game/MobileNavBar";
+import { MobileNavBar, MobileTab } from "./game/MobileNavBar"; // BARU: Impor MobileTab
+import { BattleMapRenderer } from "./game/BattleMapRenderer"; // BARU
 import { ChoiceButtons } from "./game/ChoiceButtons";
 import { CharacterPanel } from "./game/CharacterPanel";
 import { CombatTracker } from "./game/CombatTracker";
@@ -118,9 +119,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		_setRuntimeCampaignState(campaign);
 	}, [campaign, _setRuntimeCampaignState]);
 
-	const [activeMobileTab, setActiveMobileTab] = useState<
-		"chat" | "character" | "info"
-	>("chat");
+	const [activeMobileTab, setActiveMobileTab] = useState<MobileTab>("chat");
 	const [pendingSkill, setPendingSkill] = useState<Skill | null>(null);
 	const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
@@ -239,10 +238,59 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		(campaign.gameState === "exploration" ||
 			(isMyTurn && character.currentHp > 0));
 
+	// BARU: Panel untuk BattleMap
+    const BattleMapPanel = () => (
+        <main className="flex-grow flex flex-col h-full overflow-hidden">
+            {campaign.battleState ? (
+                <BattleMapRenderer 
+                    battleState={campaign.battleState} 
+                    campaignActions={campaignActions}
+                    currentUserId={character.id}
+                />
+            ) : (
+                <div className="w-full h-full flex items-center justify-center bg-black">
+                    <p>Menunggu Battle State...</p>
+                </div>
+            )}
+        </main>
+    );
+
 	const ChatPanel = () => (
 		<main className="flex-grow flex flex-col h-full overflow-hidden">
-			{/* REFAKTOR G-4-R1: Pastikan komponen ini mengambil 'players' dari state 'campaign' */}
-			<ChatLog
+            {/* BARU: Render Map jika kombat, Chat jika eksplorasi */}
+            {campaign.gameState === 'combat' && campaign.battleState ? (
+                <BattleMapRenderer 
+                    battleState={campaign.battleState} 
+                    campaignActions={campaignActions}
+                    currentUserId={character.id}
+                />
+            ) : (
+                <ChatLog
+                    events={campaign.eventLog}
+                    players={campaign.players}
+                    characterId={character.id}
+                    thinkingState={campaign.thinkingState}
+                    onObjectClick={handleObjectClick}
+                />
+            )}
+            {/* BARU: Jangan render input/pilihan jika sedang di peta tempur (desktop) */}
+			{(campaign.gameState !== 'combat') && (
+                <div className="flex-shrink-0">
+                    {shouldShowChoices && (
+                        <ChoiceButtons
+                            choices={campaign.choices}
+                            onChoiceSelect={handleActionSubmit}
+                        />
+                    )}
+                    <ActionBar
+                        disabled={isDisabled}
+                        onActionSubmit={handleActionSubmit}
+                        pendingSkill={pendingSkill}
+                    />
+                </div>
+            )}
+		</main>
+	);
 				events={campaign.eventLog}
 				players={campaign.players}
 				characterId={character.id}
@@ -324,9 +372,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 					<RightPanel />
 				</div>
 
-				{/* Mobile Layout (unchanged) */}
+				{/* Mobile Layout (BARU) */}
 				<div className="md:hidden w-full h-full pb-16">
 					{activeMobileTab === "chat" && <ChatPanel />}
+                    {activeMobileTab === "battle" && <BattleMapPanel />}
 					{activeMobileTab === "character" && <RightPanel />}
 					{/* REFAKTOR G-4-R1: InfoPanel harus menggunakan 'campaign' (state) bukan 'initialCampaign' */}
 					{activeMobileTab === "info" && (
@@ -338,6 +387,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 			<MobileNavBar
 				activeTab={activeMobileTab}
 				setActiveTab={setActiveMobileTab}
+                gameState={campaign.gameState}
 			/>
 
 			{/* (Poin 7) Render Modal Level Up jika terpicu */}
