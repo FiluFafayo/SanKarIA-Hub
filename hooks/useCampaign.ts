@@ -1,7 +1,7 @@
 import { useReducer, useMemo } from "react";
 // REFAKTOR G-5: Hapus dataService, ganti dengan registry
 // import { dataService } from "../services/dataService"; 
-import { findItem } from "../data/registry"; // REFAKTOR G-5
+import { findItem, findMonster } from "../data/registry"; // REFAKTOR G-5 / FASE 3
 import {
 	Campaign,
 	GameEvent,
@@ -32,7 +32,7 @@ import {
     Unit,
 } from "../types";
 import { generateId } from "../utils";
-import { MONSTER_DEFINITIONS } from "../data/monsters"; // <-- FIX: Import name yang benar
+// import { MONSTER_DEFINITIONS } from "../data/monsters"; // <-- FASE 3: Dihapus, gunakan registry
 
 export interface CampaignState extends Campaign {
 	thinkingState: ThinkingState;
@@ -595,10 +595,8 @@ export const useCampaign = (
 				let newMonsters: MonsterInstance[] = [];
 
 				monstersToSpawn.forEach((m) => {
-					// REFAKTOR: Selalu cari di MONSTER_DEFINITIONS
-					const template = MONSTER_DEFINITIONS.find(
-						(dm) => dm.name.toLowerCase() === m.name.toLowerCase()
-					);
+					// FASE 3: Gunakan findMonster dari registry
+					const template = findMonster(m.name);
 
 					if (template) {
 						for (let i = 0; i < m.quantity; i++) {

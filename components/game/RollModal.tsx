@@ -17,36 +17,52 @@ export const RollModal: React.FC<RollModalProps> = ({ request, character, onComp
     const [finalRoll, setFinalRoll] = useState<DiceRoll | null>(null);
 
     // Ambil status adv/disadv dari request
-    const { diceNotation, modifier, title, dc, modifierBreakdown, relevantAbility, isAdvantage, isDisadvantage } = useMemo(() => {
-        let diceNotation = '1d20';
-        let mod = 0;
-        let title = "Permintaan Lemparan";
-        let localDc = request.dc;
-        let abilityMod = 0;
-        let profBonus = 0;
-        let relAbility: Ability | undefined = request.ability;
+const { diceNotation, modifier, title, dc, modifierBreakdown, relevantAbility, isAdvantage, isDisadvantage } = useMemo(() => {
+    let diceNotation = '1d20';
+    let mod = 0;
+    let title = "Permintaan Lemparan";
+    let localDc = request.dc;
+    let abilityMod = 0;
+    let profBonus = 0;
+    let relAbility: Ability | undefined = request.ability;
 
-        if (request.type === 'deathSave') {
-            title = "Penyelamatan Kematian";
-            diceNotation = '1d20';
-            mod = 0;
-            localDc = 10;
-        } else if (request.stage === 'attack') {
-            title = "Lemparan Serangan";
-            localDc = request.target?.ac;
-            // REFAKTOR: Ambil toHitBonus dari item.bonuses
-            if (request.item?.item.bonuses?.attack) {
-                mod = request.item.item.bonuses.attack;
-            } else {
-                 // Fallback jika item tidak punya bonus (misal: unarmed)
-                 const strMod = getAbilityModifier(character.abilityScores.strength);
-                 const prof = getProficiencyBonus(character.level);
-                 mod = strMod + prof;
-                 abilityMod = strMod;
-                 profBonus = prof;
-                 relAbility = Ability.Strength;
-            }
-        } else if (request.stage === 'damage') {
+    if (request.type === 'deathSave') {
+        title = "Penyelamatan Kematian";
+        diceNotation = '1d20';
+        mod = 0;
+        localDc = 10;
+    } else if (request.stage === 'attack') {
+        title = "Lemparan Serangan";
+        localDc = request.target?.ac;
+
+        // REFAKTOR FASE 3: Logika Finesse (DEX) vs STR
+        const strMod = getAbilityModifier(character.abilityScores.strength);
+        const dexMod = getAbilityModifier(character.abilityScores.dexterity);
+        const prof = getProficiencyBonus(character.level);
+        profBonus = prof;
+
+        // Cek apakah item adalah 'finesse' (misal: Rapier, Dagger, Shortsword)
+        // (Idealnya, 'isFinesse' ada di ItemDefinition, tapi ini perbaikan cepat)
+        const itemName = request.item?.item.name.toLowerCase() || '';
+        const isFinesseWeapon = itemName.includes('rapier') || itemName.includes('dagger') || itemName.includes('shortsword');
+
+        if (isFinesseWeapon && dexMod > strMod) {
+            // Gunakan DEX
+            abilityMod = dexMod;
+            relAbility = Ability.Dexterity;
+        } else {
+            // Gunakan STR (default)
+            abilityMod = strMod;
+            relAbility = Ability.Strength;
+        }
+
+        // Ambil bonus spesifik item JIKA ADA (misal: +1 Magic Weapon)
+        const itemAttackBonus = request.item?.item.bonuses?.attack || 0;
+
+        // Mod = (STR atau DEX) + Proficiency + Bonus Item
+        mod = abilityMod + profBonus + itemAttackBonus;
+
+    } else if (request.stage === 'damage') {
             title = "Lemparan Kerusakan";
             diceNotation = request.damageDice || '1d4';
             mod = 0;
