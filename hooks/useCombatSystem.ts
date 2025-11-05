@@ -826,44 +826,6 @@ export const useCombatSystem = ({
 		players,
 		campaignActions,
 	]);
-				...players.filter((p) => campaign.playerIds.includes(p.id)),
-				...campaign.monsters,
-			];
-
-			const initiatives = combatants.map((c) => {
-				const id = "ownerId" in c ? c.id : c.instanceId;
-				const dexScore =
-					"ownerId" in c
-						? c.abilityScores.dexterity
-						: c.definition.abilityScores.dexterity;
-				return {
-					id: id,
-					initiative: rollInitiative(dexScore),
-				};
-			});
-
-			initiatives.sort((a, b) => b.initiative - a.initiative);
-			const order = initiatives.map((i) => i.id);
-
-			campaignActions.setInitiativeOrder(order);
-			campaignActions.setCurrentPlayerId(order[0]);
-			campaignActions.logEvent(
-				{
-					type: "system",
-					text: `Pertarungan dimulai! Urutan inisiatif telah ditentukan.`,
-				},
-				turnId
-			);
-			campaignActions.endTurn();
-		}
-	}, [
-		campaign.gameState,
-		campaign.initiativeOrder.length,
-		campaign.monsters,
-		players,
-		campaignActions,
-		campaign.playerIds,
-	]);
 
 	// Effect untuk memajukan giliran (Tidak berubah)
 	useEffect(() => {
