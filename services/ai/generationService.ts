@@ -216,7 +216,7 @@ class GenerationService {
 
     async generateMapImage(description: string): Promise<string> {
         // (P0 FIX) Pelanggaran Visi Free Tier. Ganti ke placeholder Non-AI.
-        console.warn("[FIX P0] generateMapImage dialihkan ke placeholder `picsum.photos` (Prinsip Non-AI).");
+        // console.warn("[FIX P0] generateMapImage dialihkan ke placeholder `picsum.photos` (Prinsip Non-AI)."); // (Cleanup)
         const seed = description.trim().split(' ')[0] || 'map-fallback';
         const url = `https://picsum.photos/seed/${seed}/800/600`;
         // Kita tidak bisa mengembalikan B64, jadi kita kembalikan URL.
