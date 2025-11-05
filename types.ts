@@ -1,6 +1,69 @@
 // types.ts
 
 // =================================================================
+// BAGIAN 0: TIPE DATA PIXEL ART (BARU DARI P2)
+// =================================================================
+
+// Tipe Tile diadaptasi dari P2 (pixel-vtt-stylizer)
+export interface Tile {
+  id: number;
+  name: string;
+  color: string; // Warna Heksadesimal untuk digambar di canvas
+  isImpassable?: boolean; // Untuk pathfinding
+  movementCost?: number; // Untuk pathfinding (default 1)
+  category: 'Terrain' | 'Wall' | 'Door' | 'Object' | 'Hazard' | 'Structure' | 'Biome' | 'POI';
+}
+
+// Tipe SpritePart diadaptasi dari P2 (pixel-vtt-stylizer)
+export interface SpritePart {
+  id: string;
+  name: string;
+  color: string;
+  layer: SpriteLayer;
+}
+
+// Kategori Lapisan BARU (sesuai permintaan Fase 0)
+export type SpriteLayer =
+  | 'gender_base'
+  | 'race_base'
+  | 'body_type'
+  | 'facial_feature'
+  | 'head_accessory'
+  | 'hair'
+  | 'armor_torso'
+  | 'armor_legs'
+  | 'weapon_right_hand'
+  | 'weapon_left_hand';
+
+// Struktur Kategori BARU yang detail
+export type SpriteLayerCategory = {
+  gender_base: SpritePart[];
+  race_base: SpritePart[];
+  body_type: SpritePart[];
+  facial_feature: SpritePart[];
+  head_accessory: SpritePart[];
+  hair: SpritePart[];
+  armor_torso: SpritePart[];
+  armor_legs: SpritePart[];
+  weapon_right_hand: SpritePart[];
+  weapon_left_hand: SpritePart[];
+};
+
+// Tipe AssembledCharacter diadaptasi dari P2 (pixel-vtt-stylizer)
+export interface AssembledCharacter {
+  gender_base: SpritePart;
+  race_base: SpritePart;
+  body_type: SpritePart;
+  facial_feature: SpritePart;
+  head_accessory: SpritePart;
+  hair: SpritePart;
+  armor_torso: SpritePart;
+  armor_legs: SpritePart;
+  weapon_right_hand: SpritePart;
+  weapon_left_hand: SpritePart;
+}
+
+// =================================================================
 // BAGIAN 1: TIPE ENUM & UTILITAS DASAR D&D
 // =================================================================
 
@@ -178,6 +241,9 @@ export interface Character {
     level: number;
     xp: number;
     image: string;
+    gender: 'Pria' | 'Wanita' | 'Lainnya'; // BARU
+    bodyType: string; // BARU (e.g., 'normal', 'missing_arm_right')
+    scars: string[]; // BARU (e.g., 'scar_eye_left')
     
     // Detail Karakter (dari Background - Fase 1)
     background: string;
@@ -366,6 +432,59 @@ export interface Campaign {
     // Runtime-only state (Tidak disimpan di DB 'campaigns')
     choices: string[];
     turnId: string | null;
+
+    // =================================================================
+    // BAGIAN 4B: TIPE BATTLE STATE (BARU DARI P2)
+    // =================================================================
+    
+    // Grid Peta Eksplorasi (BARU)
+    explorationGrid: number[][]; // (Skala Zoom-Out, 10000+)
+    fogOfWar: boolean[][]; // Grid paralel untuk fog of war
+
+    // Battle State (BARU)
+    battleState: BattleState | null; // Null jika tidak sedang kombat
+}
+
+// =================================================================
+// BAGIAN 4B: TIPE BATTLE STATE (BARU DARI P2)
+// Diadaptasi dari ai-native-virtual-tabletop-architect [cite: 197-202]
+// =================================================================
+
+export enum BattleStatus {
+  Inactive = "Inactive",
+  Active = "Active",
+  Paused = "Paused",
+}
+
+export enum TerrainType {
+  Plains = 0,
+  Difficult = 1,
+  Obstacle = 2,
+}
+
+export interface GridCell {
+  terrain: TerrainType;
+  elevation: number;
+}
+
+export interface Unit {
+  id: string; // (Bisa Character.id atau MonsterInstance.instanceId)
+  name: string;
+  isPlayer: boolean;
+  hp: number;
+  maxHp: number;
+  movementSpeed: number; // (dalam sel grid)
+  remainingMovement: number;
+  gridPosition: { x: number; y: number };
+}
+
+export interface BattleState {
+  status: BattleStatus;
+  gridMap: GridCell[][]; // Grid layout data (30x30)
+  mapImageUrl?: string; // URL Peta HD yang di-render AI
+  units: Unit[];
+  turnOrder: string[]; // array of unit IDs
+  activeUnitId: string | null;
 }
 
 // =================================================================

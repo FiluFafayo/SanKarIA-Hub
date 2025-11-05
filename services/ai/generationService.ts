@@ -5,6 +5,7 @@
 import { Type, FunctionDeclaration, Modality } from "@google/genai";
 import { Campaign, ToolCall, MapMarker, WorldTime, WorldWeather } from '../../types';
 import { geminiService } from "../geminiService"; // Import klien inti
+import { formatDndTime } from "../../utils"; // Import helper waktu
 
 // SKEMA LAMA (Dipindah dari geminiService.ts)
 const CAMPAIGN_FRAMEWORK_SCHEMA = {
@@ -215,14 +216,118 @@ class GenerationService {
     }
 
     async generateMapImage(description: string): Promise<string> {
-        // (P0 FIX) Pelanggaran Visi Free Tier. Ganti ke placeholder Non-AI.
-        // console.warn("[FIX P0] generateMapImage dialihkan ke placeholder `picsum.photos` (Prinsip Non-AI)."); // (Cleanup)
-        const seed = description.trim().split(' ')[0] || 'map-fallback';
-        const url = `https://picsum.photos/seed/${seed}/800/600`;
-        // Kita tidak bisa mengembalikan B64, jadi kita kembalikan URL.
-        // Ini akan merusak 'imageUrl = `data:image/png;base64,${imageB64}`;'
-        // Kita harus memperbaiki `views/CreateCampaignView.tsx` juga.
-        return url;
+        // REVISI FASE 1: Menggunakan logika P2 (ai-native...) [cite: 227-232]
+        // untuk membuat peta eksplorasi HD berdasarkan premis.
+        const prompt = `
+        Generate an atmospheric, top-down, HD fantasy TTRPG exploration map.
+        Style: digital painting, fantasy art, detailed, high quality, vibrant colors, style of D&D 5e sourcebooks, gridless.
+        Base Location: ${description}.
+        The image should be an environment, with no characters or fog of war.
+        `;
+
+        const call = async (client: any) => {
+             const response = await client.models.generateContent({
+                model: 'gemini-2.5-flash-image', // (P0 FIX) Ganti ke model yang sesuai
+                contents: { parts: [{ text: prompt }] },
+                config: { responseModalities: [Modality.IMAGE] },
+            });
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    // (P0 FIX) Kembalikan URL data base64, BUKAN URL picsum
+                    return `data:image/png;base64,${part.inlineData.data}`;
+                }
+            }
+            throw new Error("Tidak ada gambar yang dihasilkan untuk peta.");
+        };
+        return geminiService.makeApiCall(call);
+    }
+
+    // BARU: FASE 1 - Ditransplantasi dari P2 (ai-native...) [cite: 218-224]
+    async generateBattleMapVisual(base64Layout: string, theme: string): Promise<string> {
+        const imagePart = {
+            inlineData: {
+                mimeType: 'image/png',
+                data: base64Layout.split(',')[1], // Ambil data B64 mentah
+            },
+        };
+
+        // Prompt dari P2, disesuaikan sedikit
+        const textPart = {
+            text: `Transform this simple pixel grid layout into a detailed, top-down fantasy battle map.
+            - The layout is a blueprint: Black=Impassable Obstacle/Wall, Gray=Difficult Terrain, White=Clear Ground.
+            - The overall theme is: "${theme}".
+            - Style: digital painting, fantasy art, detailed, high quality, top-down perspective, grid-aligned.
+            - Render the terrain faithfully based on the layout blueprint.`
+        };
+
+        const call = async (client: any) => {
+            const response = await client.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: { parts: [imagePart, textPart] },
+                config: { responseModalities: [Modality.IMAGE] },
+            });
+            if (response.candidates && response.candidates[0].content.parts[0].inlineData) {
+                const base64ImageBytes: string = response.candidates[0].content.parts[0].inlineData.data;
+                return `data:image/png;base64,${base64ImageBytes}`;
+            } else {
+                throw new Error("Tidak dapat menghasilkan peta tempur dari layout.");
+            }
+        };
+        return geminiService.makeApiCall(call);
+    }
+
+    // BARU: FASE 1 - Ditransplantasi dari P2 (rpg-asset...) [cite: 70-83]
+    async stylizePixelLayout(base64Image: string, prompt: string, category: 'Map' | 'Sprite' | 'Item'): Promise<string> {
+        
+        const base64Data = base64Image.split(',')[1] || base64Image;
+        const imagePart = {
+            inlineData: {
+                data: base64Data,
+                mimeType: 'image/png',
+            },
+        };
+        
+        let categoryGuidance = '';
+        switch(category) {
+            case 'Map':
+                categoryGuidance = 'This is a top-down 2D RPG map layout. Walls should be impassable, floors should be walkable. Maintain the original structure.';
+                break;
+            case 'Sprite':
+                categoryGuidance = 'This is a 2D character sprite pixel layout. The final image should be a full-color character portrait that fits this shape and composition for an RPG game.';
+                break;
+            case 'Item':
+                categoryGuidance = 'This is a 2D RPG item icon. The final image should be a detailed item that fits this shape.';
+                break;
+        }
+        
+        const fullPrompt = `A high-fidelity, HD, 2D, digital painting of an RPG game asset.
+        The desired style is: "${prompt}".
+        Use the provided pixel art image as a *strict* structural, compositional, and color-block guide.
+        ${categoryGuidance}`;
+
+        const call = async (client: any) => {
+            const response = await client.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: {
+                    parts: [
+                        imagePart,
+                        { text: fullPrompt },
+                    ],
+                },
+                config: {
+                    responseModalities: [Modality.IMAGE],
+                },
+            });
+            
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    const base64ImageBytes: string = part.inlineData.data;
+                    return `data:image/png;base64,${base64ImageBytes}`;
+                }
+            }
+            throw new Error("Tidak ada gambar yang dihasilkan oleh API (stylizePixelLayout).");
+        };
+        return geminiService.makeApiCall(call);
     }
 
     async generateMapMarkers(campaignFramework: any): Promise<{ markers: MapMarker[], startLocationId: string }> {
