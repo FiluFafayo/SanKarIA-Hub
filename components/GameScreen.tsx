@@ -291,27 +291,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
             )}
 		</main>
 	);
-				events={campaign.eventLog}
-				players={campaign.players}
-				characterId={character.id}
-				thinkingState={campaign.thinkingState}
-				onObjectClick={handleObjectClick}
-			/>
-			<div className="flex-shrink-0">
-				{shouldShowChoices && (
-					<ChoiceButtons
-						choices={campaign.choices}
-						onChoiceSelect={handleActionSubmit}
-					/>
-				)}
-				<ActionBar
-					disabled={isDisabled}
-					onActionSubmit={handleActionSubmit}
-					pendingSkill={pendingSkill}
-				/>
-			</div>
-		</main>
-	);
 
 	const RightPanel = () => (
 		<aside className="w-full md:w-80 lg:w-96 flex-shrink-0 bg-gray-800 md:border-l-2 border-gray-700 p-4 overflow-y-auto flex flex-col gap-4">
