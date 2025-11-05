@@ -216,7 +216,7 @@ class GenerationService {
     }
 
     async generateMapImage(description: string): Promise<string> {
-        // REVISI FASE 1: Menggunakan logika P2 (ai-native...) [cite: 227-232]
+        // REVISI FASE 1: Menggunakan logika P2 (ai-native...)
         // untuk membuat peta eksplorasi HD berdasarkan premis.
         const prompt = `
         Generate an atmospheric, top-down, HD fantasy TTRPG exploration map.
@@ -242,7 +242,7 @@ class GenerationService {
         return geminiService.makeApiCall(call);
     }
 
-    // BARU: FASE 1 - Ditransplantasi dari P2 (ai-native...) [cite: 218-224]
+    // BARU: FASE 1 - Ditransplantasi dari P2 (ai-native...)
     async generateBattleMapVisual(base64Layout: string, theme: string): Promise<string> {
         const imagePart = {
             inlineData: {
@@ -276,7 +276,7 @@ class GenerationService {
         return geminiService.makeApiCall(call);
     }
 
-    // BARU: FASE 1 - Ditransplantasi dari P2 (rpg-asset...) [cite: 70-83]
+    // BARU: FASE 1 - Ditransplantasi dari P2 (rpg-asset...)
     async stylizePixelLayout(base64Image: string, prompt: string, category: 'Map' | 'Sprite' | 'Item'): Promise<string> {
         
         const base64Data = base64Image.split(',')[1] || base64Image;

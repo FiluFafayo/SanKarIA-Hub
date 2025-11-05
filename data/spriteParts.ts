@@ -3,7 +3,7 @@
 // di canvas tersembunyi. "color" di sini adalah kode internal kita, 
 // yang akan dirender oleh pixelRenderer.ts (di Fase 2).
 
-// Tipe SpritePart diadaptasi dari P2 (pixel-vtt-stylizer [cite: 416-418])
+// Tipe SpritePart diadaptasi dari P2 (pixel-vtt-stylizer)
 export interface SpritePart {
   id: string;
   name: string; // Nama deskriptif

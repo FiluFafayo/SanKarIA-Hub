@@ -20,6 +20,8 @@ import {
 import { getAbilityModifier } from '../utils';
 import { dataService } from '../services/dataService';
 import { useDataStore } from './dataStore';
+import { generationService } from '../services/ai/generationService'; // BARU
+import { pixelRenderer } from '../services/pixelRenderer'; // BARU
 
 // =================================================================
 // Tipe Helper
@@ -74,7 +76,14 @@ interface RuntimeActions {
 // --- Slice 3: Character Creation ---
 interface CharacterCreationState {
     step: number;
+    statusMessage: string; // BARU: Untuk loading
     name: string;
+    gender: 'Pria' | 'Wanita'; // BARU
+    hair: string; // BARU
+    facialHair: string; // BARU
+    headAccessory: string; // BARU
+    bodyType: string; // BARU
+    scars: string[]; // BARU
     selectedRace: RaceData;
     selectedClass: ClassData;
     abilityScores: Partial<AbilityScores>;
@@ -92,7 +101,14 @@ const getDefaultEquipment = (charClass: ClassData): Record<number, EquipmentChoi
 };
 const initialCharacterState: CharacterCreationState = {
     step: 0, // 0 = tidak aktif
+    statusMessage: '',
     name: '',
+    gender: 'Pria',
+    hair: 'h_short_blond',
+    facialHair: 'ff_none',
+    headAccessory: 'ha_none',
+    bodyType: 'bt_normal',
+    scars: [],
     // (P0 FIX) Gunakan finder untuk memastikan referensi yang aman
     selectedRace: findRace('Human') || getAllRaces()[0],
     selectedClass: findClass('Fighter') || Object.values(getAllClasses())[0],
@@ -104,7 +120,14 @@ const initialCharacterState: CharacterCreationState = {
 };
 interface CharacterCreationActions {
     setCharacterStep: (step: number) => void;
+    setStatusMessage: (message: string) => void; // BARU
     setName: (name: string) => void;
+    setGender: (gender: 'Pria' | 'Wanita') => void; // BARU
+    setHair: (partId: string) => void; // BARU
+    setFacialHair: (partId: string) => void; // BARU
+    setHeadAccessory: (partId: string) => void; // BARU
+    setBodyType: (partId: string) => void; // BARU
+    toggleScar: (partId: string) => void; // BARU
     setSelectedRace: (race: RaceData) => void;
     setSelectedClass: (charClass: ClassData) => void;
     setAbilityScore: (ability: Ability, score: number) => void;
@@ -273,7 +296,20 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
         // --- Character Actions ---
         setCharacterStep: (step) => set(state => ({ characterCreation: { ...state.characterCreation, step } })),
+        setStatusMessage: (message) => set(state => ({ characterCreation: { ...state.characterCreation, statusMessage: message } })), // BARU
         setName: (name) => set(state => ({ characterCreation: { ...state.characterCreation, name } })),
+        setGender: (gender) => set(state => ({ characterCreation: { ...state.characterCreation, gender } })), // BARU
+        setHair: (partId) => set(state => ({ characterCreation: { ...state.characterCreation, hair: partId } })), // BARU
+        setFacialHair: (partId) => set(state => ({ characterCreation: { ...state.characterCreation, facialHair: partId } })), // BARU
+        setHeadAccessory: (partId) => set(state => ({ characterCreation: { ...state.characterCreation, headAccessory: partId } })), // BARU
+        setBodyType: (partId) => set(state => ({ characterCreation: { ...state.characterCreation, bodyType: partId } })), // BARU
+        toggleScar: (partId) => set(state => { // BARU
+            const currentScars = state.characterCreation.scars;
+            const newScars = currentScars.includes(partId)
+                ? currentScars.filter(s => s !== partId)
+                : [...currentScars, partId];
+            return { characterCreation: { ...state.characterCreation, scars: newScars }};
+        }),
         setSelectedRace: (selectedRace) => set(state => ({ characterCreation: { ...state.characterCreation, selectedRace } })),
         setSelectedClass: (selectedClass) => set(state => ({ 
             characterCreation: { 
@@ -321,13 +357,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
             userId: string
         ) => Promise<void>) => { // (P0 FIX) Terima callback onSaveNewCharacter dari ProfileModal
             const { characterCreation } = get();
-            const { name, selectedRace, selectedClass, abilityScores, selectedBackground, selectedSkills, selectedEquipment } = characterCreation;
+            const { 
+                name, selectedRace, selectedClass, abilityScores, selectedBackground, 
+                selectedSkills, selectedEquipment,
+                // Ambil data visual BARU
+                gender, hair, facialHair, headAccessory, bodyType, scars
+            } = characterCreation;
 
             if (Object.keys(abilityScores).length !== 6) {
                 alert("Selesaikan pelemparan semua dadu kemampuan.");
                 return;
             }
-            set(state => ({ characterCreation: { ...state.characterCreation, isSaving: true } }));
+            // --- Alur AI BARU ---
+            set(state => ({ characterCreation: { ...state.characterCreation, isSaving: true, statusMessage: "Merakit jiwa..." } }));
 
             try {
                 const baseScores = abilityScores as AbilityScores;
@@ -371,7 +413,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 ];
                 const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
                     name, class: selectedClass.name, race: selectedRace.name, level: 1, xp: 0,
-                    image: selectedRace.img, background: selectedBackground.name,
+                    image: selectedRace.img, // INI AKAN DI-OVERWRITE
+                    background: selectedBackground.name,
+                    // Tambahkan data visual BARU
+                    gender: gender,
+                    bodyType: bodyType,
+                    scars: scars,
+                    hair: hair,
+                    facialHair: facialHair,
+                    headAccessory: headAccessory,
+                    // Sisa data
                     personalityTrait: '', ideal: '', bond: '', flaw: '',
                     abilityScores: finalScores, maxHp: Math.max(1, maxHp), currentHp: Math.max(1, maxHp),
                     tempHp: 0, armorClass: armorClass, speed: selectedRace.speed,
@@ -384,6 +435,22 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 };
                 
                 // (P0 FIX) Panggil callback yang dilewatkan, jangan panggil dataStore langsung
+                // --- PANGGILAN AI BARU ---
+                // 1. Render layout pixel
+                const layout = pixelRenderer.renderCharacterLayout(newCharData as Character);
+                
+                // 2. Buat prompt
+                set(state => ({ characterCreation: { ...state.characterCreation, statusMessage: "Menghubungi AI..." } }));
+                const VISUAL_STYLE_PROMPT = "digital painting, fantasy art, detailed, high quality, vibrant colors, style of D&D 5e sourcebooks, character portrait, full body";
+                const prompt = `Potret HD, ${newCharData.gender} ${newCharData.race} ${newCharData.class}, ${getPartName(SPRITE_PARTS.hair, newCharData.hair)}, ${getPartName(SPRITE_PARTS.facial_feature, newCharData.facialHair)}, ${newCharData.scars.map(id => getPartName(SPRITE_PARTS.facial_feature, id)).join(', ')}, ${VISUAL_STYLE_PROMPT}`;
+
+                // 3. Panggil AI
+                const imageUrl = await generationService.stylizePixelLayout(layout, prompt, 'Sprite');
+                
+                // 4. Update gambar di data karakter
+                newCharData.image = imageUrl;
+                // --- AKHIR PANGGILAN AI ---
+
                 await onSaveNewCharacter(newCharData, inventoryData, spellData, userId);
                 
                 get().actions.resetCharacterCreation();
@@ -397,7 +464,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
             }
         },
 
-        // --- Campaign Actions ---
+        // Helper untuk mengambil nama part
+const getPartName = (arr: SpritePart[], id: string) => arr.find(p => p.id === id)?.name || '';
+
+// --- Campaign Actions ---
         setCampaignStep: (step) => set(state => ({ campaignCreation: { ...state.campaignCreation, step } })),
         setPillars: (pillars) => set(state => ({ campaignCreation: { ...state.campaignCreation, pillars } })),
         setFramework: (framework) => set(state => ({ campaignCreation: { ...state.campaignCreation, framework } })),

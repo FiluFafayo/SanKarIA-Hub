@@ -1,7 +1,7 @@
 // data/tileset.ts
 // Ini adalah definisi SSoT untuk SETIAP tile yang bisa dirender di peta,
 // baik Battle (zoom-in) maupun Exploration (zoom-out).
-// Diadaptasi dari P2 (pixel-vtt-stylizer [cite: 425-427]) dan diperluas.
+// Diadaptasi dari P2 (pixel-vtt-stylizer) dan diperluas.
 
 // Tipe Tile diadaptasi dari P2
 export interface Tile {

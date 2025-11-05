@@ -26,7 +26,7 @@ const createCanvas = (width: number, height: number): HTMLCanvasElement => {
 
 /**
  * Merender layout pixel art untuk karakter berdasarkan data mereka.
- * Diadaptasi dari P2 (pixel-vtt-stylizer AssemblerView)
+ * Implementasi penuh Fase 2.
  * @param character Objek Karakter (P1)
  * @returns string data URL base64 (image/png)
  */
@@ -37,53 +37,95 @@ export const renderCharacterLayout = (character: Character): string => {
 
     ctx.clearRect(0, 0, CHAR_CANVAS_WIDTH, CHAR_CANVAS_HEIGHT);
 
-    // Variabel posisi (disederhanakan dari P2)
-    const centerX = CHAR_CANVAS_WIDTH / 2;
-    const centerY = CHAR_CANVAS_HEIGHT / 2;
-    const bodyHeight = CHAR_CANVAS_HEIGHT * 0.4;
-    const bodyWidth = bodyHeight * 0.6;
-    const headRadius = bodyWidth * 0.5;
+    // Posisi gambar dasar
+    const centerX = CHAR_CANVAS_WIDTH / 2; // 48
+    const headY = 24;
+    const bodyY = 48;
+    const headRadius = 12;
+    const bodyWidth = 20;
+    const bodyHeight = 32;
 
-    // TODO: Logika pemetaan data (P1) ke sprite part (P2)
-    // Ini adalah versi sederhana untuk Fase 1
-    const parts = {
-        base: SPRITE_PARTS.race_base.find(p => p.name.includes(character.race)) || SPRITE_PARTS.race_base[0],
-        torso: SPRITE_PARTS.armor_torso.find(p => p.name.toLowerCase().includes(character.class.toLowerCase())) || SPRITE_PARTS.armor_torso[0],
-        head: SPRITE_PARTS.head_accessory.find(p => p.id === character.scars[0]) || SPRITE_PARTS.head_accessory[0],
-        weapon: SPRITE_PARTS.weapon_right_hand.find(p => p.name.includes('Sword')) || SPRITE_PARTS.weapon_right_hand[0],
+    // --- Helper cari part atau fallback ---
+    const getPart = (layer: keyof typeof SPRITE_PARTS, partName: string, defaultId: string) => {
+        const part = SPRITE_PARTS[layer].find(p => p.name === partName);
+        if (part) return part;
+        return SPRITE_PARTS[layer].find(p => p.id === defaultId) || SPRITE_PARTS[layer][0];
     };
 
-    // Render Layer (logika P2)
-    // Ini harus diperluas di Fase 2 untuk merender semua 10 layer
-    
-    // 1. Gambar Base (Kulit Ras)
-    ctx.fillStyle = parts.base.color;
-    ctx.fillRect(centerX - bodyWidth / 2, centerY - bodyHeight / 2, bodyWidth, bodyHeight); // Tubuh
+    // --- Pemetaan Data Karakter (P1) ke Sprite Parts (Fase 0) ---
+    const parts = {
+        gender_base: getPart('gender_base', character.gender === 'Pria' ? 'Bentuk Pria' : 'Bentuk Wanita', 'gb_male'),
+        race_base: getPart('race_base', character.race, 'rb_human'), // Asumsi nama Ras P1 = nama part P0
+        body_type: getPart('body_type', character.bodyType, 'bt_normal'),
+        hair: getPart('hair', character.hair, 'h_bald'),
+        facial_hair: getPart('facial_feature', character.facialHair, 'ff_none'),
+        head_accessory: getPart('head_accessory', character.headAccessory, 'ha_none'),
+        armor_torso: SPRITE_PARTS.armor_torso.find(p => p.name.toLowerCase().includes(character.class.toLowerCase())) || getPart('armor_torso', '', 'at_common_clothes'),
+        armor_legs: SPRITE_PARTS.armor_legs.find(p => p.name.toLowerCase().includes(character.class.toLowerCase())) || getPart('armor_legs', '', 'al_common_pants'),
+        weapon_right: SPRITE_PARTS.weapon_right_hand[0], // (Akan di-implementasi di Fase 5 - Equipment)
+        weapon_left: SPRITE_PARTS.weapon_left_hand[0], // (Akan di-implementasi di Fase 5 - Equipment)
+        scar: SPRITE_PARTS.facial_feature.find(p => character.scars.includes(p.id)) // Ambil scar pertama
+    };
+
+    // --- Logika Render Berbasis Layer ---
+    // (PENTING: Urutan render = dari belakang ke depan)
+
+    // 1. Base (Bentuk & Warna Kulit)
+    ctx.fillStyle = parts.race_base.color;
     ctx.beginPath();
-    ctx.arc(centerX, centerY - bodyHeight / 2, headRadius, 0, 2 * Math.PI); // Kepala
+    ctx.arc(centerX, headY, headRadius, 0, 2 * Math.PI); // Kepala
     ctx.fill();
+    ctx.fillRect(centerX - bodyWidth / 2, bodyY - bodyHeight / 2, bodyWidth, bodyHeight); // Tubuh
 
-    // 2. Gambar Armor (Torso)
-    ctx.fillStyle = parts.torso.color;
-    ctx.fillRect(centerX - bodyWidth / 2, centerY - bodyHeight / 2, bodyWidth, bodyHeight);
-
-    // 3. Gambar Senjata
-    ctx.fillStyle = parts.weapon.color;
-    ctx.fillRect(centerX + bodyWidth / 2, centerY - bodyHeight * 0.1, bodyWidth * 0.2, bodyHeight * 0.8);
+    // 2. Armor Kaki
+    ctx.fillStyle = parts.armor_legs.color;
+    ctx.fillRect(centerX - bodyWidth / 2, bodyY + (bodyHeight / 4), bodyWidth, bodyHeight / 2);
     
-    // 4. Gambar Fitur Wajah (Luka, dll)
-    if (parts.head.id !== 'ha_none') {
-        ctx.fillStyle = parts.head.color;
-        // (Contoh: gambar goresan)
-        ctx.fillRect(centerX - headRadius / 2, centerY - bodyHeight / 2 - headRadius / 2, headRadius, 4);
+    // 3. Armor Torso
+    ctx.fillStyle = parts.armor_torso.color;
+    ctx.fillRect(centerX - bodyWidth / 2, bodyY - bodyHeight / 2, bodyWidth, bodyHeight / 2);
+
+    // 4. Rambut (di belakang kepala aksesori)
+    if (parts.hair.id !== 'h_bald') {
+        ctx.fillStyle = parts.hair.color;
+        ctx.beginPath();
+        ctx.arc(centerX, headY - 2, headRadius + 2, 0.8 * Math.PI, 0.2 * Math.PI, true); // Sedikit di atas kepala
+        ctx.fill();
     }
+    
+    // 5. Jenggot / Fitur Wajah
+    if (parts.facial_hair.id !== 'ff_none') {
+        ctx.fillStyle = parts.facial_hair.color;
+        ctx.fillRect(centerX - headRadius / 2, headY + headRadius / 2, headRadius, headRadius / 2); // Area jenggot
+    }
+    
+    // 6. Aksesori Kepala (Tanduk, dll)
+    if (parts.head_accessory.id !== 'ha_none') {
+        ctx.fillStyle = parts.head_accessory.color;
+        ctx.fillRect(centerX - headRadius, headY - headRadius, 8, 8); // Tanduk kiri
+        ctx.fillRect(centerX + headRadius - 8, headY - headRadius, 8, 8); // Tanduk kanan
+    }
+
+    // 7. Luka (di atas segalanya)
+    if (parts.scar) {
+        ctx.fillStyle = parts.scar.color;
+        ctx.fillRect(centerX + 2, headY - 4, 4, 8); // Goresan vertikal di mata kanan
+    }
+
+    // 8. Modifikasi Tubuh (Tangan Buntung, dll)
+    if (parts.body_type.id === 'bt_missing_arm_r') {
+        ctx.globalCompositeOperation = 'destination-out'; // Mode 'hapus'
+        ctx.fillRect(centerX + bodyWidth / 2, bodyY - bodyHeight / 2, (CHAR_CANVAS_WIDTH - centerX - bodyWidth / 2), bodyHeight); // Hapus area tangan kanan
+        ctx.globalCompositeOperation = 'source-over'; // Kembali normal
+    }
+    // (Tambahkan logika lain untuk body_type di sini)
     
     return canvas.toDataURL('image/png');
 };
 
 /**
  * Merender layout pixel art untuk peta (tempur atau eksplorasi).
- * Diadaptasi dari P2 (pixel-vtt-stylizer BattleView) [cite: 489-490]
+ * Diadaptasi dari P2 (pixel-vtt-stylizer BattleView)
  * @param grid Grid data (number[][])
  * @param isBattleMap Menentukan tileset mana yang digunakan
  * @returns string data URL base64 (image/png)
@@ -110,7 +152,7 @@ export const renderMapLayout = (
             const tileId = grid[y][x];
             const tile = tileset[tileId as keyof typeof tileset];
             
-            // Logika P2 [cite: 489-490]
+            // Logika P2
             ctx.fillStyle = tile ? tile.color : '#FF00FF'; // Magenta untuk error
             ctx.fillRect(x * MAP_TILE_SIZE, y * MAP_TILE_SIZE, MAP_TILE_SIZE, MAP_TILE_SIZE);
             

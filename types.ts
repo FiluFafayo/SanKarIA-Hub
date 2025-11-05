@@ -241,9 +241,12 @@ export interface Character {
     level: number;
     xp: number;
     image: string;
-    gender: 'Pria' | 'Wanita' | 'Lainnya'; // BARU
-    bodyType: string; // BARU (e.g., 'normal', 'missing_arm_right')
-    scars: string[]; // BARU (e.g., 'scar_eye_left')
+    gender: 'Pria' | 'Wanita'; // (Penyederhanaan untuk Fase 2)
+    bodyType: string; // (e.g., 'normal', 'missing_arm_right')
+    scars: string[]; // (e.g., 'scar_eye_left')
+    hair: string; // (e.g., 'Rambut Panjang Hitam')
+    facialHair: string; // (e.g., 'Jenggot Panjang')
+    headAccessory: string; // (e.g., 'Tanduk Kecil')
     
     // Detail Karakter (dari Background - Fase 1)
     background: string;
@@ -447,7 +450,7 @@ export interface Campaign {
 
 // =================================================================
 // BAGIAN 4B: TIPE BATTLE STATE (BARU DARI P2)
-// Diadaptasi dari ai-native-virtual-tabletop-architect [cite: 197-202]
+// Diadaptasi dari ai-native-virtual-tabletop-architect
 // =================================================================
 
 export enum BattleStatus {

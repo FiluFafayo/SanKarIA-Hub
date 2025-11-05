@@ -19,6 +19,7 @@ import {
 	getProficiencyBonus,
 } from "../../utils";
 import { dataService } from "../../services/dataService";
+import { SPRITE_PARTS } from "../../data/spriteParts"; // BARU
 import { Die } from "../Die";
 import { SelectionCard } from "../SelectionCard"; // Import SelectionCard
 import { RaceData } from "../../data/races"; // Import Tipe Data
@@ -196,6 +197,7 @@ const CreateCharacterWizard: React.FC<{
     // FIX (P0 Regresi): Ganti useCreationStore (mati) ke useAppStore (hidup)
 	const {
 		step,
+        statusMessage, // BARU
 		name,
 		selectedRace,
 		selectedClass,
@@ -204,8 +206,23 @@ const CreateCharacterWizard: React.FC<{
 		selectedSkills,
 		selectedEquipment,
 		isSaving,
+        // Ambil state visual BARU
+        gender,
+        hair,
+        facialHair,
+        headAccessory,
+        bodyType,
+        scars,
+        // Ambil aksi BARU
 		setCharacterStep,
+        setStatusMessage,
 		setName,
+        setGender,
+        setHair,
+        setFacialHair,
+        setHeadAccessory,
+        setBodyType,
+        toggleScar,
 		setSelectedRace,
 		setSelectedClass,
 		setAbilityScore,
@@ -271,11 +288,32 @@ const CreateCharacterWizard: React.FC<{
 				</button>
 			)}
 
-			{/* === STEP 1: Ras, Kelas, Nama === */}
+			{/* === STEP 1: Ras, Kelas, Nama & Visual === */}
 			{step === 1 && (
 				<div className="flex flex-col flex-grow animate-fade-in-fast">
-					<label className="block mb-1 font-cinzel text-sm">Nama</label>
-					<input
+                    {/* Grid 2 Kolom untuk Info Dasar */}
+                    <div className="grid grid-cols-2 gap-x-4">
+                        <div>
+                            <label className="block mb-1 font-cinzel text-sm">Nama</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
+                            />
+                        </div>
+                        <div>
+                            <label className="block mb-1 font-cinzel text-sm">Jenis Kelamin</label>
+                            <select
+                                value={gender}
+                                onChange={(e) => setGender(e.target.value as 'Pria' | 'Wanita')}
+                                className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
+                            >
+                                <option value="Pria">Pria</option>
+                                <option value="Wanita">Wanita</option>
+                            </select>
+                        </div>
+                    </div>
 						type="text"
 						value={name}
 						onChange={(e) => setName(e.target.value)}
@@ -283,7 +321,7 @@ const CreateCharacterWizard: React.FC<{
 					/>
 
 					<label className="block mb-1 font-cinzel text-sm">Ras</label>
-					<div className="grid grid-cols-3 gap-2 mb-4">
+					<div className="grid grid-cols-5 gap-2 mb-4">
 						{RACES.map((r) => (
 							<SelectionCard
 								key={r.name}
@@ -295,8 +333,72 @@ const CreateCharacterWizard: React.FC<{
 						))}
 					</div>
 
-					<label className="block mb-1 font-cinzel text-sm">Kelas</label>
-					{/* REFAKTOR G-3: Gunakan setSelectedClass */}
+					{/* Grid 2 Kolom untuk Info RPG */}
+                    <div className="grid grid-cols-2 gap-x-4">
+                        <div>
+                            <label className="block mb-1 font-cinzel text-sm">Kelas</label>
+                            {/* REFAKTOR G-3: Gunakan setSelectedClass */}
+                            <select
+                                value={selectedClass.name}
+                                onChange={(e) =>
+                                    setSelectedClass(
+                                        CLASS_DEFINITIONS[e.target.value] ||
+                                            CLASS_DEFINITIONS["Fighter"]
+                                    )
+                                }
+                                className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
+                            >
+                                {Object.keys(CLASS_DEFINITIONS).map((c) => (
+                                    <option key={c} value={c}>
+                                        {c}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block mb-1 font-cinzel text-sm">Tipe Tubuh</label>
+                            <select
+                                value={bodyType}
+                                onChange={(e) => setBodyType(e.target.value)}
+                                className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
+                            >
+                                {SPRITE_PARTS.body_type.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Grid 3 Kolom untuk Visual Kustom */}
+                    <div className="grid grid-cols-3 gap-x-4">
+                        <div>
+                            <label className="block mb-1 font-cinzel text-sm">Rambut</label>
+                            <select value={hair} onChange={e => setHair(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
+                                {SPRITE_PARTS.hair.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block mb-1 font-cinzel text-sm">Fitur Wajah</label>
+                            <select value={facialHair} onChange={e => setFacialHair(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
+                                {SPRITE_PARTS.facial_feature.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block mb-1 font-cinzel text-sm">Aksesori Kepala</label>
+                            <select value={headAccessory} onChange={e => setHeadAccessory(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
+                                {SPRITE_PARTS.head_accessory.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <label className="block mb-1 font-cinzel text-sm">Luka & Tanda</label>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                        {SPRITE_PARTS.facial_feature.filter(p => p.name.includes('Luka') || p.name.includes('Buta')).map(p => (
+                             <label key={p.id} className={`p-2 rounded-lg cursor-pointer text-xs ${scars.includes(p.id) ? "bg-blue-600" : "bg-black/30 hover:bg-black/50"}`}>
+                                <input type="checkbox" className="mr-2" checked={scars.includes(p.id)} onChange={() => toggleScar(p.id)} />
+                                {p.name}
+                            </label>
+                        ))}
+                    </div>
+
 					<select
 						value={selectedClass.name}
 						onChange={(e) =>
@@ -556,12 +658,14 @@ const CreateCharacterWizard: React.FC<{
 						>
 							&larr; Ganti Equipment
 						</button>
+						{/* Tampilkan Status Loading BARU */}
+                        {isSaving && <p className="text-center text-amber-300 animate-pulse">{statusMessage || "Menyimpan..."}</p>}
 						<button
 							onClick={handleSave}
 							className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"
 							disabled={isSaving}
 						>
-							{isSaving ? "Menyimpan..." : "Selesaikan"}
+							{isSaving ? "Memproses..." : "Selesaikan"}
 						</button>
 					</div>
 				</div>
