@@ -314,11 +314,6 @@ const CreateCharacterWizard: React.FC<{
                             </select>
                         </div>
                     </div>
-						type="text"
-						value={name}
-						onChange={(e) => setName(e.target.value)}
-						className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
-					/>
 
 					<label className="block mb-1 font-cinzel text-sm">Ras</label>
 					<div className="grid grid-cols-5 gap-2 mb-4">
