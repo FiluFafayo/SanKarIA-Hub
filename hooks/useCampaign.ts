@@ -113,6 +113,7 @@ export interface CampaignActions {
     setBattleUnits: (units: Unit[]) => void;
     setActiveBattleUnit: (id: string | null) => void;
     moveUnit: (payload: { unitId: string; newPosition: { x: number; y: number }; cost: number }) => void;
+    clearBattleState: () => void; // BARU
 
 	// (Poin 5) Ganti updateWorldState
     advanceTime: (seconds: number) => void;
@@ -142,6 +143,7 @@ type Action =
     | { type: "SET_BATTLE_UNITS"; payload: Unit[] }
     | { type: "SET_ACTIVE_BATTLE_UNIT"; payload: string | null }
     | { type: "MOVE_UNIT"; payload: { unitId: string; newPosition: { x: number; y: number }; cost: number } }
+    | { type: "CLEAR_BATTLE_STATE" } // BARU
 	| {
 			type: "ADVANCE_TIME";
 			payload: number; // Detik yang ditambahkan
@@ -421,6 +423,15 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
             if (!state.battleState) return state;
             return { ...state, battleState: { ...state.battleState, activeUnitId: action.payload } };
 
+        case "CLEAR_BATTLE_STATE": // BARU
+            return { 
+                ...state, 
+                battleState: null,
+                gameState: 'exploration', // Pastikan state kembali ke eksplorasi
+                initiativeOrder: [],
+                currentPlayerId: state.players.length > 0 ? state.players[0].id : null // Kembalikan ke pemain pertama
+            };
+
         case "MOVE_UNIT": {
             // Diadaptasi dari P2 (ai-native...)
             if (!state.battleState) return state;
@@ -521,7 +532,8 @@ export const useCampaign = (
         const setActiveBattleUnit = (id: string | null) =>
             dispatch({ type: "SET_ACTIVE_BATTLE_UNIT", payload: id });
         const moveUnit = (payload: { unitId: string; newPosition: { x: number; y: number }; cost: number }) =>
-            dispatch({ type: "MOVE_UNIT", payload });
+            dispatch({ type: "MOVE_UNIT", payload: payload });
+        const clearBattleState = () => dispatch({ type: "CLEAR_BATTLE_STATE" }); // BARU
 
         // (Poin 5) Ganti implementasi action
 		const advanceTime = (seconds: number) =>
@@ -553,6 +565,7 @@ export const useCampaign = (
             setBattleUnits,
             setActiveBattleUnit,
             moveUnit,
+            clearBattleState, // BARU
 
             // (Poin 5) Ganti
             advanceTime,

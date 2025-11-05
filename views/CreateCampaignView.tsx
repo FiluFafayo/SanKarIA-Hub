@@ -1,6 +1,6 @@
 import React, { useState, ChangeEvent } from 'react'; // Import ChangeEvent
 import { ViewWrapper } from '../components/ViewWrapper';
-import { Campaign, Quest, NPC, MapMarker } from '../types';
+import { Campaign, Quest, NPC, MapMarker, TerrainType, GridCell } from '../types'; // BARU
 import { generateId, generateJoinCode } from '../utils';
 import { generationService } from '../services/ai/generationService';
 import { InteractiveMap } from '../components/game/InteractiveMap';
@@ -116,6 +116,27 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
     setLoadingMessage("Mewujudkan dunia...");
 
     try {
+        // --- BARU: FASE 4 - Generate Peta Eksplorasi ---
+        const EXPLORATION_WIDTH = 100;
+        const EXPLORATION_HEIGHT = 100;
+        // (Logika generator sederhana, bisa diganti Drunkard's Walk P2 nanti)
+        const explorationGrid: number[][] = Array.from({ length: EXPLORATION_HEIGHT }, () =>
+            Array.from({ length: EXPLORATION_WIDTH }, () => {
+                const r = Math.random();
+                if (r < 0.6) return 10001; // Plains
+                if (r < 0.85) return 10002; // Forest
+                if (r < 0.95) return 10004; // Mountains
+                return 10000; // Ocean
+            })
+        );
+        // Buat Fog of War awal (semua true/tersembunyi)
+        const fogOfWar: boolean[][] = Array.from({ length: EXPLORATION_HEIGHT }, () =>
+            Array.from({ length: EXPLORATION_WIDTH }, () => true)
+        );
+        // TODO: Tempatkan POI (Kota/Desa) dari 'mapData' ke dalam grid
+        // --- AKHIR GENERATOR PETA EKSPLORASI ---
+
+
         // REFAKTOR G-2
         const toolCalls = await generationService.mechanizeCampaignFramework(framework);
         
@@ -175,6 +196,11 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
           mapImageUrl: mapData?.imageUrl,
           mapMarkers: mapData?.markers || [],
           currentPlayerLocation: mapData?.startLocationId,
+          
+          // BARU: Tambahkan data grid
+          explorationGrid: explorationGrid,
+          fogOfWar: fogOfWar,
+          battleState: null,
         };
         
         // REFAKTOR G-4: onCreateCampaign sekarang adalah aksi dari dataStore
