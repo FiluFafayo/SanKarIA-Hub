@@ -165,6 +165,31 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: actionText }, turnId);
         campaignActions.clearChoices(); 
 
+        // --- BARU: FASE 5 (Fog of War Reveal) ---
+        // Diadaptasi dari P2 (pixel-vtt-stylizer ExplorationView)
+        const FOG_REVEAL_RADIUS = 3.5;
+        const { explorationGrid, fogOfWar, playerGridPosition } = campaign;
+        
+        // Periksa apakah grid dan fog ada sebelum mencoba mengaksesnya
+        if (explorationGrid && explorationGrid.length > 0 && fogOfWar && fogOfWar.length > 0 && playerGridPosition) {
+            const mapHeight = explorationGrid.length;
+            const mapWidth = explorationGrid[0].length;
+            const newFog = fogOfWar.map(row => [...row]);
+            
+            for (let y = 0; y < mapHeight; y++) {
+                for (let x = 0; x < mapWidth; x++) {
+                    const distance = Math.sqrt(Math.pow(x - playerGridPosition.x, 2) + Math.pow(y - playerGridPosition.y, 2));
+                    if (distance < FOG_REVEAL_RADIUS && newFog[y][x]) {
+                        newFog[y][x] = false;
+                    }
+                }
+            }
+            campaignActions.setFogOfWar(newFog); // Kirim fog baru ke state
+        } else {
+            console.warn("Data Peta Eksplorasi (grid/fog/posisi) tidak lengkap. Melewatkan update Fog of War.");
+        }
+        // --- AKHIR FASE 5 ---
+
         // (Poin 8) Cek Random Encounter (5% chance)
         if (Math.random() < 0.05 && campaign.gameState === 'exploration') {
             console.warn("[Fase 2] Random Encounter Terpicu!");

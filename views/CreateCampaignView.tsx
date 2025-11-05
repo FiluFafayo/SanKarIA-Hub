@@ -201,6 +201,7 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
           explorationGrid: explorationGrid,
           fogOfWar: fogOfWar,
           battleState: null,
+          playerGridPosition: { x: 50, y: 50 }, // BARU: Posisi Awal di tengah grid
         };
         
         // REFAKTOR G-4: onCreateCampaign sekarang adalah aksi dari dataStore

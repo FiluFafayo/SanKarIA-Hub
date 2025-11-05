@@ -3,7 +3,7 @@ import { Campaign, Character, Quest, WorldWeather } from '../../types'; // Hapus
 import { formatDndTime } from '../../utils'; // (Poin 5) Impor helper format
 import { QuestLogPanel } from './QuestLogPanel';
 import { NpcTrackerPanel } from './NpcTrackerPanel';
-import { InteractiveMap } from './InteractiveMap';
+import { ExplorationMap } from './ExplorationMap'; // BARU: FASE 5
 
 interface InfoPanelProps {
   campaign: Campaign;
@@ -106,13 +106,14 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ campaign, players }) => {
         </div>
       )}
 
-      {activeTab === 'map' && campaign.mapImageUrl && (
+      {activeTab === 'map' && campaign.explorationGrid && (
           <div className="bg-gray-900/50 p-4 rounded-lg animate-fade-in-fast">
-              <h2 className="font-cinzel text-2xl text-amber-300 border-b border-gray-600 pb-2 mb-3">Peta Wilayah</h2>
-              <InteractiveMap 
-                imageUrl={campaign.mapImageUrl} 
-                markers={campaign.mapMarkers} 
-                playerLocationId={campaign.currentPlayerLocation}
+              <h2 className="font-cinzel text-2xl text-amber-300 border-b border-gray-600 pb-2 mb-3">Peta Eksplorasi</h2>
+              {/* BARU: FASE 5 */}
+              <ExplorationMap 
+                grid={campaign.explorationGrid}
+                fog={campaign.fogOfWar}
+                playerPos={campaign.playerGridPosition}
               />
           </div>
       )}

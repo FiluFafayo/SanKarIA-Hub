@@ -340,7 +340,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 					{/* Left Panel (Info) - shows only on large screens */}
 					<aside className="hidden lg:block w-80 xl:w-96 flex-shrink-0 bg-gray-800 border-r-2 border-gray-700">
 						<div className="h-full overflow-y-auto">
-							<InfoPanel campaign={campaign} players={players} />
+							<InfoPanel campaign={campaign} players={campaign.players} />
 						</div>
 					</aside>
 

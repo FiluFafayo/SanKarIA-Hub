@@ -114,6 +114,7 @@ export interface CampaignActions {
     setActiveBattleUnit: (id: string | null) => void;
     moveUnit: (payload: { unitId: string; newPosition: { x: number; y: number }; cost: number }) => void;
     clearBattleState: () => void; // BARU
+    setFogOfWar: (fog: boolean[][]) => void; // BARU: Fase 5
 
 	// (Poin 5) Ganti updateWorldState
     advanceTime: (seconds: number) => void;
@@ -143,6 +144,7 @@ type Action =
     | { type: "SET_BATTLE_UNITS"; payload: Unit[] }
     | { type: "SET_ACTIVE_BATTLE_UNIT"; payload: string | null }
     | { type: "MOVE_UNIT"; payload: { unitId: string; newPosition: { x: number; y: number }; cost: number } }
+    | { type: "SET_FOG_OF_WAR"; payload: boolean[][] } // BARU: Fase 5
     | { type: "CLEAR_BATTLE_STATE" } // BARU
 	| {
 			type: "ADVANCE_TIME";
@@ -432,6 +434,9 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
                 currentPlayerId: state.players.length > 0 ? state.players[0].id : null // Kembalikan ke pemain pertama
             };
 
+        case "SET_FOG_OF_WAR": // BARU: Fase 5
+            return { ...state, fogOfWar: action.payload };
+
         case "MOVE_UNIT": {
             // Diadaptasi dari P2 (ai-native...)
             if (!state.battleState) return state;
@@ -534,6 +539,7 @@ export const useCampaign = (
         const moveUnit = (payload: { unitId: string; newPosition: { x: number; y: number }; cost: number }) =>
             dispatch({ type: "MOVE_UNIT", payload: payload });
         const clearBattleState = () => dispatch({ type: "CLEAR_BATTLE_STATE" }); // BARU
+        const setFogOfWar = (fog: boolean[][]) => dispatch({ type: "SET_FOG_OF_WAR", payload: fog }); // BARU: Fase 5
 
         // (Poin 5) Ganti implementasi action
 		const advanceTime = (seconds: number) =>
@@ -566,6 +572,7 @@ export const useCampaign = (
             setActiveBattleUnit,
             moveUnit,
             clearBattleState, // BARU
+            setFogOfWar, // BARU
 
             // (Poin 5) Ganti
             advanceTime,

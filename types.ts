@@ -446,6 +446,9 @@ export interface Campaign {
 
     // Battle State (BARU)
     battleState: BattleState | null; // Null jika tidak sedang kombat
+    
+    // Posisi Pemain di Peta Eksplorasi (BARU: FASE 5)
+    playerGridPosition: { x: number; y: number };
 }
 
 // =================================================================
