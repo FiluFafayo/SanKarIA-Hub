@@ -133,9 +133,18 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
         const fogOfWar: boolean[][] = Array.from({ length: EXPLORATION_HEIGHT }, () =>
             Array.from({ length: EXPLORATION_WIDTH }, () => true)
         );
-        // TODO: Tempatkan POI (Kota/Desa) dari 'mapData' ke dalam grid
-        // --- AKHIR GENERATOR PETA EKSPLORASI ---
 
+        // FASE 4 FIX: Tentukan posisi awal (default tengah jika peta gagal)
+        let playerGridPosition = { x: 50, y: 50 };
+        if (mapData && mapData.startLocationId) {
+            const startMarker = mapData.markers.find(m => m.id === mapData.startLocationId);
+            if (startMarker) {
+                // Konversi % (0-100) ke koordinat grid (0-99)
+                playerGridPosition.x = Math.max(0, Math.min(EXPLORATION_WIDTH - 1, Math.floor((startMarker.x / 100) * EXPLORATION_WIDTH)));
+                playerGridPosition.y = Math.max(0, Math.min(EXPLORATION_HEIGHT - 1, Math.floor((startMarker.y / 100) * EXPLORATION_HEIGHT)));
+            }
+        }
+        // --- AKHIR GENERATOR PETA EKSPLORASI ---
 
         // REFAKTOR G-2
         const toolCalls = await generationService.mechanizeCampaignFramework(framework);
@@ -198,10 +207,10 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
           currentPlayerLocation: mapData?.startLocationId,
           
           // BARU: Tambahkan data grid
-          explorationGrid: explorationGrid,
-          fogOfWar: fogOfWar,
-          battleState: null,
-          playerGridPosition: { x: 50, y: 50 }, // BARU: Posisi Awal di tengah grid
+        explorationGrid: explorationGrid,
+        fogOfWar: fogOfWar,
+        battleState: null,
+        playerGridPosition: playerGridPosition, // FASE 4 FIX: Gunakan posisi awal yang dihitung
         };
         
         // REFAKTOR G-4: onCreateCampaign sekarang adalah aksi dari dataStore

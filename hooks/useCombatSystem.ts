@@ -806,15 +806,17 @@ export const useCombatSystem = ({
                 const imageUrl = await generationService.generateBattleMapVisual(layoutB64, mapTheme);
                 
                 // Kirim URL Gambar ke Reducer
-                campaignActions.setBattleMapImage(imageUrl);
+				campaignActions.setBattleMapImage(imageUrl);
 
-            } catch (e) {
-                console.error("Gagal men-generate visual peta tempur:", e);
-                // (Pertarungan tetap lanjut tanpa gambar HD)
-            }
+			} catch (e) {
+				console.error("Gagal men-generate visual peta tempur:", e);
+				// (Pertarungan tetap lanjut tanpa gambar HD)
+			}
 
-            campaignActions.endTurn(); // Selesaikan "setup turn"
-        };
+			// FASE 4 FIX: Pindahkan endTurn() ke SINI (setelah await)
+			// untuk mencegah race condition.
+			campaignActions.endTurn(); // Selesaikan "setup turn"
+		};
         
         setupBattlefield();
 

@@ -58,8 +58,9 @@ export const DEFAULT_CAMPAIGNS: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | '
     currentPlayerLocation: 'shoreline',
     currentPlayerId: null, // Ditetapkan saat player pertama join
     // BARU: Fase 6 - Tambahan Data Peta Grid
-    explorationGrid: [], // Akan di-populate saat load jika kosong
-    fogOfWar: [], // Akan di-populate saat load jika kosong
+    // FASE 4 FIX: Inisialisasi grid/fog default agar dataService (Fase 1) tidak gagal
+    explorationGrid: Array.from({ length: 100 }, () => Array(100).fill(10001)), // Default 100x100 Plains
+    fogOfWar: Array.from({ length: 100 }, () => Array(100).fill(true)), // Default 100x100 Fog
     battleState: null,
     playerGridPosition: { x: 10, y: 50 }, // Sesuaikan dengan 'shoreline'
   },
@@ -101,8 +102,9 @@ export const DEFAULT_CAMPAIGNS: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | '
     currentPlayerLocation: 'red-peak-village',
     currentPlayerId: null,
     // BARU: Fase 6 - Tambahan Data Peta Grid
-    explorationGrid: [],
-    fogOfWar: [],
+    // FASE 4 FIX: Inisialisasi grid/fog default
+    explorationGrid: Array.from({ length: 100 }, () => Array(100).fill(10001)),
+    fogOfWar: Array.from({ length: 100 }, () => Array(100).fill(true)),
     battleState: null,
     playerGridPosition: { x: 40, y: 70 }, // Sesuaikan dengan 'red-peak-village'
   },

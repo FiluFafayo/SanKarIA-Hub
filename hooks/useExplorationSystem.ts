@@ -170,8 +170,14 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         const FOG_REVEAL_RADIUS = 3.5;
         const { explorationGrid, fogOfWar, playerGridPosition } = campaign;
         
-        // Periksa apakah grid dan fog ada sebelum mencoba mengaksesnya
-        if (explorationGrid && explorationGrid.length > 0 && fogOfWar && fogOfWar.length > 0 && playerGridPosition) {
+        // FASE 4 FIX: Periksa apakah grid/fog valid dan memiliki dimensi
+        // (DataService Fase 1 sekarang memuat ini, tetapi kampanye lama mungkin tidak memilikinya)
+        if (
+            explorationGrid && Array.isArray(explorationGrid) && explorationGrid.length > 0 &&
+            fogOfWar && Array.isArray(fogOfWar) && fogOfWar.length > 0 &&
+            explorationGrid.length === fogOfWar.length && explorationGrid[0].length === fogOfWar[0].length &&
+            playerGridPosition
+        ) {
             const mapHeight = explorationGrid.length;
             const mapWidth = explorationGrid[0].length;
             const newFog = fogOfWar.map(row => [...row]);
