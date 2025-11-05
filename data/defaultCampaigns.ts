@@ -57,6 +57,11 @@ export const DEFAULT_CAMPAIGNS: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | '
     ],
     currentPlayerLocation: 'shoreline',
     currentPlayerId: null, // Ditetapkan saat player pertama join
+    // BARU: Fase 6 - Tambahan Data Peta Grid
+    explorationGrid: [], // Akan di-populate saat load jika kosong
+    fogOfWar: [], // Akan di-populate saat load jika kosong
+    battleState: null,
+    playerGridPosition: { x: 10, y: 50 }, // Sesuaikan dengan 'shoreline'
   },
   {
     title: 'Bisikan di Puncak Merah',
@@ -95,6 +100,11 @@ export const DEFAULT_CAMPAIGNS: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | '
     ],
     currentPlayerLocation: 'red-peak-village',
     currentPlayerId: null,
+    // BARU: Fase 6 - Tambahan Data Peta Grid
+    explorationGrid: [],
+    fogOfWar: [],
+    battleState: null,
+    playerGridPosition: { x: 40, y: 70 }, // Sesuaikan dengan 'red-peak-village'
   },
   // (Campaign 3 akan mengikuti pola yang sama)
 ];

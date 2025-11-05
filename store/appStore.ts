@@ -140,8 +140,17 @@ interface CharacterCreationActions {
     setSelectedBackground: (background: BackgroundData) => void;
     toggleSkill: (skill: Skill) => void;
     setSelectedEquipment: (choiceIndex: number, option: EquipmentChoice['options'][0]) => void;
-    resetCharacterCreation: () => void;
-    finalizeCharacter: (userId: string) => Promise<void>;
+	resetCharacterCreation: () => void;
+	// BARU: Fase 6 - Sinkronkan Tipe
+	finalizeCharacter: (
+		userId: string, 
+		onSaveNewCharacter: (
+			charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
+			inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
+			spellData: SpellDefinition[],
+			userId: string
+		) => Promise<void>
+	) => Promise<void>;
 }
 
 // --- Slice 4: Campaign Creation ---
