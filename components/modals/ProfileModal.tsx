@@ -18,13 +18,28 @@ import {
 	getAbilityModifier,
 	getProficiencyBonus,
 } from "../../utils";
-import { dataService } from "../../services/dataService";
+// import { dataService } from "../../services/dataService"; // (Tidak digunakan langsung di sini)
 import { SPRITE_PARTS } from "../../data/spriteParts"; // BARU
 import { Die } from "../Die";
 import { SelectionCard } from "../SelectionCard"; // Import SelectionCard
-import { RaceData } from "../../data/races"; // Import Tipe Data
-import { ClassData, EquipmentChoice } from "../../data/classes"; // Import Tipe Data
-import { BackgroundData } from "../../data/backgrounds"; // Import Tipe Data
+
+// FASE 2: Impor SSoT Data Statis dari Registry
+import { 
+    getAllRaces,
+    getAllClasses,
+    getAllBackgrounds,
+    getItemDef,
+    findRace,
+    findClass,
+    findBackground,
+    RaceData, 
+    ClassData, 
+    BackgroundData, 
+    EquipmentChoice
+} from "../../data/registry";
+// FASE 2: Impor utilitas AI
+import { renderCharacterLayout } from "../../services/pixelRenderer";
+import { generationService } from "../../services/ai/generationService";
 
 // Helper untuk membuat item inventory
 const createInvItem = (
@@ -174,70 +189,82 @@ const AbilityRoller: React.FC<{
 // =================================================================
 // Sub-Komponen: Wizard Pembuatan Karakter (REFAKTORISASI BESAR)
 // =================================================================
-// REFAKTOR G-3: Seluruh state lokal wizard dipindah ke zustand
-// Logika handleSave juga dipindah ke store (finalizeCharacter)
+// REFAKTOR FASE 2: State Wizard sekarang dikelola secara lokal.
 
-// (P0 FIX) Hapus 'onSave' dari props wizard, karena akan dipanggil oleh handleSave di level atas
+// Helper untuk mengambil equipment default (dipindah dari appStore)
+const getDefaultEquipment = (charClass: ClassData): Record<number, EquipmentChoice['options'][0]> => {
+    const initialEquipment: Record<number, EquipmentChoice['options'][0]> = {};
+    charClass.startingEquipment.choices.forEach((choice, index) => {
+        initialEquipment[index] = choice.options[0];
+    });
+    return initialEquipment;
+};
+
 const CreateCharacterWizard: React.FC<{
 	onCancel: () => void;
 	userId: string;
-}> = ({ onCancel, userId }) => {
-	// Ambil data SSoT statis (RACES, CLASSES, BACKGROUNDS) dari global (dimuat di App.tsx)
-	const RACES: RaceData[] = useMemo(() => (window as any).RACES_DATA || [], []);
+    // FASE 2: Ambil prop onSaveNewCharacter (dari dataStore)
+    onSaveNewCharacter: (
+		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+		spellData: SpellDefinition[]
+	) => Promise<void>;
+}> = ({ onCancel, userId, onSaveNewCharacter }) => {
+	// FASE 2: Ambil data SSoT statis dari registry, bukan (window)
+	const RACES: RaceData[] = useMemo(() => getAllRaces() || [], []);
 	const CLASS_DEFINITIONS: Record<string, ClassData> = useMemo(
-		() => (window as any).CLASS_DEFINITIONS_DATA || {},
+		() => getAllClasses() || {},
 		[]
 	);
 	const BACKGROUNDS: BackgroundData[] = useMemo(
-		() => (window as any).BACKGROUNDS_DATA || [],
+		() => getAllBackgrounds() || [],
 		[]
 	);
 
-	// REFAKTOR G-3: Ambil state dari Zustand Store
-    // FIX (P0 Regresi): Ganti useCreationStore (mati) ke useAppStore (hidup)
-	const {
-		step,
-        statusMessage, // BARU
-		name,
-		selectedRace,
-		selectedClass,
-		abilityScores,
-		selectedBackground,
-		selectedSkills,
-		selectedEquipment,
-		isSaving,
-        // Ambil state visual BARU
-        gender,
-        hair,
-        facialHair,
-        headAccessory,
-        bodyType,
-        scars,
-        // Ambil aksi BARU
-		setCharacterStep,
-        setStatusMessage,
-		setName,
-        setGender,
-        setHair,
-        setFacialHair,
-        setHeadAccessory,
-        setBodyType,
-        toggleScar,
-		setSelectedRace,
-		setSelectedClass,
-		setAbilityScore,
-		toggleSkill,
-		setSelectedEquipment,
-		resetCharacterCreation,
-		finalizeCharacter,
-	} = useAppStore((s) => ({ // <-- FIX
-		...s.characterCreation,
-		...s.actions,
-	}));
+	// FASE 2: State sekarang lokal menggunakan useState, bukan zustand
+    const [step, setStep] = useState(1);
+    const [statusMessage, setStatusMessage] = useState('');
+    const [name, setName] = useState('');
+    const [gender, setGender] = useState<'Pria' | 'Wanita'>('Pria');
+    const [hair, setHair] = useState('h_short_blond');
+    const [facialHair, setFacialHair] = useState('ff_none');
+    const [headAccessory, setHeadAccessory] = useState('ha_none');
+    const [bodyType, setBodyType] = useState('bt_normal');
+    const [scars, setScars] = useState<string[]>([]);
+
+    // Pastikan RACES, dll. dimuat sebelum inisialisasi state
+    const [selectedRace, setSelectedRace] = useState<RaceData>(() => findRace('Human') || RACES[0]);
+    const [selectedClass, setSelectedClass] = useState<ClassData>(() => findClass('Fighter') || Object.values(CLASS_DEFINITIONS)[0]);
+    const [abilityScores, setAbilityScores] = useState<Partial<AbilityScores>>({});
+    const [selectedBackground, setSelectedBackground] = useState<BackgroundData>(() => findBackground('Acolyte') || BACKGROUNDS[0]);
+    const [selectedSkills, setSelectedSkills] = useState<Skill[]>([]);
+    const [selectedEquipment, setSelectedEquipment] = useState<Record<number, EquipmentChoice['options'][0]>>(() => getDefaultEquipment(findClass('Fighter') || Object.values(CLASS_DEFINITIONS)[0]));
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Aksi Store sekarang menjadi handler lokal
+    const setCharacterStep = setStep;
+    const setAbilityScore = (ability: Ability, score: number) => {
+        setAbilityScores(prev => ({ ...prev, [ability]: score }));
+    };
+    const toggleScar = (partId: string) => {
+        setScars(currentScars => {
+            const newScars = currentScars.includes(partId)
+                ? currentScars.filter(s => s !== partId)
+                : [...currentScars, partId];
+            return newScars;
+        });
+    };
+    const handleClassChange = (className: string) => {
+        const newClass = CLASS_DEFINITIONS[className] || CLASS_DEFINITIONS["Fighter"];
+        setSelectedClass(newClass);
+        setSelectedSkills([]); // Reset skill pilihan
+        setSelectedEquipment(getDefaultEquipment(newClass)); // Reset equipment pilihan
+    };
+
 	const abilitiesToRoll = useMemo(() => ALL_ABILITIES, []);
 	const currentAbilityIndex = Object.keys(abilityScores).length;
 
-	// REFAKTOR G-3: Event handler sekarang memanggil aksi store
+	// FASE 2: Event handler sekarang memanggil state lokal
 	const handleAbilityRollComplete = (ability: Ability, score: number) => {
 		setAbilityScore(ability, score);
 		if (currentAbilityIndex === abilitiesToRoll.length - 1) {
@@ -245,24 +272,137 @@ const CreateCharacterWizard: React.FC<{
 		}
 	};
 
-	// REFAKTOR G-3: handleSave sekarang hanya delegasi ke store
+	// FASE 2: Logika finalizeCharacter (dari appStore) dipindahkan ke sini
 	const handleSave = async () => {
-        // (P0 FIX) Kirim callback 'onSaveNewCharacter' dari props ke 'finalizeCharacter'
-		await finalizeCharacter(userId, onSaveNewCharacter);
+        if (Object.keys(abilityScores).length !== 6) {
+            alert("Selesaikan pelemparan semua dadu kemampuan.");
+            return;
+        }
+
+        setIsSaving(true);
+        setStatusMessage("Merakit jiwa...");
+
+        try {
+            const baseScores = abilityScores as AbilityScores;
+            const finalScores = { ...baseScores };
+            for (const [ability, bonus] of Object.entries(selectedRace.abilityScoreBonuses)) {
+                if (typeof bonus === 'number') finalScores[ability as Ability] += bonus;
+            }
+            const profSkills = new Set<Skill>([
+                ...selectedBackground.skillProficiencies,
+                ...(selectedRace.proficiencies?.skills || []),
+                ...selectedSkills,
+            ]);
+            const conModifier = getAbilityModifier(finalScores.constitution);
+            const dexModifier = getAbilityModifier(finalScores.dexterity);
+            const maxHp = selectedClass.hpAtLevel1(conModifier);
+            let inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[] = [];
+
+            selectedClass.startingEquipment.fixed.forEach(item => inventoryData.push(createInvItem(item.item, item.quantity)));
+            Object.values(selectedEquipment).forEach(chosenOption => {
+                chosenOption.items.forEach(itemDef => inventoryData.push(createInvItem(itemDef, chosenOption.quantity || 1)));
+            });
+            selectedBackground.equipment.forEach(itemName => {
+                 // FASE 2: Gunakan getItemDef dari registry
+                 try { inventoryData.push(createInvItem(getItemDef(itemName))); } catch (e) { console.warn(e); }
+            });
+
+            let armorClass = 10 + dexModifier;
+            let equippedArmorDef: ItemDefinition | null = null;
+            const armorIndex = inventoryData.findIndex(i => i.item.type === 'armor' && i.item.armorType !== 'shield');
+            const shieldIndex = inventoryData.findIndex(i => i.item.name === 'Shield');
+            if (armorIndex > -1) { inventoryData[armorIndex].isEquipped = true; equippedArmorDef = inventoryData[armorIndex].item; }
+            if (shieldIndex > -1) { inventoryData[shieldIndex].isEquipped = true; }
+            if (equippedArmorDef) {
+                const baseAc = equippedArmorDef.baseAc || 10;
+                if (equippedArmorDef.armorType === 'light') armorClass = baseAc + dexModifier;
+                else if (equippedArmorDef.armorType === 'medium') armorClass = baseAc + Math.min(2, dexModifier);
+                else if (equippedArmorDef.armorType === 'heavy') armorClass = baseAc;
+            }
+            if (shieldIndex > -1) armorClass += 2;
+
+            const spellSlots = selectedClass.spellcasting?.spellSlots || [];
+            const spellData: SpellDefinition[] = [
+                ...(selectedClass.spellcasting?.knownCantrips || []),
+                ...(selectedClass.spellcasting?.knownSpells || []),
+            ];
+
+            const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
+                name, class: selectedClass.name, race: selectedRace.name, level: 1, xp: 0,
+                image: selectedRace.img, // INI AKAN DI-OVERWRITE
+                background: selectedBackground.name,
+                gender: gender,
+                bodyType: bodyType,
+                scars: scars,
+                hair: hair,
+                facialHair: facialHair,
+                headAccessory: headAccessory,
+                personalityTrait: '', ideal: '', bond: '', flaw: '',
+                abilityScores: finalScores, maxHp: Math.max(1, maxHp), currentHp: Math.max(1, maxHp),
+                tempHp: 0, armorClass: armorClass, speed: selectedRace.speed,
+                hitDice: { [selectedClass.hitDice]: { max: 1, spent: 0 } },
+                deathSaves: { successes: 0, failures: 0}, conditions: [],
+                racialTraits: selectedRace.traits, classFeatures: selectedClass.features,
+                proficientSkills: Array.from(profSkills),
+                proficientSavingThrows: selectedClass.proficiencies.savingThrows,
+                spellSlots: spellSlots,
+            };
+
+            // --- PANGGILAN AI BARU ---
+            // 1. Render layout pixel
+            setStatusMessage("Merender layout piksel...");
+            const layout = renderCharacterLayout(newCharData as Character);
+
+            // 2. Buat prompt
+            setStatusMessage("Menghubungi AI untuk visual...");
+            const VISUAL_STYLE_PROMPT = "digital painting, fantasy art, detailed, high quality, vibrant colors, style of D&D 5e sourcebooks, character portrait, full body";
+            // FASE 2: Ambil nama part dari SPRITE_PARTS
+            const getPartName = (arr: any[], id: string) => arr.find(p => p.id === id)?.name || '';
+            const prompt = `Potret HD, ${newCharData.gender} ${newCharData.race} ${newCharData.class}, ${getPartName(SPRITE_PARTS.hair, newCharData.hair)}, ${getPartName(SPRITE_PARTS.facial_feature, newCharData.facialHair)}, ${newCharData.scars.map(id => getPartName(SPRITE_PARTS.facial_feature, id)).join(', ')}, ${VISUAL_STYLE_PROMPT}`;
+
+            // 3. Panggil AI
+            const imageUrl = await generationService.stylizePixelLayout(layout, prompt, 'Sprite');
+
+            // 4. Update gambar di data karakter
+            newCharData.image = imageUrl;
+            // --- AKHIR PANGGILAN AI ---
+
+            setStatusMessage("Menyimpan ke database...");
+            await onSaveNewCharacter(newCharData, inventoryData, spellData, userId);
+
+            onCancel(); // Sukses, tutup wizard
+
+        } catch (e) {
+            console.error("Gagal finalisasi karakter:", e);
+            alert("Gagal menyimpan karakter baru. Coba lagi.");
+        } finally {
+            setIsSaving(false);
+            setStatusMessage("");
+        }
 	};
 
 	const handleBack = () => {
 		if (step > 1) {
 			setCharacterStep(step - 1);
 		} else {
-			onCancel(); // Ini akan memanggil resetCharacterCreation dari parent
+			onCancel();
 		}
 	};
 
-	// REFAKTOR G-3: Helper untuk Pilihan Skill (Step 4)
+	// FASE 2: Helper untuk Pilihan Skill (Step 4)
 	const handleSkillToggle = (skill: Skill) => {
-		// Logika limit sekarang ada di dalam aksi 'toggleSkill' di store
-		toggleSkill(skill);
+        const limit = selectedClass.proficiencies.skills.choices;
+        setSelectedSkills(currentSkills => {
+            const newSkills = currentSkills.includes(skill)
+                ? currentSkills.filter(s => s !== skill)
+                : (currentSkills.length < limit ? [...currentSkills, skill] : currentSkills);
+
+            if (newSkills.length > limit) {
+                alert(`Anda hanya bisa memilih ${limit} skill.`);
+                return currentSkills;
+            }
+            return newSkills;
+        });
 	};
 
 	// REFAKTOR G-3: Helper untuk Pilihan Equipment (Step 5)
@@ -335,12 +475,7 @@ const CreateCharacterWizard: React.FC<{
                             {/* REFAKTOR G-3: Gunakan setSelectedClass */}
                             <select
                                 value={selectedClass.name}
-                                onChange={(e) =>
-                                    setSelectedClass(
-                                        CLASS_DEFINITIONS[e.target.value] ||
-                                            CLASS_DEFINITIONS["Fighter"]
-                                    )
-                                }
+                                onChange={(e) => handleClassChange(e.target.value)}
                                 className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
                             >
                                 {Object.keys(CLASS_DEFINITIONS).map((c) => (
@@ -432,7 +567,6 @@ const CreateCharacterWizard: React.FC<{
 						>
 							Batal
 						</button>
-						{/* REFAKTOR G-3: Gunakan setCharacterStep */}
 						<button
 							onClick={() => name.trim() && setCharacterStep(2)}
 							disabled={!name.trim()}
@@ -489,7 +623,6 @@ const CreateCharacterWizard: React.FC<{
 
 					<div className="flex-grow"></div>
 					<div className="flex justify-between">
-						{/* REFAKTOR G-3: Gunakan setCharacterStep */}
 						<button
 							onClick={() => setCharacterStep(2)}
 							className="font-cinzel text-gray-300 hover:text-white"
@@ -540,7 +673,7 @@ const CreateCharacterWizard: React.FC<{
 					<div className="flex-grow"></div>
 					<div className="flex justify-between">
 						<button
-							onClick={() => setStep(3)}
+							onClick={() => setCharacterStep(3)}
 							className="font-cinzel text-gray-300 hover:text-white"
 						>
 							&larr; Ganti Background
@@ -597,7 +730,6 @@ const CreateCharacterWizard: React.FC<{
 					</div>
 					<div className="flex-grow"></div>
 					<div className="flex justify-between">
-						{/* REFAKTOR G-3: Gunakan setCharacterStep */}
 						<button
 							onClick={() => setCharacterStep(4)}
 							className="font-cinzel text-gray-300 hover:text-white"
@@ -645,7 +777,6 @@ const CreateCharacterWizard: React.FC<{
 					</div>
 					<div className="flex-grow"></div>
 					<div className="flex justify-between">
-						{/* REFAKTOR G-3: Gunakan setCharacterStep */}
 						<button
 							onClick={() => setCharacterStep(5)}
 							className="font-cinzel text-gray-300 hover:text-white"
@@ -675,21 +806,15 @@ const CreateCharacterWizard: React.FC<{
 export const ProfileModal: React.FC<ProfileModalProps> = ({
 	onClose,
 	characters,
-	setCharacters,
+	// setCharacters DIHAPUS
 	userId,
 	onSaveNewCharacter,
 }) => {
 	// REFAKTOR G-4: myCharacters sekarang adalah prop 'characters'
 	const myCharacters = characters;
 	const [selectedChar, setSelectedChar] = useState<Character | null>(null);
-	// REFAKTOR G-3: 'isCreating' sekarang dikontrol oleh state 'step' di store
-    // FIX (P0 Regresi): Ganti useCreationStore (mati) ke useAppStore (hidup)
-	const isCreating = useAppStore((s) => s.characterCreation.step > 0); // <-- FIX
-	// Ambil aksi reset
-	const resetCharacterCreation = useAppStore( // <-- FIX
-		(s) => s.actions.resetCharacterCreation
-	);
-	const setCharacterStep = useAppStore((s) => s.actions.setCharacterStep); // <-- FIX
+	// FASE 2: isCreating sekarang adalah state lokal
+    const [isCreating, setIsCreating] = useState(false);
 
 	useEffect(() => {
 		if (!isCreating && !selectedChar && myCharacters.length > 0) {
@@ -697,28 +822,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 		}
 		if (myCharacters.length === 0 && !isCreating) {
 			setSelectedChar(null);
-			setCharacterStep(1); // Paksa masuk mode create jika tidak ada karakter
+			setIsCreating(true); // Paksa masuk mode create jika tidak ada karakter
 		}
-	}, [myCharacters, isCreating, selectedChar, setCharacterStep]);
+	}, [myCharacters, isCreating, selectedChar]);
 
+	// FASE 2: Fungsi ini sekarang hanya sebagai prop pass-through
 	const handleCreateCharacter = async (
 		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
 		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
 		spellData: SpellDefinition[]
 	) => {
-		try {
-			// REFAKTOR G-4: Panggil prop onSaveNewCharacter (dari dataStore)
-			await onSaveNewCharacter(charData, inventoryData, spellData, userId);
-			// Reset state G-3 di-handle oleh finalizeCharacter di store
-			// setIsCreating(false); // (Tidak perlu lagi)
-		} catch (e) {
-			// Error di-handle di wizard
-		}
+		// Logika dipindahkan ke handleSave di dalam wizard
+        // Prop onSaveNewCharacter akan diteruskan ke wizard
 	};
 
-	// REFAKTOR G-3: Bungkus onClose untuk mereset state
+	// FASE 2: Bungkus onClose untuk mereset state LOKAL
 	const handleClose = () => {
-		resetCharacterCreation();
+		setIsCreating(false);
 		onClose();
 	};
 
@@ -730,11 +850,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 					<h2 className="font-cinzel text-3xl mb-4">Cermin Jiwa</h2>
 					<div className="w-full h-full bg-black/30 border-2 border-blue-300/50 rounded-lg p-4 flex flex-col">
 						{isCreating ? (
-							// REFAKTOR G-3: onCancel sekarang mereset store
-                            // (P0 FIX) Hapus prop onSave
+							// FASE 2: onCancel mereset state lokal, onSaveNewCharacter diteruskan
 							<CreateCharacterWizard
-								onCancel={() => resetCharacterCreation()}
+								onCancel={() => setIsCreating(false)}
 								userId={userId}
+                                onSaveNewCharacter={onSaveNewCharacter}
 							/>
 						) : selectedChar ? (
 							<>
@@ -875,12 +995,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 					<h3 className="font-cinzel text-xl text-center mb-4">Rak Jiwa</h3>
 					<div className="flex flex-wrap justify-center gap-4 mb-6 overflow-y-auto">
 						{myCharacters.map((char) => (
-							// REFAKTOR G-3: onClick sekarang mereset store
+							// FASE 2: onClick sekarang mereset state lokal
 							<div
 								key={char.id}
 								onClick={() => {
 									setSelectedChar(char);
-									resetCharacterCreation();
+									setIsCreating(false);
 								}}
 								className={`flex flex-col items-center cursor-pointer transition-all duration-300 transform ${
 									selectedChar?.id === char.id && !isCreating
@@ -899,9 +1019,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 							</div>
 						))}
 					</div>
-					{/* REFAKTOR G-3: onClick sekarang memicu store */}
+					{/* FASE 2: onClick sekarang memicu state lokal */}
 					<button
-						onClick={() => setCharacterStep(1)}
+						onClick={() => setIsCreating(true)}
 						className="mt-auto w-full font-cinzel bg-blue-800/50 hover:bg-blue-700/50 py-2 rounded border border-blue-500/50"
 					>
 						+ Ciptakan Baru

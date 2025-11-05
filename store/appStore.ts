@@ -3,39 +3,11 @@
 
 import { create } from 'zustand';
 import { 
-    Ability, Skill, AbilityScores, CharacterInventoryItem, SpellDefinition, 
-    Character, MapMarker, Campaign, ItemDefinition, CampaignState
+    Character, MapMarker, Campaign, CampaignState, Location
 } from '../types';
-// REFAKTOR G-5: Impor SSoT data statis dari registry
-import { 
-    getAllRaces,
-    getAllClasses,
-    getAllBackgrounds,
-    getItemDef, // (helper getItemDef sekarang ada di registry)
-    findRace, // (P0 FIX) Impor finder
-    findClass, // (P0 FIX) Impor finder
-    findBackground, // (P0 FIX) Impor finder
-    RaceData, ClassData, BackgroundData, EquipmentChoice // (Ekspor tipe dari registry jika perlu, tapi kita impor dari types)
-} from '../data/registry';
-import { SpritePart } from '../data/spriteParts'; // BARU: Impor tipe SpritePart
-import { getAbilityModifier } from '../utils';
+// (Impor yang tidak perlu dihapus)
 import { dataService } from '../services/dataService';
 import { useDataStore } from './dataStore';
-import { generationService } from '../services/ai/generationService'; // BARU
-// BARU: Impor fungsi spesifik, bukan objek 'pixelRenderer'
-import { renderCharacterLayout, renderMapLayout } from '../services/pixelRenderer'; 
-
-// Helper untuk mengambil nama part (DIPINDAHKAN KE SINI)
-const getPartName = (arr: SpritePart[], id: string) => arr.find(p => p.id === id)?.name || '';
-
-// =================================================================
-// Tipe Helper
-// =================================================================
-const createInvItem = (def: ItemDefinition, qty = 1, equipped = false): Omit<CharacterInventoryItem, 'instanceId'> => ({
-    item: def,
-    quantity: qty,
-    isEquipped: equipped,
-});
 
 type View = Location | 'nexus' | 'character-selection';
 
@@ -78,80 +50,9 @@ interface RuntimeActions {
 }
 
 
-// --- Slice 3: Character Creation ---
-interface CharacterCreationState {
-    step: number;
-    statusMessage: string; // BARU: Untuk loading
-    name: string;
-    gender: 'Pria' | 'Wanita'; // BARU
-    hair: string; // BARU
-    facialHair: string; // BARU
-    headAccessory: string; // BARU
-    bodyType: string; // BARU
-    scars: string[]; // BARU
-    selectedRace: RaceData;
-    selectedClass: ClassData;
-    abilityScores: Partial<AbilityScores>;
-    selectedBackground: BackgroundData;
-    selectedSkills: Skill[];
-    selectedEquipment: Record<number, EquipmentChoice['options'][0]>;
-    isSaving: boolean;
-}
-const getDefaultEquipment = (charClass: ClassData): Record<number, EquipmentChoice['options'][0]> => {
-    const initialEquipment: Record<number, EquipmentChoice['options'][0]> = {};
-    charClass.startingEquipment.choices.forEach((choice, index) => {
-        initialEquipment[index] = choice.options[0];
-    });
-    return initialEquipment;
-};
-const initialCharacterState: CharacterCreationState = {
-    step: 0, // 0 = tidak aktif
-    statusMessage: '',
-    name: '',
-    gender: 'Pria',
-    hair: 'h_short_blond',
-    facialHair: 'ff_none',
-    headAccessory: 'ha_none',
-    bodyType: 'bt_normal',
-    scars: [],
-    // (P0 FIX) Gunakan finder untuk memastikan referensi yang aman
-    selectedRace: findRace('Human') || getAllRaces()[0],
-    selectedClass: findClass('Fighter') || Object.values(getAllClasses())[0],
-    abilityScores: {},
-    selectedBackground: findBackground('Acolyte') || getAllBackgrounds()[0],
-    selectedSkills: [],
-    selectedEquipment: getDefaultEquipment(findClass('Fighter') || Object.values(getAllClasses())[0]),
-    isSaving: false,
-};
-interface CharacterCreationActions {
-    setCharacterStep: (step: number) => void;
-    setStatusMessage: (message: string) => void; // BARU
-    setName: (name: string) => void;
-    setGender: (gender: 'Pria' | 'Wanita') => void; // BARU
-    setHair: (partId: string) => void; // BARU
-    setFacialHair: (partId: string) => void; // BARU
-    setHeadAccessory: (partId: string) => void; // BARU
-    setBodyType: (partId: string) => void; // BARU
-    toggleScar: (partId: string) => void; // BARU
-    setSelectedRace: (race: RaceData) => void;
-    setSelectedClass: (charClass: ClassData) => void;
-    setAbilityScore: (ability: Ability, score: number) => void;
-    setAbilityScores: (scores: Partial<AbilityScores>) => void;
-    setSelectedBackground: (background: BackgroundData) => void;
-    toggleSkill: (skill: Skill) => void;
-    setSelectedEquipment: (choiceIndex: number, option: EquipmentChoice['options'][0]) => void;
-	resetCharacterCreation: () => void;
-	// BARU: Fase 6 - Sinkronkan Tipe
-	finalizeCharacter: (
-		userId: string, 
-		onSaveNewCharacter: (
-			charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
-			inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
-			spellData: SpellDefinition[],
-			userId: string
-		) => Promise<void>
-	) => Promise<void>;
-}
+// --- Slice 3: Character Creation (DIHAPUS) ---
+// State ini sekarang dikelola secara lokal oleh ProfileModal.tsx
+// untuk menghindari konflik arsitektur.
 
 // --- Slice 4: Campaign Creation ---
 // (Tidak berubah dari G-3)
@@ -208,9 +109,9 @@ type AppStore = {
     navigation: NavigationState;
     runtime: RuntimeState; // G-4-R1
     levelUp: LevelUpState; // (Poin 7)
-    characterCreation: CharacterCreationState;
+    // characterCreation DIHAPUS
     campaignCreation: CampaignCreationState;
-    actions: NavigationActions & RuntimeActions & LevelUpActions & CharacterCreationActions & CampaignCreationActions;
+    actions: NavigationActions & RuntimeActions & LevelUpActions & /* CharacterCreationActions DIHAPUS */ CampaignCreationActions;
 }
 
 // =================================================================
@@ -221,25 +122,25 @@ export const useAppStore = create<AppStore>((set, get) => ({
     navigation: initialNavigationState,
     runtime: initialRuntimeState,
     levelUp: initialLevelUpState, // (Poin 7)
-    characterCreation: initialCharacterState,
+    // characterCreation DIHAPUS
     campaignCreation: initialCampaignState,
 
     // === ACTIONS ===
     actions: {
         // --- Navigation Actions ---
         navigateTo: (view) => {
-            if (view !== Location.MirrorOfSouls) get().actions.resetCharacterCreation();
+            // if (view !== Location.MirrorOfSouls) get().actions.resetCharacterCreation(); // DIHAPUS
             if (view !== Location.StorytellersSpire) get().actions.resetCampaignCreation();
-            if (view === Location.MirrorOfSouls) {
-                set(state => ({ characterCreation: { ...state.characterCreation, step: 1 } }));
-            }
+            // if (view === Location.MirrorOfSouls) { // DIHAPUS
+            //     set(state => ({ characterCreation: { ...state.characterCreation, step: 1 } }));
+            // }
             if (view === Location.StorytellersSpire) {
                 set(state => ({ campaignCreation: { ...state.campaignCreation, step: 1 } }));
             }
             set(state => ({ navigation: { ...state.navigation, currentView: view } }));
         },
         returnToNexus: () => {
-            get().actions.resetCharacterCreation();
+            // get().actions.resetCharacterCreation(); // DIHAPUS
             get().actions.resetCampaignCreation();
             set({ navigation: initialNavigationState });
         },
@@ -308,175 +209,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
             set({ levelUp: initialLevelUpState });
         },
 
-        // --- Character Actions ---
-        setCharacterStep: (step) => set(state => ({ characterCreation: { ...state.characterCreation, step } })),
-        setStatusMessage: (message) => set(state => ({ characterCreation: { ...state.characterCreation, statusMessage: message } })), // BARU
-        setName: (name) => set(state => ({ characterCreation: { ...state.characterCreation, name } })),
-        setGender: (gender) => set(state => ({ characterCreation: { ...state.characterCreation, gender } })), // BARU
-        setHair: (partId) => set(state => ({ characterCreation: { ...state.characterCreation, hair: partId } })), // BARU
-        setFacialHair: (partId) => set(state => ({ characterCreation: { ...state.characterCreation, facialHair: partId } })), // BARU
-        setHeadAccessory: (partId) => set(state => ({ characterCreation: { ...state.characterCreation, headAccessory: partId } })), // BARU
-        setBodyType: (partId) => set(state => ({ characterCreation: { ...state.characterCreation, bodyType: partId } })), // BARU
-        toggleScar: (partId) => set(state => { // BARU
-            const currentScars = state.characterCreation.scars;
-            const newScars = currentScars.includes(partId)
-                ? currentScars.filter(s => s !== partId)
-                : [...currentScars, partId];
-            return { characterCreation: { ...state.characterCreation, scars: newScars }};
-        }),
-        setSelectedRace: (selectedRace) => set(state => ({ characterCreation: { ...state.characterCreation, selectedRace } })),
-        setSelectedClass: (selectedClass) => set(state => ({ 
-            characterCreation: { 
-                ...state.characterCreation, 
-                selectedClass,
-                selectedSkills: [],
-                selectedEquipment: getDefaultEquipment(selectedClass),
-            } 
-        })),
-        setAbilityScore: (ability, score) => set(state => ({
-            characterCreation: { 
-                ...state.characterCreation, 
-                abilityScores: { ...state.characterCreation.abilityScores, [ability]: score }
-            }
-        })),
-        setAbilityScores: (scores) => set(state => ({
-            characterCreation: { ...state.characterCreation, abilityScores: scores }
-        })),
-        setSelectedBackground: (selectedBackground) => set(state => ({ characterCreation: { ...state.characterCreation, selectedBackground } })),
-        toggleSkill: (skill) => set(state => {
-            const currentSkills = state.characterCreation.selectedSkills;
-            const limit = state.characterCreation.selectedClass.proficiencies.skills.choices;
-            const newSkills = currentSkills.includes(skill)
-                ? currentSkills.filter(s => s !== skill)
-                : (currentSkills.length < limit ? [...currentSkills, skill] : currentSkills);
-            
-            if (newSkills.length > limit) {
-                alert(`Anda hanya bisa memilih ${limit} skill.`);
-                return state;
-            }
-            return { characterCreation: { ...state.characterCreation, selectedSkills: newSkills }};
-        }),
-        setSelectedEquipment: (choiceIndex, option) => set(state => ({
-            characterCreation: {
-                ...state.characterCreation,
-                selectedEquipment: { ...state.characterCreation.selectedEquipment, [choiceIndex]: option }
-            }
-        })),
-        resetCharacterCreation: () => set({ characterCreation: { ...initialCharacterState, step: 0 } }),
-        
-        finalizeCharacter: async (userId: string, onSaveNewCharacter: (
-            charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
-            inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
-            spellData: SpellDefinition[],
-            userId: string
-        ) => Promise<void>) => { // (P0 FIX) Terima callback onSaveNewCharacter dari ProfileModal
-            const { characterCreation } = get();
-            const { 
-                name, selectedRace, selectedClass, abilityScores, selectedBackground, 
-                selectedSkills, selectedEquipment,
-                // Ambil data visual BARU
-                gender, hair, facialHair, headAccessory, bodyType, scars
-            } = characterCreation;
-
-            if (Object.keys(abilityScores).length !== 6) {
-                alert("Selesaikan pelemparan semua dadu kemampuan.");
-                return;
-            }
-            // --- Alur AI BARU ---
-            set(state => ({ characterCreation: { ...state.characterCreation, isSaving: true, statusMessage: "Merakit jiwa..." } }));
-
-            try {
-                const baseScores = abilityScores as AbilityScores;
-                const finalScores = { ...baseScores };
-                for (const [ability, bonus] of Object.entries(selectedRace.abilityScoreBonuses)) {
-                    if (typeof bonus === 'number') finalScores[ability as Ability] += bonus;
-                }
-                const profSkills = new Set<Skill>([
-                    ...selectedBackground.skillProficiencies,
-                    ...(selectedRace.proficiencies?.skills || []),
-                    ...selectedSkills,
-                ]);
-                const conModifier = getAbilityModifier(finalScores.constitution);
-                const dexModifier = getAbilityModifier(finalScores.dexterity);
-                const maxHp = selectedClass.hpAtLevel1(conModifier);
-                let inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[] = [];
-                selectedClass.startingEquipment.fixed.forEach(item => inventoryData.push(createInvItem(item.item, item.quantity)));
-                Object.values(selectedEquipment).forEach(chosenOption => {
-                    chosenOption.items.forEach(itemDef => inventoryData.push(createInvItem(itemDef, chosenOption.quantity || 1)));
-                });
-                selectedBackground.equipment.forEach(itemName => {
-                     try { inventoryData.push(createInvItem(getItemDef(itemName))); } catch (e) { console.warn(e); }
-                });
-                let armorClass = 10 + dexModifier;
-                let equippedArmorDef: ItemDefinition | null = null;
-                const armorIndex = inventoryData.findIndex(i => i.item.type === 'armor' && i.item.armorType !== 'shield');
-                const shieldIndex = inventoryData.findIndex(i => i.item.name === 'Shield');
-                if (armorIndex > -1) { inventoryData[armorIndex].isEquipped = true; equippedArmorDef = inventoryData[armorIndex].item; }
-                if (shieldIndex > -1) { inventoryData[shieldIndex].isEquipped = true; }
-                if (equippedArmorDef) {
-                    const baseAc = equippedArmorDef.baseAc || 10;
-                    if (equippedArmorDef.armorType === 'light') armorClass = baseAc + dexModifier;
-                    else if (equippedArmorDef.armorType === 'medium') armorClass = baseAc + Math.min(2, dexModifier);
-                    else if (equippedArmorDef.armorType === 'heavy') armorClass = baseAc;
-                }
-                if (shieldIndex > -1) armorClass += 2;
-                const spellSlots = selectedClass.spellcasting?.spellSlots || [];
-                const spellData: SpellDefinition[] = [
-                    ...(selectedClass.spellcasting?.knownCantrips || []),
-                    ...(selectedClass.spellcasting?.knownSpells || []),
-                ];
-                const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
-                    name, class: selectedClass.name, race: selectedRace.name, level: 1, xp: 0,
-                    image: selectedRace.img, // INI AKAN DI-OVERWRITE
-                    background: selectedBackground.name,
-                    // Tambahkan data visual BARU
-                    gender: gender,
-                    bodyType: bodyType,
-                    scars: scars,
-                    hair: hair,
-                    facialHair: facialHair,
-                    headAccessory: headAccessory,
-                    // Sisa data
-                    personalityTrait: '', ideal: '', bond: '', flaw: '',
-                    abilityScores: finalScores, maxHp: Math.max(1, maxHp), currentHp: Math.max(1, maxHp),
-                    tempHp: 0, armorClass: armorClass, speed: selectedRace.speed,
-                    hitDice: { [selectedClass.hitDice]: { max: 1, spent: 0 } },
-                    deathSaves: { successes: 0, failures: 0}, conditions: [],
-                    racialTraits: selectedRace.traits, classFeatures: selectedClass.features,
-                    proficientSkills: Array.from(profSkills),
-                    proficientSavingThrows: selectedClass.proficiencies.savingThrows,
-                    spellSlots: spellSlots,
-                };
-                
-                // (P0 FIX) Panggil callback yang dilewatkan, jangan panggil dataStore langsung
-                // --- PANGGILAN AI BARU ---
-                // 1. Render layout pixel
-                const layout = renderCharacterLayout(newCharData as Character); // Hapus 'pixelRenderer.'
-                
-                // 2. Buat prompt
-                set(state => ({ characterCreation: { ...state.characterCreation, statusMessage: "Menghubungi AI..." } }));
-                const VISUAL_STYLE_PROMPT = "digital painting, fantasy art, detailed, high quality, vibrant colors, style of D&D 5e sourcebooks, character portrait, full body";
-                const prompt = `Potret HD, ${newCharData.gender} ${newCharData.race} ${newCharData.class}, ${getPartName(SPRITE_PARTS.hair, newCharData.hair)}, ${getPartName(SPRITE_PARTS.facial_feature, newCharData.facialHair)}, ${newCharData.scars.map(id => getPartName(SPRITE_PARTS.facial_feature, id)).join(', ')}, ${VISUAL_STYLE_PROMPT}`;
-
-                // 3. Panggil AI
-                const imageUrl = await generationService.stylizePixelLayout(layout, prompt, 'Sprite');
-                
-                // 4. Update gambar di data karakter
-                newCharData.image = imageUrl;
-                // --- AKHIR PANGGILAN AI ---
-
-                await onSaveNewCharacter(newCharData, inventoryData, spellData, userId);
-                
-                get().actions.resetCharacterCreation();
-                get().actions.returnToNexus();
-
-            } catch (e) {
-                console.error("Gagal finalisasi karakter:", e);
-                alert("Gagal menyimpan karakter baru. Coba lagi.");
-            } finally {
-                set(state => ({ characterCreation: { ...state.characterCreation, isSaving: false } }));
-            }
-        },
+        // --- Character Actions (DIHAPUS) ---
+        // (Seluruh blok logika dari setCharacterStep hingga finalizeCharacter dihapus)
 
         // --- Campaign Actions ---
         setCampaignStep: (step) => set(state => ({ campaignCreation: { ...state.campaignCreation, step } })),
