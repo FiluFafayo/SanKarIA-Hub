@@ -202,50 +202,6 @@ export const generateDefaultCharacters = (ownerId: string): Omit<Character, 'id'
 };
 
 /**
- * Fungsi ini HANYA untuk seeding tabel 'characters'
+ * (Fungsi seeding 'getRawCharactersForSeeding' dan 'getRawCharacterRelationsForSeeding'
+ * telah dihapus karena tidak digunakan oleh aplikasi runtime.)
  */
-export const getRawCharactersForSeeding = (ownerId: string): Omit<DbCharacter, 'id'>[] => {
-    return RAW_DEFAULT_CHARACTERS.map(rawChar => {
-        const { inventory, knownSpells, ...coreData } = rawChar;
-        return {
-            ...coreData,
-            owner_id: ownerId,
-            ability_scores: coreData.abilityScores,
-            max_hp: coreData.maxHp,
-            current_hp: coreData.currentHp,
-            temp_hp: coreData.tempHp,
-            armor_class: coreData.armorClass,
-            hit_dice: coreData.hitDice,
-            death_saves: coreData.deathSaves,
-            racial_traits: coreData.racialTraits,
-            class_features: coreData.classFeatures,
-            proficient_skills: coreData.proficientSkills,
-            proficient_saving_throws: coreData.proficientSavingThrows,
-            spell_slots: coreData.spellSlots,
-            personality_trait: coreData.personalityTrait,
-        };
-    });
-};
-
-/**
- * Fungsi ini HANYA untuk seeding tabel 'character_inventory' dan 'character_spells'
- */
-export const getRawCharacterRelationsForSeeding = (characterId: string, characterName: string): {
-    inventory: Omit<DbCharacterInventory, 'id' | 'character_id'>[],
-    spells: Omit<DbCharacterSpell, 'id' | 'character_id'>[]
-} => {
-    const rawChar = RAW_DEFAULT_CHARACTERS.find(c => c.name === characterName);
-    if (!rawChar) return { inventory: [], spells: [] };
-
-    const inventory = rawChar.inventory.map(inv => ({
-        item_id: inv.item.id, // (Kita pakai nama sebagai ID sementara)
-        quantity: inv.quantity,
-        is_equipped: inv.isEquipped,
-    }));
-    
-    const spells = rawChar.knownSpells.map(sp => ({
-        spell_id: sp.id, // (Kita pakai nama sebagai ID sementara)
-    }));
-
-    return { inventory, spells };
-};

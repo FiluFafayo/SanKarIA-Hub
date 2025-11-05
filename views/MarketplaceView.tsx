@@ -92,15 +92,15 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 			quests: originalCampaign.quests, // Salin quests & npcs
 			npcs: originalCampaign.npcs,
 			worldEventCounter: 0,
-			currentTime: "Siang",
+			currentTime: 43200, // FASE 5 FIX: Diubah ke number (12:00 PM)
 			currentWeather: "Cerah",
 			// (ownerId akan di-set oleh dataService.createCampaign)
 		};
-        
-        // (Poin 5) Pastikan campaign baru yang disalin juga menggunakan format waktu number
-        if (typeof (newCampaign as any).currentTime === 'string') {
-            (newCampaign as any).currentTime = 43200; // Fallback ke 12:00 PM
-        }
+
+        // (Poin 5) Pemeriksaan string tidak lagi diperlukan
+        // if (typeof (newCampaign as any).currentTime === 'string') {
+        //     (newCampaign as any).currentTime = 43200; // Fallback ke 12:00 PM
+        // }
 
 		try {
 			// REFAKTOR G-4: Panggil aksi dataStore untuk membuat campaign
