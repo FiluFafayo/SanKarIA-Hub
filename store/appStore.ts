@@ -22,7 +22,8 @@ import { getAbilityModifier } from '../utils';
 import { dataService } from '../services/dataService';
 import { useDataStore } from './dataStore';
 import { generationService } from '../services/ai/generationService'; // BARU
-import { pixelRenderer } from '../services/pixelRenderer'; // BARU
+// BARU: Impor fungsi spesifik, bukan objek 'pixelRenderer'
+import { renderCharacterLayout, renderMapLayout } from '../services/pixelRenderer'; 
 
 // Helper untuk mengambil nama part (DIPINDAHKAN KE SINI)
 const getPartName = (arr: SpritePart[], id: string) => arr.find(p => p.id === id)?.name || '';
@@ -441,7 +442,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 // (P0 FIX) Panggil callback yang dilewatkan, jangan panggil dataStore langsung
                 // --- PANGGILAN AI BARU ---
                 // 1. Render layout pixel
-                const layout = pixelRenderer.renderCharacterLayout(newCharData as Character);
+                const layout = renderCharacterLayout(newCharData as Character); // Hapus 'pixelRenderer.'
                 
                 // 2. Buat prompt
                 set(state => ({ characterCreation: { ...state.characterCreation, statusMessage: "Menghubungi AI..." } }));
