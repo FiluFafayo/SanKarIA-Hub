@@ -13,6 +13,11 @@ import { InfoPanel } from "./game/InfoPanel";
 import { ChatLog } from "./game/ChatLog";
 import { ActionBar } from "./game/ActionBar";
 import { RollModal } from "./game/RollModal";
+// (Poin 7) Impor untuk Modal Level Up
+import { ModalWrapper } from "./ModalWrapper";
+import { Die } from "./Die";
+import { xpToNextLevel, rollHitDice, getAbilityModifier } from "../utils";
+import { findClass } from "../data/registry";
 
 // REFAKTOR G-4: GameScreen sekarang mengambil SSoT updater dari store
 import { useDataStore } from "../store/dataStore";
@@ -45,14 +50,23 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 	userId,
 }) => {
 	// REFAKTOR G-4-R1: Ambil aksi updater state runtime dari appStore
-	const { _setRuntimeCampaignState, _setRuntimeCharacterState } = useAppStore(
-		(s) => s.actions
-	);
+    // (Poin 7) Ambil state & aksi Level Up
+	const { 
+        _setRuntimeCampaignState, _setRuntimeCharacterState,
+        characterToLevel, triggerLevelUp, closeLevelUp
+    } = useAppStore(s => ({
+        _setRuntimeCampaignState: s.actions._setRuntimeCampaignState,
+        _setRuntimeCharacterState: s.actions._setRuntimeCharacterState,
+        characterToLevel: s.levelUp.characterToLevel,
+        triggerLevelUp: s.actions.triggerLevelUp,
+        closeLevelUp: s.actions.closeLevelUp,
+    }));
 
 	// Ambil SSoT updater dari dataStore
 	const { updateCharacter } = useDataStore((s) => s.actions);
 	// F3.1: Ambil SSoT characters (untuk mendeteksi data basi)
 	const ssotCharacters = useDataStore((s) => s.state.characters);
+    const dataStore = useDataStore.getState(); // (Poin 7)
 
 	// Inisialisasi useCampaign dengan state SSoT
 	const { campaign, campaignActions } = useCampaign(initialCampaign, players);
@@ -82,6 +96,21 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		});
 		// Kita hanya peduli jika SSoT (dari luar) berubah.
 	}, [ssotCharacters, campaignActions, campaign.players]);
+
+    // (Poin 7) Deteksi Level Up
+    const xpForNextLevel = xpToNextLevel(character.level);
+    useEffect(() => {
+        if (xpForNextLevel > 0 && character.xp >= xpForNextLevel) {
+            // Cek SSoT (dataStore) untuk memastikan kita belum memproses level up ini
+            // Ini mencegah modal muncul berulang kali jika SSoT belum disinkronkan
+            const ssotCharacter = dataStore.state.characters.find(c => c.id === character.id);
+            
+            // Jika SSoT level-nya MASIH SAMA dengan level runtime kita (yang akan naik), picu modal.
+            if (ssotCharacter && ssotCharacter.level === character.level) {
+                 triggerLevelUp(character);
+            }
+        }
+    }, [character.xp, character.level, xpForNextLevel, triggerLevelUp, character, dataStore.state.characters]);
 
 	// REFAKTOR G-4-R1: Sync state internal useCampaign -> ke state runtime global (appStore)
 	// Ini penting agar saat 'exitGame' dipanggil, state terbaru-lah yang disimpan.
@@ -311,6 +340,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 				setActiveTab={setActiveMobileTab}
 			/>
 
+			{/* (Poin 7) Render Modal Level Up jika terpicu */}
+            {characterToLevel && characterToLevel.id === character.id && (
+                <LevelUpModal
+                    key={characterToLevel.id}
+                    char={characterToLevel}
+                    onComplete={closeLevelUp}
+                    onSave={memoizedUpdateCharacter}
+                />
+            )}
+
 			{campaign.activeRollRequest &&
 				campaign.activeRollRequest.characterId === character.id && (
 					<RollModal
@@ -359,4 +398,83 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 			)}
 		</div>
 	);
+};
+
+// (Poin 7) Komponen Level Up Modal
+const LevelUpModal: React.FC<{
+    char: Character;
+    onComplete: () => void;
+    onSave: (updatedChar: Character) => Promise<void>;
+}> = ({ char, onComplete, onSave }) => {
+    const [step, setStep] = useState(0); // 0 = intro, 1 = rolling, 2 = result
+    const [hpRoll, setHpRoll] = useState(0);
+    const [newMaxHp, setNewMaxHp] = useState(0);
+
+    const conMod = getAbilityModifier(char.abilityScores.constitution);
+    // Ambil Tipe Hit Dice (e.g., 'd10') dari registry
+    const classHitDice = findClass(char.class)?.hitDice || 'd8'; 
+    const dieTypeNum = parseInt(classHitDice.replace('d','')) as 20 | 12 | 10 | 8 | 6;
+
+    const handleRollHp = () => {
+        setStep(1); // Show rolling
+        // (Hotfix G-Fix v3) Panggil util baru dengan object, bukan string
+        const roll = rollHitDice(char.hitDice, conMod, char.level + 1);
+        const newHp = char.maxHp + roll;
+        
+        setTimeout(() => {
+            setHpRoll(roll);
+            setNewMaxHp(newHp);
+            setStep(2); // Show result
+        }, 1500);
+    };
+
+    const handleConfirm = async () => {
+        const updatedChar: Character = {
+            ...char,
+            level: char.level + 1,
+            maxHp: newMaxHp,
+            currentHp: newMaxHp, // Full heal on level up
+            // TODO (Poin 7 Gap): Tawarkan ability/spell baru.
+            // Untuk sekarang, kita hanya implementasikan HP roll & Lvl.
+            // Kita juga perlu update SSoT Hit Dice (tambah 1 max)
+            hitDice: {
+                [classHitDice]: {
+                    max: (char.hitDice[classHitDice]?.max || 0) + 1,
+                    spent: 0 // Reset spent HD
+                }
+            }
+        };
+        await onSave(updatedChar);
+        onComplete();
+    };
+
+    return (
+        <ModalWrapper onClose={() => {}} title="Naik Level!">
+            <div className="bg-gray-800/80 backdrop-blur-sm border border-purple-500/30 rounded-xl p-8 shadow-2xl text-white w-full max-w-lg text-center">
+                <h2 className="font-cinzel text-3xl text-purple-200">Selamat!</h2>
+                <p className="text-lg my-2">{char.name} telah mencapai Level {char.level + 1}!</p>
+                
+                {step === 0 && (
+                    <button onClick={handleRollHp} className="font-cinzel text-2xl bg-purple-600 hover:bg-purple-500 px-8 py-4 rounded-lg shadow-lg transition-transform hover:scale-105 mt-4">
+                        Lemparkan Hit Dice ({classHitDice})!
+                    </button>
+                )}
+                {step === 1 && (
+                    <div className="flex justify-center my-8">
+                        <Die sides={dieTypeNum} value={'?'} size="lg" isRolling={true} status={'neutral'} />
+                    </div>
+                )}
+                {step === 2 && (
+                     <div className="animate-fade-in-fast flex flex-col items-center mt-6">
+                        <p>HP Bertambah ({classHitDice} + {conMod} CON):</p>
+                        <h3 className="font-bold text-7xl mb-4 text-green-400">{hpRoll}</h3>
+                        <p>Max HP Baru: {char.maxHp} &rarr; {newMaxHp}</p>
+                        <button onClick={handleConfirm} className="font-cinzel text-xl bg-green-600 hover:bg-green-500 px-6 py-2 rounded-lg shadow-lg transition-transform hover:scale-105 mt-6">
+                            Luar Biasa!
+                        </button>
+                    </div>
+                )}
+            </div>
+        </ModalWrapper>
+    );
 };

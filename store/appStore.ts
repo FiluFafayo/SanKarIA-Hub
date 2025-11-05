@@ -130,6 +130,19 @@ interface CampaignFramework {
     potentialSideQuests: { title: string, description: string }[];
     description: string;
 }
+// (Poin 7) Slice state baru untuk UI Level Up
+interface LevelUpState {
+    characterToLevel: Character | null; // Karakter yang sedang naik level
+}
+const initialLevelUpState: LevelUpState = {
+    characterToLevel: null,
+};
+interface LevelUpActions {
+    triggerLevelUp: (character: Character) => void;
+    closeLevelUp: () => void;
+}
+
+
 interface CampaignCreationState {
     step: number; // 0 = tidak aktif
     pillars: CampaignCreationPillars;
@@ -157,9 +170,10 @@ interface CampaignCreationActions {
 type AppStore = {
     navigation: NavigationState;
     runtime: RuntimeState; // G-4-R1
+    levelUp: LevelUpState; // (Poin 7)
     characterCreation: CharacterCreationState;
     campaignCreation: CampaignCreationState;
-    actions: NavigationActions & RuntimeActions & CharacterCreationActions & CampaignCreationActions;
+    actions: NavigationActions & RuntimeActions & LevelUpActions & CharacterCreationActions & CampaignCreationActions;
 }
 
 // =================================================================
@@ -169,6 +183,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     // === STATE ===
     navigation: initialNavigationState,
     runtime: initialRuntimeState,
+    levelUp: initialLevelUpState, // (Poin 7)
     characterCreation: initialCharacterState,
     campaignCreation: initialCampaignState,
 
@@ -243,6 +258,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
         },
         _setRuntimeCharacterState: (character) => {
             set(state => ({ runtime: { ...state.runtime, playingCharacter: character } }));
+        },
+
+        // --- Level Up Actions (Poin 7) ---
+        triggerLevelUp: (character) => {
+            // Cek untuk mencegah modal muncul berulang kali jika state belum di-save
+            if (get().levelUp.characterToLevel) return;
+            console.log(`[LevelUp] Memicu modal Level Up untuk ${character.name}`);
+            set(state => ({ levelUp: { characterToLevel: character } }));
+        },
+        closeLevelUp: () => {
+            set({ levelUp: initialLevelUpState });
         },
 
         // --- Character Actions ---

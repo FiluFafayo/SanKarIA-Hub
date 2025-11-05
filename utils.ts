@@ -69,8 +69,10 @@ export const rollOneAbilityScore = (): number => {
 };
 
 // (Poin 7) Helper Roll HP dengan Safety Net
-export const rollHitDice = (hitDice: string, conMod: number, level: number): number => {
-    const match = hitDice.match(/d(\d+)/);
+// (Hotfix G-Fix v3) Ubah 'hitDice: string' menjadi 'hitDice: Record<...>'
+export const rollHitDice = (hitDice: Record<string, { max: number; spent: number }>, conMod: number, level: number): number => {
+    const dieString = Object.keys(hitDice)[0] || 'd8'; // Ambil 'd10' atau 'd8'
+    const match = dieString.match(/d(\d+)/);
     if (!match) return 1 + conMod; // Fallback
     
     const dieType = parseInt(match[1], 10);
