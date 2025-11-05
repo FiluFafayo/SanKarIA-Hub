@@ -1,5 +1,5 @@
 -- =================================================================
--- SKRIP SQL FINAL (CLEAN, CREATE, SEED) - VERSI 3 (DEFINITIF)
+-- SKRIP SQL FINAL (CLEAN, CREATE, SEED) - VERSI 4 (PATCHED)
 -- =================================================================
 
 -- =================================================================
@@ -131,6 +131,14 @@ CREATE TABLE "public"."characters" (
     "level" integer NOT NULL DEFAULT 1,
     "xp" integer NOT NULL DEFAULT 0,
     "image" "text",
+    -- FASE 0: TAMBAHAN KOLOM VISUAL
+    "gender" "text" DEFAULT 'Pria',
+    "body_type" "text" DEFAULT 'bt_normal',
+    "scars" "text"[] DEFAULT '{}',
+    "hair" "text" DEFAULT 'h_short_blond',
+    "facial_hair" "text" DEFAULT 'ff_none',
+    "head_accessory" "text" DEFAULT 'ha_none',
+    -- AKHIR TAMBAHAN
     "background" "text",
     "personality_trait" "text",
     "ideal" "text",
@@ -207,9 +215,6 @@ CREATE POLICY "Users can manage their own character's known spells." ON "public"
 
 CREATE TABLE "public"."campaigns" (
     "id" "uuid" PRIMARY KEY DEFAULT "gen_random_uuid"(),
-    -- =============================================================
-    -- PERBAIKAN ARSITEKTUR: Merujuk ke auth.users, BUKAN profiles
-    -- =============================================================
     "owner_id" "uuid" NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
     "title" "text" NOT NULL,
     "description" "text",
@@ -223,12 +228,19 @@ CREATE TABLE "public"."campaigns" (
     "current_player_id" "uuid" REFERENCES "public"."characters"("id") ON DELETE SET NULL,
     "initiative_order" "text"[] DEFAULT '{}',
     "long_term_memory" "text",
-    "current_time" "text" DEFAULT 'Siang',
+    -- FASE 0: UBAH TIPE DATA WAKTU
+    "current_time" bigint DEFAULT 43200, -- (Default ke 12:00 PM dalam detik)
     "current_weather" "text" DEFAULT 'Cerah',
     "world_event_counter" integer DEFAULT 0,
     "map_image_url" "text",
     "map_markers" "jsonb"[] DEFAULT '{}',
     "current_player_location" "text",
+    -- FASE 0: TAMBAHAN KOLOM PETA
+    "exploration_grid" "jsonb" DEFAULT '[]'::jsonb,
+    "fog_of_war" "jsonb" DEFAULT '[]'::jsonb,
+    "battle_state" "jsonb", -- (Bisa null)
+    "player_grid_position" "jsonb" DEFAULT '{"x": 50, "y": 50}'::jsonb,
+    -- AKHIR TAMBAHAN
     "quests" "jsonb"[] DEFAULT '{}',
     "npcs" "jsonb"[] DEFAULT '{}',
     "maxPlayers" integer DEFAULT 4,

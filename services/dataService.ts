@@ -33,6 +33,14 @@ type DbCharacter = {
     level: number;
     xp: number;
     image: string;
+    // FASE 1: Tambahkan data visual
+    gender: string;
+    body_type: string;
+    scars: string[];
+    hair: string;
+    facial_hair: string;
+    head_accessory: string;
+    // AKHIR FASE 1
     background: string;
     personality_trait: string;
     ideal: string;
@@ -132,6 +140,16 @@ type DbCampaign = {
     id: string;
     owner_id: string;
     title: string;
+    description: string; // FASE 1: Menambahkan properti yang hilang
+    image: string; // FASE 1: Menambahkan properti yang hilang
+    join_code: string; // FASE 1: Menambahkan properti yang hilang
+    is_published: boolean; // FASE 1: Menambahkan properti yang hilang
+    maxPlayers: number; // FASE 1: Menambahkan properti yang hilang
+    theme: string; // FASE 1: Menambahkan properti yang hilang
+    mainGenre: string; // FASE 1: Menambahkan properti yang hilang
+    subGenre: string; // FASE 1: Menambahkan properti yang hilang
+    duration: string; // FASE 1: Menambahkan properti yang hilang
+    isNSFW: boolean; // FASE 1: Menambahkan properti yang hilang
     description: string;
     image: string;
     join_code: string;
@@ -149,11 +167,17 @@ type DbCampaign = {
     current_player_id: string | null;
     initiative_order: string[];
     long_term_memory: string;
-    current_time: 'Pagi' | 'Siang' | 'Sore' | 'Malam';
+    current_time: number; // FASE 1: Diubah ke number (bigint)
     current_weather: 'Cerah' | 'Berawan' | 'Hujan' | 'Badai';
     world_event_counter: number;
     map_image_url?: string;
     map_markers: any[]; // jsonb
+    // FASE 1: Tambahkan kolom peta
+    exploration_grid: any; // jsonb
+    fog_of_war: any; // jsonb
+    battle_state: any; // jsonb
+    player_grid_position: any; // jsonb
+    // AKHIR FASE 1
     current_player_location?: string;
     quests: any[]; // jsonb
     npcs: any[]; // jsonb
@@ -516,6 +540,14 @@ class DataService {
             level: coreData.level,
             xp: coreData.xp,
             image: coreData.image,
+            // FASE 1: Petakan data visual
+            gender: coreData.gender,
+            body_type: coreData.bodyType,
+            scars: coreData.scars,
+            hair: coreData.hair,
+            facial_hair: coreData.facialHair,
+            head_accessory: coreData.headAccessory,
+            // AKHIR FASE 1
             background: coreData.background,
             personality_trait: coreData.personalityTrait,
             ideal: coreData.ideal,
@@ -609,6 +641,14 @@ class DataService {
             level: charData.level,
             xp: charData.xp,
             image: charData.image,
+            // FASE 1: Petakan data visual
+            gender: charData.gender,
+            body_type: charData.bodyType,
+            scars: charData.scars,
+            hair: charData.hair,
+            facial_hair: charData.facialHair,
+            head_accessory: charData.headAccessory,
+            // AKHIR FASE 1
             background: charData.background,
             personality_trait: charData.personalityTrait,
             ideal: charData.ideal,
@@ -705,14 +745,20 @@ class DataService {
             responseLength: response_length,
             gameState: game_state,
             currentPlayerId: current_player_id,
-            initiativeOrder: initiative_order,
-            longTermMemory: long_term_memory,
-            currentTime: current_time,
+            initiative_order: initiative_order,
+            long_term_memory: long_term_memory,
+            currentTime: parseInt(current_time, 10) || 43200, // FASE 1: Konversi bigint (string) ke number
             currentWeather: current_weather,
             worldEventCounter: world_event_counter,
             mapImageUrl: map_image_url,
             mapMarkers: map_markers,
             currentPlayerLocation: current_player_location,
+            // FASE 1: Muat data peta
+            explorationGrid: dbCampaign.exploration_grid || [],
+            fogOfWar: dbCampaign.fog_of_war || [],
+            battleState: dbCampaign.battle_state || null,
+            playerGridPosition: dbCampaign.player_grid_position || { x: 50, y: 50 },
+            // AKHIR FASE 1
             playerIds: playerIds,
             eventLog: [],
             monsters: [],
@@ -791,7 +837,9 @@ class DataService {
             mainGenre, subGenre, duration, isNSFW, dmPersonality, dmNarrationStyle,
             responseLength, gameState, currentPlayerId, initiativeOrder, longTermMemory,
             currentTime, currentWeather, worldEventCounter, mapImageUrl, mapMarkers,
-            currentPlayerLocation, quests, npcs
+            currentPlayerLocation, quests, npcs,
+            // FASE 1: Ambil data peta
+            explorationGrid, fogOfWar, battleState, playerGridPosition
         } = campaign as CampaignState;
         
         // BUGFIX G-1: Petakan manual camelCase (App) ke snake_case (DB)
@@ -815,7 +863,7 @@ class DataService {
             current_player_id: currentPlayerId,
             initiative_order: initiativeOrder,
             long_term_memory: longTermMemory,
-            current_time: currentTime,
+            current_time: currentTime, // FASE 1: Ini sudah number (bigint)
             current_weather: currentWeather,
             world_event_counter: worldEventCounter,
             map_image_url: mapImageUrl,
@@ -823,6 +871,12 @@ class DataService {
             current_player_location: currentPlayerLocation,
             quests: quests,
             npcs: npcs,
+            // FASE 1: Petakan data peta
+            exploration_grid: explorationGrid,
+            fog_of_war: fogOfWar,
+            battle_state: battleState,
+            player_grid_position: playerGridPosition,
+            // AKHIR FASE 1
         };
         
         const { data, error } = await supabase
@@ -866,7 +920,7 @@ class DataService {
             current_player_id: campaign.currentPlayerId,
             initiative_order: campaign.initiativeOrder,
             long_term_memory: campaign.longTermMemory,
-            current_time: campaign.currentTime,
+            current_time: campaign.currentTime, // FASE 1: Ini sudah number (bigint)
             current_weather: campaign.currentWeather,
             world_event_counter: campaign.worldEventCounter,
             map_image_url: campaign.mapImageUrl,
@@ -874,6 +928,12 @@ class DataService {
             current_player_location: campaign.currentPlayerLocation,
             quests: campaign.quests,
             npcs: campaign.npcs,
+            // FASE 1: Petakan data peta
+            exploration_grid: campaign.explorationGrid,
+            fog_of_war: campaign.fogOfWar,
+            battle_state: campaign.battleState,
+            player_grid_position: campaign.playerGridPosition,
+            // AKHIR FASE 1
         };
         
         const { data, error } = await supabase

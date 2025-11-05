@@ -523,7 +523,7 @@ export interface RollRequest {
 }
 
 export interface ToolCall {
-    functionName: 'add_items_to_inventory' | 'update_quest_log' | 'log_npc_interaction' | 'spawn_monsters';
+    functionName: 'add_items_to_inventory' | 'update_quest_log' | 'log_npc_interaction' | 'spawn_monsters' | 'award_xp' | 'update_npc_opinion';
     args: any;
 }
 
