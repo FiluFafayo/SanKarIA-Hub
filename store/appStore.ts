@@ -17,11 +17,15 @@ import {
     findBackground, // (P0 FIX) Impor finder
     RaceData, ClassData, BackgroundData, EquipmentChoice // (Ekspor tipe dari registry jika perlu, tapi kita impor dari types)
 } from '../data/registry';
+import { SpritePart } from '../data/spriteParts'; // BARU: Impor tipe SpritePart
 import { getAbilityModifier } from '../utils';
 import { dataService } from '../services/dataService';
 import { useDataStore } from './dataStore';
 import { generationService } from '../services/ai/generationService'; // BARU
 import { pixelRenderer } from '../services/pixelRenderer'; // BARU
+
+// Helper untuk mengambil nama part (DIPINDAHKAN KE SINI)
+const getPartName = (arr: SpritePart[], id: string) => arr.find(p => p.id === id)?.name || '';
 
 // =================================================================
 // Tipe Helper
@@ -464,10 +468,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
             }
         },
 
-        // Helper untuk mengambil nama part
-const getPartName = (arr: SpritePart[], id: string) => arr.find(p => p.id === id)?.name || '';
-
-// --- Campaign Actions ---
+        // --- Campaign Actions ---
         setCampaignStep: (step) => set(state => ({ campaignCreation: { ...state.campaignCreation, step } })),
         setPillars: (pillars) => set(state => ({ campaignCreation: { ...state.campaignCreation, pillars } })),
         setFramework: (framework) => set(state => ({ campaignCreation: { ...state.campaignCreation, framework } })),
