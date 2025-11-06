@@ -104,7 +104,7 @@ export const useDataStore = create<DataStore>((set, get) => ({
             
             try {
                 await dataService.cacheGlobalData();
-                const fetchedCharacters = await dataService.getMyCharacters(userId);
+                let fetchedCharacters = await dataService.getMyCharacters(userId); // Ganti jadi 'let'
                 get().actions._setCharacters(fetchedCharacters);
 
                 const myCharacterIds = fetchedCharacters.map(c => c.id);
