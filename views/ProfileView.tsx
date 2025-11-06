@@ -1,8 +1,9 @@
 // REFAKTOR G-4: View ini sekarang menjadi "container" tipis
 // yang mengambil data dari store dan meneruskannya ke Modal.
+// FASE 1: Ganti nama impor ProfileModal -> ProfileWizard
 
 import React from 'react';
-import { ProfileModal } from '../components/modals/ProfileModal';
+import { ProfileWizard } from '../components/profile/ProfileWizard'; // FASE 1
 import { useAppStore } from '../store/appStore';
 import { useDataStore } from '../store/dataStore';
 import { ViewWrapper } from '../components/ViewWrapper'; // FASE 2: Impor ViewWrapper
@@ -29,7 +30,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onClose, userId }) => 
   // bukan sebagai modalnya sendiri.
   return (
     <ViewWrapper onClose={handleClose} title="Cermin Jiwa">
-      <ProfileModal 
+      {/* FASE 1: Ganti nama komponen */}
+      <ProfileWizard 
         onClose={handleClose} // onClose tetap di-pass untuk tombol Batal/Selesai di Wizard
         characters={characters.filter(c => c.ownerId === userId)} // Kirim SSoT karakter milikku
         userId={userId}

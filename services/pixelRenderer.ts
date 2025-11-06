@@ -62,8 +62,8 @@ export const renderCharacterLayout = (character: Character): string => {
         head_accessory: getPart('head_accessory', character.headAccessory, 'ha_none'),
         armor_torso: SPRITE_PARTS.armor_torso.find(p => p.name.toLowerCase().includes(character.class.toLowerCase())) || getPart('armor_torso', '', 'at_common_clothes'),
         armor_legs: SPRITE_PARTS.armor_legs.find(p => p.name.toLowerCase().includes(character.class.toLowerCase())) || getPart('armor_legs', '', 'al_common_pants'),
-        weapon_right: SPRITE_PARTS.weapon_right_hand[0], // (Akan di-implementasi di Fase 5 - Equipment)
-        weapon_left: SPRITE_PARTS.weapon_left_hand[0], // (Akan di-implementasi di Fase 5 - Equipment)
+        weapon_right: SPRITE_PARTS.weapon_right_hand[0], 
+        weapon_left: SPRITE_PARTS.weapon_left_hand[0], 
         scar: SPRITE_PARTS.facial_feature.find(p => character.scars.includes(p.id)) // Ambil scar pertama
     };
 
@@ -118,7 +118,6 @@ export const renderCharacterLayout = (character: Character): string => {
         ctx.fillRect(centerX + bodyWidth / 2, bodyY - bodyHeight / 2, (CHAR_CANVAS_WIDTH - centerX - bodyWidth / 2), bodyHeight); // Hapus area tangan kanan
         ctx.globalCompositeOperation = 'source-over'; // Kembali normal
     }
-    // (Tambahkan logika lain untuk body_type di sini)
     
     return canvas.toDataURL('image/png');
 };

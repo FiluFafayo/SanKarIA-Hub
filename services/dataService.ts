@@ -258,7 +258,6 @@ class DataService {
         if (this.isLoadingCache || this.hasLoadedCache) return;
         this.isLoadingCache = true;
         
-        console.log("Memulai cache data global...");
         const supabase = this.ensureSupabase();
         
         try {
@@ -275,7 +274,6 @@ class DataService {
             this.spellDefinitions = (spells || []).map(this.mapDbSpellToApp);
             this.monsterDefinitions = (monsters || []).map(this.mapDbMonsterToApp);
 
-            console.log(`Data global berhasil di-cache: ${this.itemDefinitions.length} item, ${this.spellDefinitions.length} spell, ${this.monsterDefinitions.length} monster.`);
             this.hasLoadedCache = true;
 
         } catch (error) {

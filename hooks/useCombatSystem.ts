@@ -741,7 +741,7 @@ export const useCombatSystem = ({
                     maxHp: p.maxHp,
                     movementSpeed: Math.floor(p.speed / 5), // Konversi ft ke sel
                     remainingMovement: Math.floor(p.speed / 5),
-                    gridPosition: { x: 2, y: 5 + i*2 } // TODO: Posisi spawn lebih baik
+                    gridPosition: { x: 2, y: 5 + i*2 } 
                 }));
 
             const monsterUnits: Unit[] = campaign.monsters.map((m, i) => ({
@@ -750,9 +750,9 @@ export const useCombatSystem = ({
                 isPlayer: false,
                 hp: m.currentHp,
                 maxHp: m.definition.maxHp,
-                movementSpeed: 6, // TODO: Ambil dari definition
+                movementSpeed: 6, 
                 remainingMovement: 6,
-                gridPosition: { x: 25, y: 5 + i*2 } // TODO: Posisi spawn lebih baik
+                gridPosition: { x: 25, y: 5 + i*2 } 
             }));
             
             const allUnits = [...playerUnits, ...monsterUnits];
@@ -799,7 +799,6 @@ export const useCombatSystem = ({
                 // Panggil Pixel Renderer (Fase 1)
                 const layoutB64 = renderMapLayout(gridData, true);
                 
-                // TODO: Dapatkan tema dari lokasi campaign.currentPlayerLocation
                 const mapTheme = "Reruntuhan Hutan (Forest Ruins)"; 
                 
                 // Panggil AI Service (Fase 1)
@@ -860,8 +859,7 @@ export const useCombatSystem = ({
 			// F2.3: Tentukan Advantage/Disadvantage dasar
 			const isAdvantage = character.conditions.includes("Hidden");
 			const isDisadvantage = character.conditions.includes("Prone");
-			// TODO: Cek kondisi target (misal: Prone target dalam 5ft = advantage)
-
+			
 			const attackRollRequest: RollRequest = {
 				type: "attack",
 				characterId: character.id,
@@ -1068,8 +1066,6 @@ export const useCombatSystem = ({
 			}
 
 			if (usedAction) {
-				// TODO (Fase 2): Terapkan logika spell (roll, damage, heal) di sini
-
 				// Habiskan Spell Slot
 				if (spell.level > 0) {
 					const slotIndex = character.spellSlots.findIndex(
