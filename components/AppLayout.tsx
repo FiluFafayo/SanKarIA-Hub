@@ -114,28 +114,23 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
               character={playingCharacter} 
               players={playingCampaign.players}
               onExit={handleExitGame} // Handler baru
-              // updateCharacter (SSoT) sekarang dipanggil DARI DALAM GameScreen
-              // (Lihat modifikasi GameScreen)
               userId={userId}
             />
         );
     }
 
-    // 3. Tampilkan Nexus (jika view = 'nexus') atau ViewManager (jika view != 'nexus')
+    // 3. Tampilkan ViewManager.
+    // FASE 0: Logika percabangan Nexus/ViewManager dihapus.
+    // ViewManager sekarang menangani SEMUA view, termasuk 'nexus'.
     return (
-        <>
-            {currentView === 'nexus' && <NexusSanctum userEmail={userEmail} />}
-            {currentView !== 'nexus' && 
-                <ViewManager 
-                    userId={userId}
-                    userEmail={userEmail}
-                    theme={theme}
-                    setTheme={setTheme}
-                    // Teruskan handler sesi game ke ViewManager
-                    onSelectCampaign={handleSelectCampaign}
-                    onCharacterSelection={handleCharacterSelection}
-                />
-            }
-        </>
+        <ViewManager 
+            userId={userId}
+            userEmail={userEmail}
+            theme={theme}
+            setTheme={setTheme}
+            // Teruskan handler sesi game ke ViewManager
+            onSelectCampaign={handleSelectCampaign}
+            onCharacterSelection={handleCharacterSelection}
+        />
     );
 };

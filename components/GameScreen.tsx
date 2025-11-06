@@ -1,35 +1,29 @@
 import React, { useState, useEffect, useCallback, MouseEvent } from "react";
-import { Campaign, Character, DiceRoll, RollRequest, Skill } from "../types";
+import { Campaign, Character, DiceRoll, RollRequest, Skill, CampaignState } from "../types"; // FASE 0: Impor CampaignState
 import { useCampaign } from "../hooks/useCampaign";
 import { useCombatSystem } from "../hooks/useCombatSystem";
 import { useExplorationSystem } from "../hooks/useExplorationSystem";
 
-// Import modular components
-import { MobileNavBar, MobileTab } from "./game/MobileNavBar"; // BARU: Impor MobileTab
-import { BattleMapRenderer } from "./game/BattleMapRenderer"; // BARU
-import { ChoiceButtons } from "./game/ChoiceButtons";
-import { CharacterPanel } from "./game/CharacterPanel";
-import { CombatTracker } from "./game/CombatTracker";
-import { InfoPanel } from "./game/InfoPanel";
-import { ChatLog } from "./game/ChatLog";
-import { ActionBar } from "./game/ActionBar";
+// FASE 0: Impor Panel Modular BARU
+import { MobileNavBar, MobileTab } from "./game/MobileNavBar";
+import { GameChatPanel } from "./game/panels/GameChatPanel";
+import { GameCharacterPanel } from "./game/panels/GameCharacterPanel";
+import { GameInfoPanel } from "./game/panels/GameInfoPanel";
+import { GameBattleMapPanel } from "./game/panels/GameBattleMapPanel";
+
+// Import komponen UI (tidak berubah)
 import { RollModal } from "./game/RollModal";
-// (Poin 7) Impor untuk Modal Level Up
 import { ModalWrapper } from "./ModalWrapper";
 import { Die } from "./Die";
 import { xpToNextLevel, rollHitDice, getAbilityModifier } from "../utils";
 import { findClass } from "../data/registry";
 
-// REFAKTOR G-4: GameScreen sekarang mengambil SSoT updater dari store
+// Import store (tidak berubah)
 import { useDataStore } from "../store/dataStore";
-
-// REFAKTOR G-4-R1: GameScreen sekarang harus mempropagasi perubahan
-// state runtime (campaign, character) kembali ke appStore.
-
-import { useAppStore } from "../store/appStore"; // G-4-R1
+import { useAppStore } from "../store/appStore";
 
 interface GameScreenProps {
-	initialCampaign: CampaignState; // G-4-R1: Tipe dikoreksi
+	initialCampaign: CampaignState; 
 	character: Character;
 	players: Character[];
 	onExit: (finalCampaignState: CampaignState) => void;
@@ -43,6 +37,29 @@ interface ContextMenuState {
 	objectId: string;
 }
 
+// FASE 0: CSS untuk layout grid baru
+const gridLayoutStyle = `
+    @media (min-width: 768px) { /* md */
+        #gamescreen-layout {
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr;
+            grid-template-areas: 
+                "chat character";
+        }
+        #gamescreen-layout > [data-area="info"] { display: none; }
+        #gamescreen-layout > [data-area="nav"] { display: none; }
+    }
+    @media (min-width: 1024px) { /* lg */
+        #gamescreen-layout {
+            grid-template-columns: 320px 1fr 384px; /* 80rem (w-80) + 1fr + 96rem (w-96) */
+            grid-template-areas: 
+                "info chat character";
+        }
+        #gamescreen-layout > [data-area="info"] { display: flex; }
+    }
+`;
+
+
 export const GameScreen: React.FC<GameScreenProps> = ({
 	initialCampaign,
 	character,
@@ -50,7 +67,9 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 	onExit,
 	userId,
 }) => {
-	// REFAKTOR G-4-R1: Ambil aksi updater state runtime dari appStore
+	// (Logika hook (useAppStore, useDataStore, useCampaign) tidak berubah)
+    // ... (kode hook identik dari Search) ...
+    // REFAKTOR G-4-R1: Ambil aksi updater state runtime dari appStore
     // (Poin 7) Ambil state & aksi Level Up
 	const { 
         _setRuntimeCampaignState, _setRuntimeCharacterState,
@@ -73,40 +92,24 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 	const { campaign, campaignActions } = useCampaign(initialCampaign, players);
 
 	// F3.2: Sinkronisasi Stale State (SSoT -> Runtime)
-	// Mendengarkan SSoT (dataStore) dan memaksa update ke state runtime (useCampaign)
-	// Ini penting jika HP/Inventaris pemain lain berubah (misal: multiplayer)
 	useEffect(() => {
-		// Ambil ID pemain yang ada di state runtime (useCampaign)
 		const runtimePlayerIds = new Set(campaign.players.map((p) => p.id));
-
-		// Filter SSoT global hanya untuk karakter yang relevan dengan campaign ini
 		const relevantSsotChars = ssotCharacters.filter((c) =>
 			runtimePlayerIds.has(c.id)
 		);
-
 		relevantSsotChars.forEach((ssotChar) => {
 			const runtimeChar = campaign.players.find((p) => p.id === ssotChar.id);
-
-			// Jika SSoT (dataStore) berbeda dari runtime (useCampaign)
-			// (Kita gunakan perbandingan JSON string untuk deteksi perubahan apa pun)
 			if (runtimeChar && JSON.stringify(runtimeChar) !== JSON.stringify(ssotChar)) {
-				// Update state runtime lokal (useCampaign)
-				// Ini akan me-refresh UI (CombatTracker, InfoPanel)
 				campaignActions.updateCharacterInCampaign(ssotChar);
 			}
 		});
-		// Kita hanya peduli jika SSoT (dari luar) berubah.
 	}, [ssotCharacters, campaignActions, campaign.players]);
 
     // (Poin 7) Deteksi Level Up
     const xpForNextLevel = xpToNextLevel(character.level);
     useEffect(() => {
         if (xpForNextLevel > 0 && character.xp >= xpForNextLevel) {
-            // Cek SSoT (dataStore) untuk memastikan kita belum memproses level up ini
-            // Ini mencegah modal muncul berulang kali jika SSoT belum disinkronkan
             const ssotCharacter = dataStore.state.characters.find(c => c.id === character.id);
-            
-            // Jika SSoT level-nya MASIH SAMA dengan level runtime kita (yang akan naik), picu modal.
             if (ssotCharacter && ssotCharacter.level === character.level) {
                  triggerLevelUp(character);
             }
@@ -114,7 +117,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
     }, [character.xp, character.level, xpForNextLevel, triggerLevelUp, character, dataStore.state.characters]);
 
 	// REFAKTOR G-4-R1: Sync state internal useCampaign -> ke state runtime global (appStore)
-	// Ini penting agar saat 'exitGame' dipanggil, state terbaru-lah yang disimpan.
 	useEffect(() => {
 		_setRuntimeCampaignState(campaign);
 	}, [campaign, _setRuntimeCampaignState]);
@@ -125,6 +127,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
 	const isMyTurn = campaign.currentPlayerId === character.id;
 
+    // (Logika useEffect untuk activeMobileTab tidak berubah)
 	useEffect(() => {
 		const isReadyForPlayerAction =
 			campaign.gameState === "combat" &&
@@ -135,7 +138,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		if (isReadyForPlayerAction) {
 			setActiveMobileTab("character");
 		} else {
-			setActiveMobileTab("chat");
+            // FASE 0: Default ke 'chat' atau 'battle' tergantung state
+			setActiveMobileTab(campaign.gameState === 'combat' ? 'battle' : 'chat');
 		}
 	}, [
 		campaign.gameState,
@@ -144,18 +148,17 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		campaign.activeRollRequest,
 	]);
 
+    // (Logika memoizedUpdateCharacter tidak berubah)
 	const memoizedUpdateCharacter = useCallback(
 		async (updatedChar: Character) => {
-			// 1. Update SSoT DB (via store)
 			await updateCharacter(updatedChar);
-			// 2. Update state runtime campaign internal (useCampaign)
 			campaignActions.updateCharacterInCampaign(updatedChar);
-			// 3. Update state runtime global (appStore) G-4-R1
 			_setRuntimeCharacterState(updatedChar);
 		},
 		[updateCharacter, campaignActions, _setRuntimeCharacterState]
 	);
 
+    // (Logika combatSystem dan explorationSystem tidak berubah)
 	const combatSystem = useCombatSystem({
 		campaign,
 		character,
@@ -171,25 +174,16 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		campaignActions,
 	});
 
-	// PERBAIKAN KRITIS: Logika `isDisabled` diubah total
-	// GANTI DENGAN LOGIKA BARU:
+    // (Logika isDisabled tidak berubah)
 	const isCombat = campaign.gameState === "combat";
-	// Giliran kombat kita adalah saat: mode kombat, giliran kita, DAN ada turnId aktif
 	const isMyCombatTurn = isCombat && isMyTurn && !!campaign.turnId;
-	// Mode eksplorasi adalah saat: BUKAN kombat, DAN TIDAK ada turnId aktif (game sedang menunggu input)
 	const isExploration = !isCombat && !campaign.turnId;
-
-	// Tombol Aksi di-disable JIKA:
-	// 1. AI sedang berpikir (selalu)
-	// 2. Ada RollModal aktif (selalu)
-	// 3. Kita lagi kombat, TAPI BUKAN giliran kita (isMyCombatTurn false)
-	// 4. Kita lagi eksplorasi, TAPI AI sedang memproses aksi (isExploration false)
-	// Jadi, kita aktif HANYA jika (AI tidak berpikir) DAN (tidak ada modal) DAN (ini giliran kombat kita ATAU ini mode eksplorasi)
 	const isDisabled =
 		campaign.thinkingState !== "idle" ||
 		!!campaign.activeRollRequest ||
 		(!isMyCombatTurn && !isExploration);
 
+    // (Logika handleActionSubmit, handleSkillSelect, handleRollComplete, handleObjectClick tidak berubah)
 	const handleActionSubmit = (actionText: string) => {
 		campaignActions.clearChoices();
 		if (campaign.gameState === "exploration") {
@@ -205,17 +199,15 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 	};
 
 	const handleRollComplete = (roll: DiceRoll, request: RollRequest) => {
-		const currentTurnId = campaign.turnId; // Ambil turnId yang sedang aktif
+		const currentTurnId = campaign.turnId; 
 		if (!currentTurnId) {
-			// Ini seharusnya tidak pernah terjadi jika modalnya muncul
 			console.error("RollModal selesai tetapi tidak ada turnId aktif!");
 			return;
 		}
-
 		if (campaign.gameState === "combat") {
-			combatSystem.handleRollComplete(roll, request, currentTurnId); // Lewatkan ID-nya
+			combatSystem.handleRollComplete(roll, request, currentTurnId); 
 		} else {
-			explorationSystem.handleRollComplete(roll, request, currentTurnId); // Lewatkan ID-nya
+			explorationSystem.handleRollComplete(roll, request, currentTurnId); 
 		}
 	};
 
@@ -231,6 +223,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 			objectId,
 		});
 	};
+    // ... (Akhir dari logika hook yang tidak berubah) ...
 
 	const hasChoices = campaign.choices && campaign.choices.length > 0;
 	const shouldShowChoices =
@@ -238,85 +231,15 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		(campaign.gameState === "exploration" ||
 			(isMyTurn && character.currentHp > 0));
 
-	// BARU: Panel untuk BattleMap
-    const BattleMapPanel = () => (
-        <main className="flex-grow flex flex-col h-full overflow-hidden">
-            {campaign.battleState ? (
-                <BattleMapRenderer 
-                    battleState={campaign.battleState} 
-                    campaignActions={campaignActions}
-                    currentUserId={character.id}
-                />
-            ) : (
-                <div className="w-full h-full flex items-center justify-center bg-black">
-                    <p>Menunggu Battle State...</p>
-                </div>
-            )}
-        </main>
-    );
-
-	const ChatPanel = () => (
-		<main className="flex-grow flex flex-col h-full overflow-hidden">
-            {/* BARU: Render Map jika kombat, Chat jika eksplorasi */}
-            {campaign.gameState === 'combat' && campaign.battleState ? (
-                <BattleMapRenderer 
-                    battleState={campaign.battleState} 
-                    campaignActions={campaignActions}
-                    currentUserId={character.id}
-                />
-            ) : (
-                <ChatLog
-                    events={campaign.eventLog}
-                    players={campaign.players}
-                    characterId={character.id}
-                    thinkingState={campaign.thinkingState}
-                    onObjectClick={handleObjectClick}
-                />
-            )}
-            {/* BARU: Jangan render input/pilihan jika sedang di peta tempur (desktop) */}
-			{(campaign.gameState !== 'combat') && (
-                <div className="flex-shrink-0">
-                    {shouldShowChoices && (
-                        <ChoiceButtons
-                            choices={campaign.choices}
-                            onChoiceSelect={handleActionSubmit}
-                        />
-                    )}
-                    <ActionBar
-                        disabled={isDisabled}
-                        onActionSubmit={handleActionSubmit}
-                        pendingSkill={pendingSkill}
-                    />
-                </div>
-            )}
-		</main>
-	);
-
-	const RightPanel = () => (
-		<aside className="w-full md:w-80 lg:w-96 flex-shrink-0 bg-gray-800 md:border-l-2 border-gray-700 p-4 overflow-y-auto flex flex-col gap-4">
-			<CombatTracker
-				players={campaign.players} // G-4-R1: Gunakan players dari state campaign
-				monsters={campaign.monsters}
-				initiativeOrder={campaign.initiativeOrder}
-				currentPlayerId={campaign.currentPlayerId}
-			/>
-			<CharacterPanel
-				character={character} // 'character' di sini adalah SSoT yang di-pass, ini OK
-				monsters={campaign.monsters}
-				isMyTurn={isMyTurn}
-				combatSystem={combatSystem}
-				// updateCharacter prop dihapus
-				gameState={campaign.gameState}
-				onSkillSelect={handleSkillSelect}
-			/>
-		</aside>
-	);
+	// FASE 0: HAPUS fungsi render lokal (BattleMapPanel, ChatPanel, RightPanel)
+    // ... (Fungsi BattleMapPanel, ChatPanel, RightPanel dihapus) ...
 
 	return (
 		<div
 			className="w-screen h-screen bg-gray-900 text-gray-200 flex flex-col font-sans"
 			onClick={() => setContextMenu(null)}
 		>
+            <style>{gridLayoutStyle}</style> {/* FASE 0: Tambahkan CSS Grid */}
 			<header className="flex-shrink-0 bg-gray-800 p-3 flex items-center justify-between border-b-2 border-gray-700 z-20">
 				<h1 className="font-cinzel text-xl text-purple-300 truncate pr-4">
 					{campaign.title}
@@ -325,7 +248,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 					onClick={() => onExit(campaign)}
 					className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-4 rounded flex-shrink-0 transition-colors
                                disabled:bg-gray-600 disabled:cursor-not-allowed"
-					// F1.1: Mencegah race condition saat keluar
 					disabled={
 						campaign.thinkingState !== "idle" || !!campaign.activeRollRequest
 					}
@@ -334,43 +256,94 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 				</button>
 			</header>
 
-			<div className="flex flex-grow overflow-hidden relative">
-				{/* Desktop Layout: Three columns for large screens, two for medium */}
-				<div className="hidden md:flex flex-grow h-full">
-					{/* Left Panel (Info) - shows only on large screens */}
-					<aside className="hidden lg:block w-80 xl:w-96 flex-shrink-0 bg-gray-800 border-r-2 border-gray-700">
-						<div className="h-full overflow-y-auto">
-							{/* BARU: Fase 6 - Perbaikan Regresi Stale State */}
-							<InfoPanel campaign={campaign} players={campaign.players} />
-						</div>
-					</aside>
+            {/* FASE 0: Ganti seluruh layout bercabang dengan CSS Grid tunggal */}
+			<div 
+                id="gamescreen-layout"
+                className="flex-grow overflow-hidden relative grid"
+                style={{
+                    gridTemplateRows: '1fr auto',
+                    gridTemplateAreas: `
+                        "chat"
+                        "nav"
+                    `
+                }}
+            >
+                {/* Panel Info (Area: info) */}
+                <div data-area="info" className="hidden lg:flex flex-col bg-gray-800 border-r-2 border-gray-700 overflow-hidden">
+                    <GameInfoPanel
+                        campaign={campaign}
+                        players={campaign.players}
+                    />
+                </div>
 
-					{/* Center Panel (Chat) */}
-					<ChatPanel />
+                {/* Panel Utama (Chat/Battle) (Area: chat) */}
+                <div 
+                    data-area="chat" 
+                    className="flex-grow overflow-hidden h-full"
+                    style={{
+                        display: activeMobileTab === 'chat' || activeMobileTab === 'battle' ? 'flex' : 'none'
+                    }}
+                >
+                    <GameChatPanel
+                        campaign={campaign}
+                        players={campaign.players}
+                        characterId={character.id}
+                        onObjectClick={handleObjectClick}
+                        shouldShowChoices={shouldShowChoices}
+                        onChoiceSelect={handleActionSubmit}
+                        isDisabled={isDisabled}
+                        pendingSkill={pendingSkill}
+                        onActionSubmit={handleActionSubmit}
+                        campaignActions={campaignActions}
+                        activeMobileTab={activeMobileTab}
+                        setActiveMobileTab={setActiveMobileTab}
+                    />
+                </div>
+                
+                {/* Panel Karakter (Area: character) */}
+                 <div 
+                    data-area="character" 
+                    className="flex-grow overflow-hidden h-full"
+                    style={{
+                        display: activeMobileTab === 'character' ? 'flex' : 'none'
+                    }}
+                 >
+                    <GameCharacterPanel
+                        character={character}
+                        campaign={campaign}
+                        combatSystem={combatSystem}
+                        onSkillSelect={handleSkillSelect}
+                        isMyTurn={isMyTurn}
+                    />
+                </div>
+                
+                {/* Panel Info (Mobile) */}
+                <div 
+                    data-area="info" 
+                    className="flex-grow overflow-hidden h-full"
+                    style={{
+                        display: activeMobileTab === 'info' ? 'flex' : 'none'
+                    }}
+                >
+                    <GameInfoPanel
+                        campaign={campaign}
+                        players={campaign.players}
+                    />
+                </div>
 
-					{/* Right Panel (Character/Combat) */}
-					<RightPanel />
-				</div>
-
-				{/* Mobile Layout (BARU) */}
-				<div className="md:hidden w-full h-full pb-16">
-					{activeMobileTab === "chat" && <ChatPanel />}
-                    {activeMobileTab === "battle" && <BattleMapPanel />}
-					{activeMobileTab === "character" && <RightPanel />}
-					{/* REFAKTOR G-4-R1: InfoPanel harus menggunakan 'campaign' (state) bukan 'initialCampaign' */}
-					{activeMobileTab === "info" && (
-						<InfoPanel campaign={campaign} players={campaign.players} />
-					)}
-				</div>
+                {/* Mobile Nav Bar (Area: nav) */}
+                <div data-area="nav" className="flex-shrink-0 md:hidden">
+                    <MobileNavBar
+                        activeTab={activeMobileTab}
+                        setActiveTab={setActiveMobileTab}
+                        gameState={campaign.gameState}
+                    />
+                </div>
 			</div>
+            {/* FASE 0: Akhir dari layout grid baru */}
 
-			<MobileNavBar
-				activeTab={activeMobileTab}
-				setActiveTab={setActiveMobileTab}
-                gameState={campaign.gameState}
-			/>
 
-			{/* (Poin 7) Render Modal Level Up jika terpicu */}
+			{/* (Render Modal tidak berubah) */}
             {characterToLevel && characterToLevel.id === character.id && (
                 <LevelUpModal
                     key={characterToLevel.id}
@@ -385,7 +358,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 					<RollModal
 						key={`${campaign.activeRollRequest.type}-${campaign.activeRollRequest.reason}`}
 						request={campaign.activeRollRequest}
-						character={character} // Ini OK, 'character' adalah SSoT kita
+						character={character} 
 						onComplete={handleRollComplete}
 					/>
 				)}
@@ -430,7 +403,8 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 	);
 };
 
-// (Poin 7) Komponen Level Up Modal
+// (Komponen LevelUpModal tidak berubah)
+// ... (kode LevelUpModal identik dari Search) ...
 const LevelUpModal: React.FC<{
     char: Character;
     onComplete: () => void;

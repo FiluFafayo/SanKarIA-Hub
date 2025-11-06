@@ -1,4 +1,5 @@
 // REFAKTOR G-4: Disederhanakan, ambil data dari store
+// FASE 0: Dihapus props 'myCharacters' dan 'campaigns'
 import React from "react";
 import { ViewWrapper } from "../components/ViewWrapper";
 import { Campaign, Character } from "../types";
@@ -7,7 +8,6 @@ import { useDataStore } from "../store/dataStore"; // G-4
 interface HallOfEchoesViewProps {
 	onClose: () => void;
 	onSelectCampaign: (campaign: Campaign) => void; // Handler tetap di-pass
-	// Props campaigns, myCharacters, onUpdateCampaign dihapus
 }
 
 const CampaignPortal: React.FC<{
@@ -44,10 +44,9 @@ const CampaignPortal: React.FC<{
 					<p className="text-sm font-bold text-amber-300">Giliran Anda!</p>
 				)}
 				<p className="text-xs opacity-80">
-					{campaign.eventLog.length > 0
-						? `Terakhir dimainkan: ${new Date(
-								campaign.eventLog[campaign.eventLog.length - 1].timestamp
-						  ).toLocaleDateString()}`
+                    {/* FASE 0: eventLog tidak ada di SSoT, periksa playerIds saja */}
+					{campaign.playerIds.length > 0
+						? `${campaign.playerIds.length} pemain bergabung`
 						: "Belum dimulai"}
 				</p>
 			</div>

@@ -4,11 +4,14 @@
 // ke view yang sesuai.
 
 import React from 'react';
+import React from 'react';
 import { Location, Campaign, Character } from '../types';
 import { useAppStore } from '../store/appStore';
 import { useDataStore } from '../store/dataStore';
+import { dataService } from '../services/dataService'; // Import dataService
 
 // Import Views
+import { NexusSanctum } from './NexusSanctum'; // FASE 0: Import Nexus
 import { CreateCampaignView } from '../views/CreateCampaignView';
 import { HallOfEchoesView } from '../views/HallOfEchoesView';
 import { JoinCampaignView } from '../views/JoinCampaignView';
@@ -42,7 +45,8 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
     const { campaigns, characters } = useDataStore(s => s.state);
     
     // Ambil Aksi SSoT
-    const { createCampaign, updateCampaign, addCampaign } = useDataStore(s => s.actions);
+    // REFAKTOR G-4: HallOfEchoesView memanggil dataStore.saveCampaign secara langsung
+    const { createCampaign, addCampaign } = useDataStore(s => s.actions);
 
     // Ini adalah logika 'renderView' yang lama
     if (currentView === 'character-selection' && campaignToJoinOrStart) {
@@ -55,20 +59,21 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
       );
     }
 
+    // FASE 0: ViewManager sekarang menangani SEMUA view, termasuk 'nexus'
     switch (currentView) {
+      case 'nexus':
+        return <NexusSanctum userEmail={userEmail} />;
       case Location.StorytellersSpire:
         return <CreateCampaignView 
                     onClose={returnToNexus} 
-                    // createCampaign (dari dataStore) menangani AI call + save
                     onCreateCampaign={(campaignData) => createCampaign(campaignData, userId)} 
                 />;
       case Location.HallOfEchoes:
         return <HallOfEchoesView 
                     onClose={returnToNexus} 
-                    campaigns={campaigns} // SSoT
+                    // campaigns, myCharacters, dan onUpdateCampaign dihapus
+                    // View akan mengambilnya dari dataStore
                     onSelectCampaign={onSelectCampaign} // Handler dari AppLayout
-                    myCharacters={characters} // SSoT
-                    onUpdateCampaign={updateCampaign} // Aksi SSoT
                 />;
       case Location.WanderersTavern:
         return <JoinCampaignView 
@@ -95,6 +100,6 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
                   userId={userId} 
                 />; // Disederhanakan, ProfileView akan ambil data dari store
       default:
-        return null; // 'nexus' ditangani oleh AppLayout
+        return <NexusSanctum userEmail={userEmail} />; // Fallback aman
     }
 };

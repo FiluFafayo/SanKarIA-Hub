@@ -505,6 +505,39 @@ export interface CampaignState extends Campaign {
     players: Character[]; // Daftar objek Karakter *lengkap* yang ada di sesi ini
 }
 
+// FASE 0: Tipe Aksi Kampanye diperlukan oleh panel modular
+export interface CampaignActions {
+	logEvent: (event: any, turnId: string) => void;
+	startTurn: () => string;
+	endTurn: () => void;
+	updateMonster: (monster: MonsterInstance) => void;
+	removeMonster: (monsterInstanceId: string) => void;
+	setInitiativeOrder: (order: string[]) => void;
+	setCurrentPlayerId: (id: string | null) => void;
+	setGameState: (state: "exploration" | "combat") => void;
+	setThinkingState: (state: ThinkingState) => void;
+	setActiveRollRequest: (request: RollRequest | null) => void;
+	spawnMonsters: (monstersToSpawn: any[]) => void;
+	clearChoices: () => void;
+	setChoices: (choices: string[]) => void;
+	updateCharacterInCampaign: (character: Character) => void;
+	addItemsToInventory: (payload: any) => void;
+	updateQuestLog: (payload: any) => void;
+	logNpcInteraction: (payload: any) => void;
+    setBattleState: (state: BattleState | null) => void;
+    setBattleGrid: (grid: GridCell[][]) => void;
+    setBattleMapImage: (url: string) => void;
+    setBattleUnits: (units: Unit[]) => void;
+    setActiveBattleUnit: (id: string | null) => void;
+    moveUnit: (payload: { unitId: string; newPosition: { x: number; y: number }; cost: number }) => void;
+    clearBattleState: () => void; 
+    setFogOfWar: (fog: boolean[][]) => void; 
+    advanceTime: (seconds: number) => void;
+    setWeather: (weather: WorldWeather) => void;
+    awardXp: (characterId: string, amount: number) => void; 
+    updateNpcOpinion: (npcId: string, characterId: string, change: number) => void;
+}
+
 
 export interface RollRequest {
     type: 'skill' | 'savingThrow' | 'attack' | 'damage' | 'deathSave';

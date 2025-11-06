@@ -21,7 +21,9 @@ const NavButton: React.FC<{ label: string, isActive: boolean, onClick: () => voi
 
 export const MobileNavBar: React.FC<MobileNavBarProps> = ({ activeTab, setActiveTab, gameState }) => {
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-gray-800 border-t-2 border-gray-700 flex justify-around items-stretch z-30">
+    // FASE 0: Hapus 'md:hidden' dan 'fixed bottom-0'.
+    // Komponen ini sekarang akan ditempatkan di dalam grid layout.
+    <div className="h-16 bg-gray-800 border-t-2 border-gray-700 flex justify-around items-stretch z-30">
         <NavButton label="Karakter" isActive={activeTab === 'character'} onClick={() => setActiveTab('character')} />
         
         {/* BARU: Render kondisional berdasarkan gameState */}

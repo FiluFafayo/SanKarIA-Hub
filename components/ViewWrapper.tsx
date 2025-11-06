@@ -6,10 +6,12 @@ interface ViewWrapperProps {
   title: string;
 }
 
+// FASE 0: Direfaktor. Ini bukan lagi MODAL (fixed inset-0).
+// Ini sekarang adalah Halaman Layout standar yang membungkus view.
 export const ViewWrapper: React.FC<ViewWrapperProps> = ({ children, onClose, title }) => {
   return (
-    <div className="fixed inset-0 bg-bg-primary text-text-primary z-50 flex flex-col animate-fade-in">
-      <header className="flex-shrink-0 bg-bg-secondary/80 backdrop-blur-sm p-4 flex items-center justify-between border-b border-border-primary">
+    <div className="w-full min-h-screen bg-bg-primary text-text-primary flex flex-col animate-fade-in">
+      <header className="flex-shrink-0 bg-bg-secondary/80 backdrop-blur-sm p-4 flex items-center justify-between border-b border-border-primary z-10">
         <h1 className="font-cinzel text-2xl text-accent-primary">{title}</h1>
         <button
           onClick={onClose}
