@@ -3,7 +3,7 @@
 // FASE 1: Ganti nama impor ProfileModal -> ProfileWizard
 
 import React from 'react';
-import { ProfileWizard } from '@/components/profile/ProfileWizard'; // FASE 1 (FIX): Gunakan alias path
+import { ProfileWizard } from '../components/profile/ProfileWizard'; // FASE 1
 import { useAppStore } from '../store/appStore';
 import { useDataStore } from '../store/dataStore';
 import { ViewWrapper } from '../components/ViewWrapper'; // FASE 2: Impor ViewWrapper
