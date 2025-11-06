@@ -4,7 +4,7 @@
 // ke view yang sesuai.
 
 import React from 'react';
-import React from 'react';
+// FASE 1 FIX: Hapus impor ganda
 import { Location, Campaign, Character } from '../types';
 import { useAppStore } from '../store/appStore';
 import { useDataStore } from '../store/dataStore';

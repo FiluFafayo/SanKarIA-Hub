@@ -17,12 +17,7 @@ import { AppLayout } from './components/AppLayout'; // G-4
 // REFAKTOR G-5: (Fase 1.E Hotfix) Dihapus.
 // Data statis sekarang diakses melalui data/registry.ts,
 // bukan di-load ke (window).
-// import { RACES } from './data/races'; // (Dihapus)
-// import { CLASS_DEFINITIONS } from './data/classes'; // (Dihapus)
-// import { BACKGROUNDS } from './data/backgrounds'; // (Dihapus)
-// (window as any).RACES_DATA = RACES; // (Dihapus)
-// (window as any).CLASS_DEFINITIONS_DATA = CLASS_DEFINITIONS; // (Dihapus)
-// (window as any).BACKGROUNDS_DATA = BACKGROUNDS; // (Dihapus)
+// (Impor dan penetapan window dihapus)
 
 const App: React.FC = () => {
   const [theme, setTheme] = useLocalStorage<string>('sankaria-hub-theme', 'theme-sanc');

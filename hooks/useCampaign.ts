@@ -7,7 +7,7 @@ import {
 	GameEvent,
 	MonsterInstance,
 	RollRequest,
-	InventoryItem,
+	CharacterInventoryItem, // FASE 1 FIX: Ganti nama tipe
 	Character,
 	ThinkingState,
 	Quest,

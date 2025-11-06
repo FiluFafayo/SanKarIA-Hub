@@ -355,19 +355,8 @@ class DataService {
         return this.monsterDefinitions;
     }
     
-    // REFAKTOR G-5/Pembersihan: Fungsi-fungsi ini digantikan oleh data/registry.ts
-    // public findItemDefinition(name: string): ItemDefinition | undefined {
-    //     if (!this.hasLoadedCache) console.warn(`Cache 'items' belum siap saat mencari: ${name}`);
-    //     return this.itemDefinitions.find(i => i.name.toLowerCase() === name.toLowerCase());
-    // }
-    // public findSpellDefinition(name: string): SpellDefinition | undefined {
-    //     if (!this.hasLoadedCache) console.warn(`Cache 'spells' belum siap saat mencari: ${name}`);
-    //     return this.spellDefinitions.find(s => s.name.toLowerCase() === name.toLowerCase());
-    // }
-    // public findMonsterDefinition(name: string): MonsterDefinition | undefined {
-    //     if (!this.hasLoadedCache) console.warn(`Cache 'monsters' belum siap saat mencari: ${name}`);
-    //     return this.monsterDefinitions.find(m => m.name.toLowerCase() === name.toLowerCase());
-    // }
+    // REFAKTOR G-5/Pembersihan: Fungsi-fungsi 'find...Definition' yang usang dihapus.
+    // Aplikasi sekarang harus menggunakan data/registry.ts
 
     // =================================================================
     // METODE OTENTIKASI & PROFIL (Sudah Benar)
