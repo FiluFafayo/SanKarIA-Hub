@@ -217,10 +217,15 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
         // REFAKTOR G-4: onCreateCampaign sekarang adalah aksi dari dataStore
         await onCreateCampaign(newCampaign); 
         resetCampaignCreation(); // Reset state G-3 setelah sukses
+        
+        // BUG FIX: Panggil handleClose() setelah sukses
+        handleClose();
 
     } catch (e) {
         console.error("Gagal memekanisasi atau membuat kampanye:", e);
         alert("Gagal menyelesaikan pembuatan kampanye. Coba lagi.");
+    } finally {
+        // BUG FIX: Selalu matikan loading spinner, baik sukses atau gagal
         setIsLoading(false);
     }
   };
