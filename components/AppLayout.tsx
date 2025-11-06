@@ -78,7 +78,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
 
         } catch (e) {
              console.error("Gagal join campaign:", e);
-             alert("Gagal bergabung ke campaign. Mungkin Anda sudah bergabung?");
+             // FASE 4: Hapus alert()
+             console.error("Gagal bergabung ke campaign. Mungkin Anda sudah bergabung?");
              returnToNexus();
         }
     };

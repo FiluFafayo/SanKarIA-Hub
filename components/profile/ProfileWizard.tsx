@@ -422,7 +422,8 @@ const CreateCharacterWizard: React.FC<{
                 : (currentSkills.length < limit ? [...currentSkills, skill] : currentSkills);
 
             if (newSkills.length > limit) {
-                alert(`Anda hanya bisa memilih ${limit} skill.`);
+                // FASE 4: Ganti alert()
+                console.warn(`Anda hanya bisa memilih ${limit} skill.`);
                 return currentSkills;
             }
             return newSkills;

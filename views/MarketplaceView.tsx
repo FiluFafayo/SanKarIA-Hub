@@ -59,7 +59,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 				setPublishedCampaigns(campaigns);
 			} catch (error) {
 				console.error("Gagal memuat marketplace:", error);
-				alert("Gagal memuat Pasar Seribu Kisah. Coba lagi nanti.");
+				// FASE 4: Hapus alert()
+				console.error("Gagal memuat Pasar Seribu Kisah. Coba lagi nanti.");
 			} finally {
 				setIsLoading(false);
 			}
@@ -111,12 +112,14 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
 			// REFAKTOR G-4: Panggil aksi store untuk menambah ke SSoT
 			onCampaignCopied(createdCampaign);
-			alert(
+			// FASE 4: Ganti alert() dengan console.log untuk pesan sukses non-invasif
+			console.log(
 				`Kampanye "${originalCampaign.title}" telah disalin ke Aula Gema Anda!`
 			);
 		} catch (error) {
 			console.error("Gagal menyalin campaign:", error);
-			alert("Gagal menyalin campaign.");
+			// FASE 4: Hapus alert()
+			console.error("Gagal menyalin campaign.");
 		}
 	};
 

@@ -111,7 +111,8 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 set(state => ({ state: { ...state.state, hasLoaded: true } }));
             } catch (error) {
                 console.error("Gagal memuat data:", error);
-                alert("Gagal memuat data dari Supabase. Periksa koneksi internet Anda atau coba lagi nanti.");
+                // FASE 4: Hapus alert()
+                console.error("Gagal memuat data dari Supabase. Periksa koneksi internet Anda atau coba lagi nanti.");
             } finally {
                 get().actions._setLoading(false);
             }
@@ -135,7 +136,8 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 });
             } catch (e) {
                 console.error("Gagal menyimpan kampanye:", e);
-                alert("Gagal menyimpan progres kampanye. Periksa koneksi Anda.");
+                // FASE 4: Hapus alert()
+                console.error("Gagal menyimpan progres kampanye. Periksa koneksi Anda.");
             }
         },
 
@@ -145,7 +147,8 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 get().actions._updateCharacter(savedCharacter);
             } catch (e) {
                  console.error("Gagal menyimpan karakter (SSoT):", e);
-                 alert("Gagal menyimpan progres karakter. Periksa koneksi Anda.");
+                 // FASE 4: Hapus alert()
+                 console.error("Gagal menyimpan progres karakter. Periksa koneksi Anda.");
             }
         },
 
@@ -155,7 +158,8 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 get().actions._addCharacter(newCharacter);
             } catch (e) {
                 console.error("Gagal menyimpan karakter baru:", e);
-                alert("Gagal menyimpan karakter baru. Coba lagi.");
+                // FASE 4: Hapus alert()
+                // UI (ProfileWizard) sekarang menangani ini dengan statusMessage
                 throw e; // Lemparkan error agar UI (store G-3) tahu
             }
         },
@@ -178,7 +182,8 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 return newCampaign; // Kembalikan untuk alur join
             } catch (e) {
                 console.error("Gagal membuat kampanye atau adegan pembuka:", e);
-                alert("Gagal membuat kampanye. Coba lagi.");
+                // FASE 4: Hapus alert()
+                console.error("Gagal membuat kampanye. Coba lagi.");
                 throw e;
             }
         },

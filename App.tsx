@@ -48,7 +48,8 @@ const App: React.FC = () => {
 
     if (!supabaseUrl || !supabaseKey) {
       console.error("❌ VITE_SUPABASE_URL atau VITE_SUPABASE_ANON_KEY environment variable belum disetel!");
-      alert("Konfigurasi database belum lengkap. Aplikasi mungkin tidak berfungsi dengan benar.");
+      // FASE 4: Hapus alert()
+      console.error("Konfigurasi database belum lengkap. Aplikasi mungkin tidak berfungsi dengan benar.");
     }
     dataService.init(supabaseUrl, supabaseKey);
   }, []);

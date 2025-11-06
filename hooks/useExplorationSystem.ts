@@ -218,7 +218,8 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
 
         // (Poin 8) Cek Random Encounter (5% chance)
         if (Math.random() < 0.05 && campaign.gameState === 'exploration') {
-            console.warn("[Fase 2] Random Encounter Terpicu!");
+            // FASE 4: Hapus console.warn debug
+            // console.warn("[Fase 2] Random Encounter Terpicu!");
             const encounterActionText = "Sedang bepergian, tiba-tiba ada ancaman baru muncul dari bayang-bayang...";
             
             try {

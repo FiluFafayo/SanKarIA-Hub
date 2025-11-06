@@ -76,7 +76,9 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
 
   const generateFramework = async () => {
       if (!pillars.premise.trim() || !pillars.keyElements.trim()) {
-          alert("Premis Utama dan Elemen Kunci harus diisi.");
+          // FASE 4: Ganti alert()
+          console.warn("Premis Utama dan Elemen Kunci harus diisi.");
+          setLoadingMessage("Premis Utama dan Elemen Kunci harus diisi."); // (Menampilkan di UI akan lebih baik, tapi ini non-blocking)
           return;
       }
       setIsLoading(true);
@@ -87,7 +89,8 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
           setStep(2); // FASE 0: Ganti ke state lokal
       } catch (e) {
           console.error("Gagal membuat kerangka kampanye:", e);
-          alert("Gagal berkomunikasi dengan AI untuk membuat kerangka. Coba lagi.");
+          // FASE 4: Hapus alert()
+          console.error("Gagal berkomunikasi dengan AI untuk membuat kerangka. Coba lagi.");
       } finally {
           setIsLoading(false);
       }
@@ -115,7 +118,8 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
 
       } catch (e) {
           console.error("Gagal membuat peta:", e);
-          alert("Gagal membuat peta kampanye. Anda dapat melanjutkan tanpa peta atau mencoba lagi.");
+          // FASE 4: Hapus alert()
+          console.error("Gagal membuat peta kampanye. Anda dapat melanjutkan tanpa peta atau mencoba lagi.");
           setStep(4); // FASE 0: Ganti ke state lokal
       } finally {
           setIsLoading(false);
@@ -234,7 +238,8 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
 
     } catch (e) {
         console.error("Gagal memekanisasi atau membuat kampanye:", e);
-        alert("Gagal menyelesaikan pembuatan kampanye. Coba lagi.");
+        // FASE 4: Hapus alert()
+        console.error("Gagal menyelesaikan pembuatan kampanye. Coba lagi.");
     } finally {
         // BUG FIX: Selalu matikan loading spinner, baik sukses atau gagal
         setIsLoading(false);

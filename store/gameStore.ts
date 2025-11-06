@@ -68,7 +68,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 });
             } catch (e) {
                 console.error("Gagal memuat data runtime campaign:", e);
-                alert("Gagal memuat sesi permainan. Coba lagi.");
+                // FASE 4: Hapus alert()
+                console.error("Gagal memuat sesi permainan. Coba lagi.");
                 set(state => ({ runtime: { ...state.runtime, isGameLoading: false } }));
             }
         },
