@@ -1,29 +1,16 @@
 // data/classes.ts
-import { Ability, Skill, CharacterFeature, ItemDefinition, SpellDefinition, CharacterSpellSlot } from '../types';
-// REFAKTOR G-5: File data statis tidak boleh saling impor, 
-// tapi karena ini adalah file definisi, kita izinkan impor definisi dasar (items, spells)
-// Registry tidak bisa dipakai di sini karena akan menyebabkan circular dependency.
-import { ITEM_DEFINITIONS } from './items';
-import { SPELL_DEFINITIONS } from './spells';
+import { Ability, Skill, CharacterFeature, CharacterSpellSlot } from '../types';
+// REFAKTOR FASE 0: Impor ItemDefinition dan SpellDefinition DIHAPUS
+// untuk memutus circular dependency.
+// Definisi kelas sekarang HANYA akan menyimpan string (nama) item/spell.
 
-// Helper untuk mengambil definisi item berdasarkan nama
-const item = (name: string): ItemDefinition => {
-    const definition = ITEM_DEFINITIONS.find(i => i.name.toLowerCase() === name.toLowerCase());
-    if (!definition) throw new Error(`[G-5 Classes] ItemDefinition not found: ${name}`);
-    return { ...definition, id: definition.id || name }; // Gunakan ID asli jika ada
-};
-
-// Helper untuk mengambil definisi spell berdasarkan nama
-const spell = (name: string): SpellDefinition => {
-    const definition = SPELL_DEFINITIONS.find(s => s.name.toLowerCase() === name.toLowerCase());
-    if (!definition) throw new Error(`[G-5 Classes] SpellDefinition not found: ${name}`);
-    return { ...definition, id: definition.id || name }; // Gunakan ID asli jika ada
-};
+// (Helper item() dan spell() DIHAPUS)
 
 // Tipe untuk Pilihan
+// REFAKTOR FASE 0: 'items' sekarang 'itemNames' dan bertipe string[]
 type EquipmentChoice = {
     description: string; // "Pilih (a) atau (b)"
-    options: { name: string, items: ItemDefinition[], quantity?: number }[];
+    options: { name: string, itemNames: string[], quantity?: number }[];
 };
 
 export interface ClassData {
@@ -40,7 +27,8 @@ export interface ClassData {
     };
     
     startingEquipment: {
-        fixed: { item: ItemDefinition, quantity: number }[];
+        // REFAKTOR FASE 0: 'item' sekarang 'itemName' dan bertipe string
+        fixed: { itemName: string, quantity: number }[];
         choices: EquipmentChoice[];
     };
     
@@ -49,8 +37,9 @@ export interface ClassData {
     // Untuk Spellcaster
     spellcasting?: {
         ability: Ability;
-        knownCantrips: SpellDefinition[];
-        knownSpells: SpellDefinition[];
+        // REFAKTOR FASE 0: Ini sekarang string[], bukan SpellDefinition[]
+        knownCantrips: string[];
+        knownSpells: string[];
         spellSlots: CharacterSpellSlot[];
     };
 }
@@ -76,23 +65,23 @@ export const CLASS_DEFINITIONS: Record<string, ClassData> = {
                 {
                     description: 'Pilih Armor:',
                     options: [
-                        { name: 'Chain Mail', items: [item('Chain Mail')] },
-                        { name: 'Leather Armor & Longbow', items: [item('Leather Armor'), item('Longbow'), item('Arrows')] }
+                        // REFAKTOR FASE 0: items -> itemNames, item() -> string
+                        { name: 'Chain Mail', itemNames: ['Chain Mail'] },
+                        { name: 'Leather Armor & Longbow', itemNames: ['Leather Armor', 'Longbow', 'Arrows'] }
                     ]
                 },
                 {
                     description: 'Pilih Senjata:',
                     options: [
-                        { name: 'Longsword & Shield', items: [item('Longsword'), item('Shield')] },
-                        { name: 'Dua Longsword', items: [item('Longsword')], quantity: 2 }
+                        { name: 'Longsword & Shield', itemNames: ['Longsword', 'Shield'] },
+                        { name: 'Dua Longsword', itemNames: ['Longsword'], quantity: 2 }
                     ]
                 },
                 {
                     description: 'Pilih Paket:',
                     options: [
-                        { name: "Explorer's Pack", items: [item("Explorer's Pack")] },
-                        // (Kita asumsikan Dungeoneer's Pack ada di items.ts)
-                        // { name: "Dungeoneer's Pack", items: [item("Dungeoneer's Pack")] } 
+                        { name: "Explorer's Pack", itemNames: ["Explorer's Pack"] },
+                        // { name: "Dungeoneer's Pack", itemNames: ["Dungeoneer's Pack"] } 
                     ]
                 }
             ]
@@ -101,7 +90,6 @@ export const CLASS_DEFINITIONS: Record<string, ClassData> = {
             {
                 name: 'Fighting Style',
                 description: 'Pilih satu gaya bertarung (cth: Defense: +1 AC saat memakai armor).'
-                // Di Fase 1.B, UI akan meminta player memilih salah satu.
             },
             {
                 name: 'Second Wind',
@@ -125,26 +113,26 @@ export const CLASS_DEFINITIONS: Record<string, ClassData> = {
         },
         startingEquipment: {
             fixed: [
-                { item: item('Leather Armor'), quantity: 1 },
-                { item: item('Dagger'), quantity: 2 },
-                { item: item("Thieves' Tools"), quantity: 1 }
+                // REFAKTOR FASE 0: item -> itemName, item() -> string
+                { itemName: 'Leather Armor', quantity: 1 },
+                { itemName: 'Dagger', quantity: 2 },
+                { itemName: "Thieves' Tools", quantity: 1 }
             ],
             choices: [
                 {
                     description: 'Pilih Senjata:',
                     options: [
-                        { name: 'Rapier', items: [item('Rapier')] },
-                        { name: 'Shortsword', items: [item('Shortsword')] }
+                        { name: 'Rapier', itemNames: ['Rapier'] },
+                        { name: 'Shortsword', itemNames: ['Shortsword'] }
                     ]
                 },
                 {
                     description: 'Pilih Busur:',
                     options: [
-                        { name: 'Shortbow & Arrows', items: [item('Shortbow'), item('Arrows')] },
-                        { name: 'Shortsword (lagi)', items: [item('Shortsword')] }
+                        { name: 'Shortbow & Arrows', itemNames: ['Shortbow', 'Arrows'] },
+                        { name: 'Shortsword (lagi)', itemNames: ['Shortsword'] }
                     ]
                 },
-                // (Tambahkan pilihan pack nanti)
             ]
         },
         features: [
@@ -178,29 +166,29 @@ export const CLASS_DEFINITIONS: Record<string, ClassData> = {
         },
         startingEquipment: {
             fixed: [
-                { item: item('Shield'), quantity: 1 },
-                { item: item('Holy Symbol'), quantity: 1 }
+                { itemName: 'Shield', quantity: 1 },
+                { itemName: 'Holy Symbol', quantity: 1 }
             ],
             choices: [
                 {
                     description: 'Pilih Senjata:',
                     options: [
-                        { name: 'Mace', items: [item('Mace')] },
-                        { name: 'Warhammer (jika proficient)', items: [item('Warhammer')] }
+                        { name: 'Mace', itemNames: ['Mace'] },
+                        { name: 'Warhammer (jika proficient)', itemNames: ['Warhammer'] }
                     ]
                 },
                 {
                     description: 'Pilih Armor:',
                     options: [
-                        { name: 'Scale Mail', items: [item('Scale Mail')] },
-                        { name: 'Leather Armor', items: [item('Leather Armor')] }
+                        { name: 'Scale Mail', itemNames: ['Scale Mail'] },
+                        { name: 'Leather Armor', itemNames: ['Leather Armor'] }
                     ]
                 },
                 {
                     description: 'Pilih Paket:',
                     options: [
-                        { name: "Priest's Pack", items: [item("Priest's Pack")] },
-                        { name: "Explorer's Pack", items: [item("Explorer's Pack")] }
+                        { name: "Priest's Pack", itemNames: ["Priest's Pack"] },
+                        { name: "Explorer's Pack", itemNames: ["Explorer's Pack"] }
                     ]
                 }
             ]
@@ -221,8 +209,9 @@ export const CLASS_DEFINITIONS: Record<string, ClassData> = {
         ],
         spellcasting: {
             ability: Ability.Wisdom,
-            knownCantrips: [spell('Light'), spell('Sacred Flame'), spell('Guidance')],
-            knownSpells: [spell('Cure Wounds'), spell('Healing Word'), spell('Guiding Bolt'), spell('Bless'), spell('Shield of Faith')],
+            // REFAKTOR FASE 0: spell() -> string
+            knownCantrips: ['Light', 'Sacred Flame', 'Guidance'],
+            knownSpells: ['Cure Wounds', 'Healing Word', 'Guiding Bolt', 'Bless', 'Shield of Faith'],
             spellSlots: [{ level: 1, max: 2, spent: 0 }]
         }
     },
@@ -242,29 +231,28 @@ export const CLASS_DEFINITIONS: Record<string, ClassData> = {
         },
         startingEquipment: {
             fixed: [
-                // (Tambahkan Spellbook ke items.ts nanti)
-                // { item: item('Spellbook'), quantity: 1 }
+                // { itemName: 'Spellbook', quantity: 1 }
             ],
             choices: [
                 {
                     description: 'Pilih Senjata:',
                     options: [
-                        { name: 'Quarterstaff', items: [item('Quarterstaff')] },
-                        { name: 'Dagger', items: [item('Dagger')] }
+                        { name: 'Quarterstaff', itemNames: ['Quarterstaff'] },
+                        { name: 'Dagger', itemNames: ['Dagger'] }
                     ]
                 },
                 {
                     description: 'Pilih Fokus:',
                     options: [
-                        { name: 'Arcane Focus', items: [item('Arcane Focus')] },
-                        // { name: "Component Pouch", items: [item("Component Pouch")] }
+                        { name: 'Arcane Focus', itemNames: ['Arcane Focus'] },
+                        // { name: "Component Pouch", itemNames: ["Component Pouch"] }
                     ]
                 },
                 {
                     description: 'Pilih Paket:',
                     options: [
-                        { name: "Scholar's Pack", items: [item("Scholar's Pack")] },
-                        { name: "Explorer's Pack", items: [item("Explorer's Pack")] }
+                        { name: "Scholar's Pack", itemNames: ["Scholar's Pack"] },
+                        { name: "Explorer's Pack", itemNames: ["Explorer's Pack"] }
                     ]
                 }
             ]
@@ -277,10 +265,10 @@ export const CLASS_DEFINITIONS: Record<string, ClassData> = {
         ],
         spellcasting: {
             ability: Ability.Intelligence,
-            knownCantrips: [spell('Fire Bolt'), spell('Mage Hand'), spell('Ray of Frost')],
-            knownSpells: [spell('Magic Missile'), spell('Shield'), spell('Mage Armor'), spell('Sleep')], // (Wizard 'mempersiapkan' dari 'spellbook', tapi ini SSoT spell yang dia *tahu*)
+            // REFAKTOR FASE 0: spell() -> string
+            knownCantrips: ['Fire Bolt', 'Mage Hand', 'Ray of Frost'],
+            knownSpells: ['Magic Missile', 'Shield', 'Mage Armor', 'Sleep'],
             spellSlots: [{ level: 1, max: 2, spent: 0 }]
         }
     },
-    // (Tambahkan Ranger & Barbarian di sini jika diinginkan)
 };

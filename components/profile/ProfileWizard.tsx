@@ -34,10 +34,11 @@ import {
     findRace,
     findClass,
     findBackground,
+    findSpell, // FASE 0: Impor findSpell
     RaceData, 
     ClassData, 
     BackgroundData, 
-    EquipmentChoice
+    EquipmentChoice // FASE 0: EquipmentChoice sekarang Tipe string, bukan Definition
 } from "../../data/registry";
 // FASE 2: Impor utilitas AI
 import { renderCharacterLayout } from "../../services/pixelRenderer";
@@ -195,6 +196,7 @@ const AbilityRoller: React.FC<{
 // REFAKTOR FASE 2: State Wizard sekarang dikelola secara lokal.
 
 // Helper untuk mengambil equipment default (dipindah dari appStore)
+// FASE 0: Direfaktor untuk menangani 'itemNames' (string[])
 const getDefaultEquipment = (charClass: ClassData): Record<number, EquipmentChoice['options'][0]> => {
     const initialEquipment: Record<number, EquipmentChoice['options'][0]> = {};
     charClass.startingEquipment.choices.forEach((choice, index) => {
@@ -301,9 +303,14 @@ const CreateCharacterWizard: React.FC<{
             const maxHp = selectedClass.hpAtLevel1(conModifier);
             let inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[] = [];
 
-            selectedClass.startingEquipment.fixed.forEach(item => inventoryData.push(createInvItem(item.item, item.quantity)));
+            // FASE 0: Refaktor untuk me-resolve string 'itemName' dan 'itemNames'
+            selectedClass.startingEquipment.fixed.forEach(item => {
+                try { inventoryData.push(createInvItem(getItemDef(item.itemName), item.quantity)); } catch (e) { console.warn(e); }
+            });
             Object.values(selectedEquipment).forEach(chosenOption => {
-                chosenOption.items.forEach(itemDef => inventoryData.push(createInvItem(itemDef, chosenOption.quantity || 1)));
+                chosenOption.itemNames.forEach(itemName => {
+                    try { inventoryData.push(createInvItem(getItemDef(itemName), chosenOption.quantity || 1)); } catch (e) { console.warn(e); }
+                });
             });
             selectedBackground.equipment.forEach(itemName => {
                  // FASE 2: Gunakan getItemDef dari registry
@@ -325,10 +332,18 @@ const CreateCharacterWizard: React.FC<{
             if (shieldIndex > -1) armorClass += 2;
 
             const spellSlots = selectedClass.spellcasting?.spellSlots || [];
-            const spellData: SpellDefinition[] = [
-                ...(selectedClass.spellcasting?.knownCantrips || []),
-                ...(selectedClass.spellcasting?.knownSpells || []),
-            ];
+            
+            // FASE 0: Refaktor untuk me-resolve string 'spellName'
+            const spellData: SpellDefinition[] = [];
+            (selectedClass.spellcasting?.knownCantrips || []).forEach(spellName => {
+                const def = findSpell(spellName);
+                if (def) spellData.push(def); else console.warn(`[ProfileWizard] Gagal menemukan definisi spell: ${spellName}`);
+            });
+            (selectedClass.spellcasting?.knownSpells || []).forEach(spellName => {
+                const def = findSpell(spellName);
+                if (def) spellData.push(def); else console.warn(`[ProfileWizard] Gagal menemukan definisi spell: ${spellName}`);
+            });
+
 
             const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
                 name, class: selectedClass.name, race: selectedRace.name, level: 1, xp: 0,
@@ -858,7 +873,8 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 		spellData: SpellDefinition[]
     ) => {
         // FASE 1: Ganti nama prop
-        await onSaveNewCharacter(charData, inventoryData);
+        // FASE 2 FIX (dari Fase 0 Roadmap): Kirim userId
+        await onSaveNewCharacter(charData, inventoryData, spellData);
         setIsCreating(false); // Kembali ke daftar karakter
     };
 
