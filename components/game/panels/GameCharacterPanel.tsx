@@ -1,5 +1,6 @@
-// FASE 0: File BARU
-// Komponen ini diekstrak dari GameScreen.tsx (sebelumnya RightPanel)
+// FASE 1: Direfaktor.
+// Komponen ini tidak lagi menjadi <aside> (panel layout).
+// Sekarang ini HANYA KONTEN yang akan dimasukkan ke dalam SidePanel.
 
 import React from 'react';
 import { Character, Skill, CampaignState } from '../../../types';
@@ -25,7 +26,9 @@ export const GameCharacterPanel: React.FC<GameCharacterPanelProps> = ({
     const { players, monsters, initiativeOrder, currentPlayerId, gameState } = campaign;
 
     return (
-		<aside className="w-full h-full bg-gray-800 md:border-l-2 border-gray-700 p-4 overflow-y-auto flex flex-col gap-4">
+        // FASE 1: Hapus <aside> wrapper.
+        // Tambahkan padding (p-4) yang hilang dan flex-col
+        <div className="p-4 overflow-y-auto flex flex-col gap-4">
 			<CombatTracker
 				players={players}
 				monsters={monsters}
@@ -41,6 +44,6 @@ export const GameCharacterPanel: React.FC<GameCharacterPanelProps> = ({
 				onSkillSelect={onSkillSelect}
                 updateCharacter={() => {}} // Prop ini tidak lagi digunakan oleh CharPanel, tapi hook membutuhkannya
 			/>
-		</aside>
+		</div>
     );
 };

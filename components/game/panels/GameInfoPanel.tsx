@@ -1,5 +1,6 @@
-// FASE 0: File BARU
-// Komponen ini diekstrak dari GameScreen.tsx (sebelumnya LeftPanel)
+// FASE 1: Direfaktor.
+// Komponen ini tidak lagi menjadi <aside> (panel layout).
+// Sekarang ini HANYA KONTEN (InfoPanel) yang akan dimasukkan ke dalam SidePanel.
 
 import React from 'react';
 import { CampaignState, Character } from '../../../types';
@@ -12,10 +13,8 @@ interface GameInfoPanelProps {
 
 export const GameInfoPanel: React.FC<GameInfoPanelProps> = ({ campaign, players }) => {
     return (
-		<aside className="w-full h-full bg-gray-800 md:border-r-2 border-gray-700">
-            <div className="h-full overflow-y-auto">
-                <InfoPanel campaign={campaign} players={players} />
-            </div>
-		</aside>
+        // FASE 1: Hapus <aside> dan <div> wrapper.
+        // InfoPanel sudah memiliki overflow-y-auto dan padding.
+        <InfoPanel campaign={campaign} players={players} />
     );
 };
