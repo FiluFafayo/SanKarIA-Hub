@@ -728,6 +728,7 @@ class DataService {
             game_state, current_player_id, initiative_order, long_term_memory, current_time,
             current_weather, world_event_counter, map_image_url, map_markers, 
             current_player_location, join_code, is_published,
+            quests, npcs, // <-- TAMBAHKAN INI
             ...rest 
         } = dbCampaign as any;
         
@@ -735,6 +736,8 @@ class DataService {
 
         return {
             ...rest,
+            quests: quests || [], // <-- TAMBAHKAN INI
+            npcs: npcs || [], // <-- TAMBAHKAN INI
             ownerId: owner_id,
             joinCode: join_code,
             isPublished: is_published,
