@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { CampaignState, CampaignActions } from "./useCampaign";
+import { useAppStore } from "../store/appStore"; // FASE 3: Impor untuk Level Up
 import {
 	Character,
 	DiceRoll,
@@ -22,6 +23,7 @@ import {
 	rollDice,
 	getAbilityModifier,
 	getProficiencyBonus,
+	xpToNextLevel, // FASE 3: Impor untuk Level Up
 } from "../utils";
 // REFAKTOR G-2: Ganti impor geminiService
 import { gameService } from "../services/ai/gameService";
@@ -72,13 +74,29 @@ export const useCombatSystem = ({
 					message = `Bahaya! Musuh baru muncul!`;
 					break;
                 // (Poin 7) Tangani tool XP
-                case 'award_xp':
+                case 'award_xp': { // FASE 3: Tambah block scope
                     const player = players.find(p => p.id === call.args.characterId);
                     if (player) {
                         campaignActions.awardXp(call.args.characterId, call.args.amount);
                         message = `${player.name} menerima ${call.args.amount} XP untuk: ${call.args.reason}`;
+                        
+                        // FASE 3: Cek Level Up (pasca-reducer)
+                        // Mirip dengan explorationSystem, kita ambil state terbaru dari 'campaign.players'
+                        // (yang merupakan prop hook yang diperbarui oleh reducer)
+                        const updatedPlayerState = campaign.players.find(p => p.id === call.args.characterId);
+                        if (updatedPlayerState) {
+                            // Panggil onCharacterUpdate untuk SSoT (jika belum ditangani oleh logic HP)
+                            onCharacterUpdate(updatedPlayerState); 
+                            
+                            const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
+                            if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
+                                console.log(`[useCombatSystem] ${updatedPlayerState.name} siap Level Up!`);
+                                useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
+                            }
+                        }
                     }
                     break;
+                }
                 // (Poin 4) Tangani tool Opini
                 case 'update_npc_opinion':
                     const npc = campaign.npcs.find(n => n.id === call.args.npcId);
@@ -97,7 +115,7 @@ export const useCombatSystem = ({
 				}
 			});
 		},
-		[campaignActions]
+		[campaignActions, players, campaign.players, onCharacterUpdate] // FASE 3: Tambah dependensi
 	);
 
 	// =================================================================

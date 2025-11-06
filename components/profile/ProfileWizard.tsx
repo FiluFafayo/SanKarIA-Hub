@@ -280,7 +280,9 @@ const CreateCharacterWizard: React.FC<{
 	// FASE 2: Logika finalizeCharacter (dari appStore) dipindahkan ke sini
 	const handleSave = async () => {
         if (Object.keys(abilityScores).length !== 6) {
-            alert("Selesaikan pelemparan semua dadu kemampuan.");
+            // FASE 3: Ganti alert() dengan status message
+            setStatusMessage("ERROR: Selesaikan pelemparan semua dadu kemampuan.");
+            // Hapus alert
             return;
         }
 
@@ -391,12 +393,15 @@ const CreateCharacterWizard: React.FC<{
 
             onCancel(); // Sukses, tutup wizard
 
-        } catch (e) {
+        } catch (e: any) { // FASE 3: Tambah tipe error
             console.error("Gagal finalisasi karakter:", e);
-            alert("Gagal menyimpan karakter baru. Coba lagi.");
+            // FASE 3: Ganti alert() dengan status message
+            setStatusMessage(`ERROR: Gagal menyimpan karakter. ${e.message || 'Coba lagi.'}`);
+            // Hapus alert
         } finally {
             setIsSaving(false);
-            setStatusMessage("");
+            // FASE 3: Jangan hapus status message jika itu adalah error
+            // setStatusMessage(""); 
         }
 	};
 
@@ -812,8 +817,12 @@ const CreateCharacterWizard: React.FC<{
 						>
 							&larr; Ganti Equipment
 						</button>
-						{/* Tampilkan Status Loading BARU */}
-                        {isSaving && <p className="text-center text-amber-300 animate-pulse">{statusMessage || "Menyimpan..."}</p>}
+						{/* Tampilkan Status Loading/Error BARU */}
+                        {(isSaving || statusMessage) && (
+                            <p className={`text-center animate-pulse ${statusMessage.startsWith('ERROR:') ? 'text-red-400' : 'text-amber-300'}`}>
+                                {isSaving ? (statusMessage || "Menyimpan...") : statusMessage}
+                            </p>
+                        )}
 						<button
 							onClick={handleSave}
 							className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"

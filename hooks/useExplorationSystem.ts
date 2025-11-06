@@ -7,6 +7,8 @@ import {
     Character, DiceRoll, RollRequest, Skill, StructuredApiResponse, 
     ToolCall, GameEvent, NPC 
 } from '../types';
+import { useAppStore } from '../store/appStore'; // FASE 3: Impor untuk Level Up
+import { xpToNextLevel } from '../utils'; // FASE 3: Impor untuk Level Up
 // Import service BARU (G-2)
 import { gameService } from '../services/ai/gameService';
 // Import service GENERASI (G-2)
@@ -51,15 +53,23 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 case 'award_xp': { // FASE 2 FIX: Ubah ke block scope
                     const player = players.find(p => p.id === call.args.characterId);
                     if (player) {
-                        // Panggil reducer. Ini akan memicu cek Level Up (Fase 1)
+                        // Panggil reducer.
                         campaignActions.awardXp(call.args.characterId, call.args.amount);
                         message = `${player.name} menerima ${call.args.amount} XP untuk: ${call.args.reason}`;
                         
                         // FASE 2 FIX: Ambil state pasca-reducer dari campaign.players
                         // dan panggil controller (GameScreen) untuk menyimpan SSoT.
+                        // FASE 3: Cek Level Up di sini (setelah state reducer ter-update).
                         const updatedPlayerState = campaign.players.find(p => p.id === call.args.characterId);
                         if (updatedPlayerState) {
                             onCharacterUpdate(updatedPlayerState);
+
+                            // FASE 3: Cek Level Up
+                            const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
+                            if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
+                                console.log(`[useExplorationSystem] ${updatedPlayerState.name} siap Level Up!`);
+                                useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
+                            }
                         }
                     }
                     break;
