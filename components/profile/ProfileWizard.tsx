@@ -420,8 +420,9 @@ const CreateCharacterWizard: React.FC<{
 
 	// ================== RENDER WIZARD ==================
 	return (
-		<div className="p-4 w-full h-full flex flex-col">
-			<h3 className="font-cinzel text-2xl text-blue-200 mb-4 text-center">
+        // FASE 0: Hapus padding, biarkan parent (panel kiri) yang mengelola
+		<div className="w-full h-full flex flex-col"> 
+			<h3 className="font-cinzel text-2xl text-blue-200 mb-4 text-center pt-4">
 				Menciptakan Jiwa Baru (Langkah {step}/6)
 			</h3>
 
@@ -436,7 +437,8 @@ const CreateCharacterWizard: React.FC<{
 
 			{/* === STEP 1: Ras, Kelas, Nama & Visual === */}
 			{step === 1 && (
-				<div className="flex flex-col flex-grow animate-fade-in-fast">
+                // FASE 0: Tambah padding internal untuk step
+				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
                     {/* Grid 2 Kolom untuk Info Dasar */}
                     <div className="grid grid-cols-2 gap-x-4">
                         <div>
@@ -599,7 +601,8 @@ const CreateCharacterWizard: React.FC<{
 
 			{/* === STEP 3: Background === */}
 			{step === 3 && (
-				<div className="flex flex-col flex-grow animate-fade-in-fast">
+                // FASE 0: Tambah padding internal untuk step
+				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
 					<label className="block mb-1 font-cinzel text-sm">Background</label>
 					<div className="grid grid-cols-3 gap-2 mb-4 max-h-80 overflow-y-auto">
 						{BACKGROUNDS.map((b) => (
@@ -648,7 +651,8 @@ const CreateCharacterWizard: React.FC<{
 
 			{/* === STEP 4: Pilihan Skill (BARU) === */}
 			{step === 4 && (
-				<div className="flex flex-col flex-grow animate-fade-in-fast">
+                // FASE 0: Tambah padding internal untuk step
+				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
 					<h4 className="font-cinzel text-xl text-blue-200 mb-2">
 						Pilihan Skill Kelas
 					</h4>
@@ -701,7 +705,8 @@ const CreateCharacterWizard: React.FC<{
 
 			{/* === STEP 5: Pilihan Equipment (BARU) === */}
 			{step === 5 && (
-				<div className="flex flex-col flex-grow animate-fade-in-fast">
+                // FASE 0: Tambah padding internal untuk step
+				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
 					<h4 className="font-cinzel text-xl text-blue-200 mb-2">
 						Pilihan Equipment
 					</h4>
@@ -755,7 +760,8 @@ const CreateCharacterWizard: React.FC<{
 
 			{/* === STEP 6: Review & Finalisasi (Dulu Step 4) === */}
 			{step === 6 && (
-				<div className="flex flex-col flex-grow animate-fade-in-fast">
+                // FASE 0: Tambah padding internal untuk step
+				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
 					<p className="text-center text-lg text-gray-300 mb-4">
 						Inilah takdirmu. Tinjau nilaimu sebelum melangkah ke dunia.
 					</p>
@@ -860,12 +866,15 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
         // FASE 2: Hapus ModalWrapper. Ganti dengan div layout halaman standar.
         // Styling modal (backdrop-blur, w-[90vw], h-[80vh]) dihapus total.
         // FASE 2 FIX: Hapus 'min-h-[700px]' agar halaman bisa di-scroll alami di mobile.
-		<div className="bg-bg-secondary border border-blue-400/30 rounded-xl shadow-2xl text-white flex flex-col md:flex-row">
+        // FASE 0: Tambah w-full, overflow-hidden
+		<div className="bg-bg-secondary border border-blue-400/30 rounded-xl shadow-2xl text-white flex flex-col md:flex-row overflow-hidden w-full">
 			{/* Left Panel: Mirror and Character Sheet */}
             {/* FASE 2 FIX: Hapus 'items-center' agar konten wizard tidak terpusat secara horizontal */}
-			<div className="w-full md:w-2/3 p-6 flex flex-col">
+            {/* FASE 0: Ganti md:w-2/3 -> md:flex-1, tambah overflow, hapus p-4 internal */}
+			<div className="w-full md:flex-1 p-4 md:p-6 flex flex-col overflow-y-auto min-w-0">
 					<h2 className="font-cinzel text-3xl mb-4">Cermin Jiwa</h2>
-					<div className="w-full h-full bg-black/30 border-2 border-blue-300/50 rounded-lg p-4 flex flex-col">
+                    {/* FASE 0: Hapus p-4 dari wrapper sheet */}
+					<div className="w-full h-full bg-black/30 border-2 border-blue-300/50 rounded-lg flex flex-col">
 						{isCreating ? (
 							// FASE 2: onCancel mereset state lokal, onSaveNewCharacter diganti handleWizardSave
 							<CreateCharacterWizard
@@ -1008,9 +1017,10 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 					</div>
 				</div>
 				{/* Right Panel: Soul Rack */}
-				<div className="w-full md:w-1/3 bg-black/20 border-t md:border-t-0 md:border-l border-blue-400/30 p-6 flex flex-col">
+                {/* FASE 0: Ganti md:w-1/3 -> md:w-72, tambah overflow */}
+				<div className="w-full md:w-72 flex-shrink-0 bg-black/20 border-t md:border-t-0 md:border-l border-blue-400/30 p-4 md:p-6 flex flex-col overflow-y-auto">
 					<h3 className="font-cinzel text-xl text-center mb-4">Rak Jiwa</h3>
-					<div className="flex flex-row md:flex-col flex-wrap justify-center gap-4 mb-6 overflow-y-auto">
+					<div className="flex flex-row md:flex-col flex-wrap justify-center gap-4 mb-6">
 						{myCharacters.map((char) => (
 							// FASE 2: onClick sekarang mereset state lokal
 							<div

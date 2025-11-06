@@ -1,10 +1,11 @@
-import React, { useState, ChangeEvent } from 'react'; // Import ChangeEvent
+import React, { useState, ChangeEvent, useEffect } from 'react'; // Import ChangeEvent, useEffect
 import { ViewWrapper } from '../components/ViewWrapper';
 import { Campaign, Quest, NPC, MapMarker, TerrainType, GridCell } from '../types'; // BARU
 import { generateId, generateJoinCode } from '../utils';
 import { generationService } from '../services/ai/generationService';
 import { InteractiveMap } from '../components/game/InteractiveMap';
-import { useAppStore } from '../store/appStore'; // REFAKTOR G-3: Import store
+// FASE 0: Hapus appStore (kecuali untuk onClose)
+// import { useAppStore } from '../store/appStore'; 
 
 
 interface CreateCampaignViewProps {
@@ -20,41 +21,51 @@ interface CampaignFramework {
     description: string; // Add original premise for map generation
 }
 
+// FASE 0: Definisikan tipe state form lokal
+interface CampaignCreationPillars {
+    premise: string;
+    keyElements: string;
+    endGoal: string;
+}
+const initialPillars: CampaignCreationPillars = { premise: '', keyElements: '', endGoal: '' };
+type MapData = { imageUrl: string; markers: MapMarker[], startLocationId: string } | null;
+
 const Page: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   // FASE 2 FIX: Hapus 'h-full'. Tambahkan 'min-h-[60vh]' agar tombol tetap di bawah pada layar pendek, tapi biarkan konten tumbuh.
   <div className="p-4 sm:p-6 md:p-8 text-gray-800 flex flex-col min-h-[60vh] bg-amber-50 rounded-lg shadow-xl">{children}</div>
 );
 
 export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose, onCreateCampaign }) => {
-  // REFAKTOR G-3: State Ephemeral (Loading) tetap lokal
+  // State Ephemeral (Loading) tetap lokal
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
 
-  // REFAKTOR G-3: State Form Persisten dipindah ke Zustand
-  const {
-    step,
-    pillars,
-    framework,
-    mapData,
-    // campaignData dihapus (Poin 10)
-    setCampaignStep,
-    setPillars,
-    setFramework,
-    setMapData,
-    // setCampaignData dihapus (Poin 10)
-    resetCampaignCreation
-  } = useAppStore(s => ({
-    ...s.campaignCreation,
-    step: s.campaignCreation.step,
-    setPillars: s.actions.setPillars,
-    setFramework: s.actions.setFramework,
-    setMapData: s.actions.setMapData,
-    resetCampaignCreation: s.actions.resetCampaignCreation,
-    setCampaignStep: s.actions.setCampaignStep,
-  }));
+  // FASE 0: State Form sekarang dikelola secara LOKAL, bukan oleh Zustand
+  const [step, setStep] = useState(1);
+  const [pillars, setPillars] = useState<CampaignCreationPillars>(initialPillars);
+  const [framework, setFramework] = useState<CampaignFramework | null>(null);
+  const [mapData, setMapData] = useState<MapData>(null);
+
+  // FASE 0: Buat fungsi reset lokal
+  const resetCampaignCreation = () => {
+      setStep(1);
+      setPillars(initialPillars);
+      setFramework(null);
+      setMapData(null);
+  };
+  
+  // FASE 0: Gunakan effect untuk reset state saat komponen ditutup
+  // (Ini menggantikan logika reset di appStore.actions.navigateTo)
+  useEffect(() => {
+      // Saat komponen unmount (ditutup), reset state
+      return () => {
+          resetCampaignCreation();
+      };
+  }, []);
+
 
   const handleClose = () => {
-    // resetCampaignCreation(); // (Sudah ditangani oleh returnToNexus di ViewManager)
+    // resetCampaignCreation(); // Tidak perlu, effect unmount akan menangani
     onClose();
   };
 
@@ -73,7 +84,7 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
       try {
           const result = await generationService.generateCampaignFramework(pillars);
           setFramework({ ...result, description: pillars.premise });
-          setCampaignStep(2); // REFAKTOR G-3
+          setStep(2); // FASE 0: Ganti ke state lokal
       } catch (e) {
           console.error("Gagal membuat kerangka kampanye:", e);
           alert("Gagal berkomunikasi dengan AI untuk membuat kerangka. Coba lagi.");
@@ -95,17 +106,17 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
           setLoadingMessage("Menandai tempat-tempat penting...");
           const markerData = await generationService.generateMapMarkers(framework);
           
-          setMapData({ // REFAKTOR G-3
+          setMapData({ // FASE 0: Ganti ke state lokal
               imageUrl,
               markers: markerData.markers,
               startLocationId: markerData.startLocationId
           });
-          setCampaignStep(4); // REFAKTOR G-3
+          setStep(4); // FASE 0: Ganti ke state lokal
 
       } catch (e) {
           console.error("Gagal membuat peta:", e);
           alert("Gagal membuat peta kampanye. Anda dapat melanjutkan tanpa peta atau mencoba lagi.");
-          setCampaignStep(4); // REFAKTOR G-3
+          setStep(4); // FASE 0: Ganti ke state lokal
       } finally {
           setIsLoading(false);
       }
@@ -216,7 +227,7 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
         
         // REFAKTOR G-4: onCreateCampaign sekarang adalah aksi dari dataStore
         await onCreateCampaign(newCampaign); 
-        resetCampaignCreation(); // Reset state G-3 setelah sukses
+        // resetCampaignCreation(); // FASE 0: Tidak perlu, penutupan akan memicu reset
         
         // BUG FIX: Panggil handleClose() setelah sukses
         handleClose();
@@ -275,9 +286,9 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                     )}
                     <div className="flex-grow"></div>
                     <div className="flex justify-between">
-                         {/* REFAKTOR G-3: Gunakan setCampaignStep */}
-                         <button onClick={() => setCampaignStep(1)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
-                         <button onClick={() => setCampaignStep(3)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">Lanjutkan ke Pembuatan Peta &rarr;</button>
+                         {/* FASE 0: Gunakan state lokal */}
+                         <button onClick={() => setStep(1)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
+                         <button onClick={() => setStep(3)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">Lanjutkan ke Pembuatan Peta &rarr;</button>
                     </div>
                 </Page>
             );
@@ -293,12 +304,12 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                     )}
                     <div className="flex-grow"></div>
                     <div className="flex justify-between">
-                         {/* REFAKTOR G-3: Gunakan setCampaignStep */}
-                         <button onClick={() => setCampaignStep(2)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
+                         {/* FASE 0: Gunakan state lokal */}
+                         <button onClick={() => setStep(2)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
                          <button onClick={generateMap} className="font-cinzel bg-yellow-800 text-white px-6 py-2 rounded hover:bg-yellow-700 transition-colors">
                            {mapData ? 'Buat Ulang Peta' : 'Buat Peta'}
                          </button>
-                         <button onClick={() => setCampaignStep(4)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">Lanjutkan ke Sentuhan Akhir &rarr;</button>
+                         <button onClick={() => setStep(4)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">Lanjutkan ke Sentuhan Akhir &rarr;</button>
                     </div>
                 </Page>
             )
@@ -312,8 +323,8 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
 
                     <div className="flex-grow"></div>
                     <div className="flex justify-between items-center">
-                         {/* REFAKTOR G-3: Gunakan setCampaignStep */}
-                         <button onClick={() => setCampaignStep(3)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
+                         {/* FASE 0: Gunakan state lokal */}
+                         <button onClick={() => setStep(3)} className="font-cinzel text-yellow-900 hover:text-yellow-700 transition-colors">&larr; Kembali</button>
                          <button onClick={handleCreate} className="font-cinzel bg-yellow-800 text-white px-6 py-2 rounded hover:bg-yellow-700 transition-colors">
                            Buat Kampanye
                          </button>

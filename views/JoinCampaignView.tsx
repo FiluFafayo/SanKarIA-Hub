@@ -44,7 +44,7 @@ export const JoinCampaignView: React.FC<JoinCampaignViewProps> = ({ onClose, onC
 
   return (
     <ViewWrapper onClose={onClose} title="Kedai Pengembara">
-      {/* FASE 2 FIX: Hapus layout 'flex justify-center h-full' agar konten mengalir normal dan bisa discroll */}
+      {/* FASE 0: Hapus layout 'flex justify-center h-full' (sudah dilakukan) */}
       <div className="flex flex-col items-center text-amber-50">
         <div className="bg-yellow-900/80 backdrop-blur-sm border border-amber-600 rounded-lg p-8 shadow-2xl w-full max-w-lg">
             <div className="flex items-center mb-6">

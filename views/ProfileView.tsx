@@ -31,6 +31,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onClose, userId }) => 
   return (
     <ViewWrapper onClose={handleClose} title="Cermin Jiwa">
       {/* FASE 1: Ganti nama komponen */}
+      {/* FASE 0: ProfileWizard sekarang mengatur layout internalnya sendiri (flex)
+          dan akan mengisi parent (ViewWrapper main area) */}
       <ProfileWizard 
         onClose={handleClose} // onClose tetap di-pass untuk tombol Batal/Selesai di Wizard
         characters={characters.filter(c => c.ownerId === userId)} // Kirim SSoT karakter milikku

@@ -12,8 +12,9 @@ interface CharacterSelectionViewProps {
 export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ characters, onSelect, onClose }) => {
   return (
     <ViewWrapper onClose={onClose} title="Pilih Karakter Anda">
-        <div className="flex flex-col items-center justify-center h-full">
-            <div className="bg-bg-secondary backdrop-blur-sm border border-amber-500/30 rounded-xl p-8 shadow-2xl max-w-2xl text-white">
+        {/* FASE 0: Hapus h-full, biarkan padding ViewWrapper bekerja */}
+        <div className="flex flex-col items-center justify-center">
+            <div className="bg-bg-secondary backdrop-blur-sm border border-amber-500/30 rounded-xl p-8 shadow-2xl max-w-2xl text-white w-full">
                 <h2 className="font-cinzel text-3xl text-amber-100 mb-4 text-center">Pilih Jiwamu</h2>
                 <p className="text-center text-gray-300 mb-6">Pahlawan mana yang akan memulai petualangan ini?</p>
                 

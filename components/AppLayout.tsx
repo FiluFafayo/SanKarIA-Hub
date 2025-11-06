@@ -11,6 +11,7 @@ import { NexusSanctum } from './NexusSanctum';
 import { ViewManager } from './ViewManager';
 import { useDataStore } from '../store/dataStore';
 import { useAppStore } from '../store/appStore';
+import { useGameStore } from '../store/gameStore'; // FASE 0: Impor gameStore
 import { Character, Campaign, CampaignState } from '../types';
 import { dataService } from '../services/dataService';
 
@@ -33,8 +34,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
         ...s.actions
     }));
     
-    // REFAKTOR G-4-R1: State Runtime sekarang diambil dari appStore
-    const { playingCampaign, playingCharacter, isGameLoading, loadGameSession, exitGameSession } = useAppStore(s => ({
+    // FASE 0: State Runtime sekarang diambil dari gameStore
+    const { playingCampaign, playingCharacter, isGameLoading, loadGameSession, exitGameSession } = useGameStore(s => ({
         ...s.runtime,
         ...s.actions
     }));
@@ -82,10 +83,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
         }
     };
 
-    // REFAKTOR G-4-R1: handleExitGame sekarang hanya memanggil aksi store
+    // FASE 0: handleExitGame sekarang memanggil aksi dari gameStore
     const handleExitGame = (finalCampaignState: CampaignState) => {
-        // Aksi exitGameSession di store SEKARANG menangani
-        // penyimpanan SSoT (Campaign + Character) DAN reset state runtime.
+        // Aksi exitGameSession di gameStore menangani
+        // penyimpanan SSoT (Campaign + Character) DAN reset state runtime,
+        // DAN reset navigasi (via appStore).
         exitGameSession(); 
     };
 
