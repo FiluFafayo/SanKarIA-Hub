@@ -10,6 +10,9 @@ import {
 } from '../types';
 import { dataService } from '../services/dataService';
 import { generationService } from '../services/ai/generationService';
+// TAMBAHAN: Impor data default
+import { DEFAULT_CAMPAIGNS } from '../data/defaultCampaigns';
+import { generateDefaultCharacters } from '../data/defaultCharacters';
 
 // =================================================================
 // Tipe State & Aksi
@@ -105,8 +108,63 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 get().actions._setCharacters(fetchedCharacters);
 
                 const myCharacterIds = fetchedCharacters.map(c => c.id);
-                const fetchedCampaigns = await dataService.getMyCampaigns(myCharacterIds);
-                get().actions._setCampaigns(fetchedCampaigns);
+                let fetchedCampaigns = await dataService.getMyCampaigns(myCharacterIds); // Jadikan 'let'
+                
+                // --- LOGIKA SEEDING OTOMATIS JIKA KOSONG ---
+                
+                // 1. Seed Default Campaigns jika kosong
+                if (fetchedCampaigns.length === 0) {
+                    console.log("[DataStore] Tidak ada campaign. Menjalankan seeding default campaigns...");
+                    const newCampaigns: Campaign[] = [];
+                    for (const campaignData of DEFAULT_CAMPAIGNS) {
+                        try {
+                            // Gunakan createCampaign yang sudah ada (termasuk generate opening scene)
+                            const newCampaign = await get().actions.createCampaign(campaignData, userId);
+                            newCampaigns.push(newCampaign);
+                        } catch (e) {
+                            console.error("Gagal seed campaign:", campaignData.title, e);
+                        }
+                    }
+                    fetchedCampaigns = newCampaigns; // Tampilkan campaign yang baru dibuat
+                }
+
+                // 2. Seed Default Characters jika kosong
+                if (fetchedCharacters.length === 0) {
+                    console.log("[DataStore] Tidak ada karakter. Menjalankan seeding default characters...");
+                    const rawCharsData = generateDefaultCharacters(userId); // Ini mengembalikan Omit<Character, 'id'>[]
+                    
+                    for (const rawChar of rawCharsData) {
+                        try {
+                            // Ambil Omit<Character>
+                            const { inventory, knownSpells, ...charData } = rawChar;
+                            
+                            // Konversi Omit<CharacterInventoryItem>
+                            const inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[] = inventory.map(inv => ({
+                                item: inv.item, // Definisinya sudah lengkap dari defaultCharacters.ts
+                                quantity: inv.quantity,
+                                isEquipped: inv.isEquipped,
+                            }));
+                            
+                            const spellData: SpellDefinition[] = knownSpells; // Definisinya sudah lengkap
+                            
+                            // Panggil saveNewCharacter
+                            await get().actions.saveNewCharacter(
+                                charData, 
+                                inventoryData, 
+                                spellData, 
+                                userId
+                            );
+                        } catch (e) {
+                            console.error("Gagal seed character:", rawChar.name, e);
+                        }
+                    }
+                    // Ambil ulang karakter setelah seeding
+                    fetchedCharacters = await dataService.getMyCharacters(userId);
+                }
+                // --- AKHIR LOGIKA SEEDING ---
+
+                get().actions._setCharacters(fetchedCharacters); // Set karakter (terbaru)
+                get().actions._setCampaigns(fetchedCampaigns); // Set campaign (terbaru)
                 
                 set(state => ({ state: { ...state.state, hasLoaded: true } }));
             } catch (error) {
