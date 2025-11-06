@@ -47,6 +47,78 @@ interface ContextMenuState {
 	objectId: string;
 }
 
+// FASE 4: CSS Grid Adaptif (Memperbaiki Regresi Desktop)
+// Mobile-first (default): grid 2 baris (chat + actionbar)
+// Desktop (lg+): grid 3 kolom (info | chat+actionbar | character)
+const gridLayoutStyle = `
+    /* Mobile (Default) - 2 Baris */
+    #gamescreen-layout {
+        display: grid;
+        grid-template-rows: 1fr auto;
+        grid-template-columns: 100%;
+        grid-template-areas: 
+            "chat"
+            "actions";
+        height: 100%; /* Pastikan mengisi flex-grow */
+    }
+    /* Sembunyikan panel desktop di mobile */
+    #gamescreen-layout > [data-panel="info"],
+    #gamescreen-layout > [data-panel="character"] {
+        display: none;
+    }
+    #gamescreen-layout > [data-panel="chat-container-mobile"] {
+        grid-area: chat;
+        overflow: hidden; /* Area chat bisa di-scroll internal */
+        display: flex; /* Pastikan flex-col berfungsi */
+        flex-direction: column;
+    }
+    #gamescreen-layout > [data-panel="actions-mobile"] {
+        grid-area: actions;
+        flex-shrink: 0;
+    }
+
+
+    /* Desktop (lg+) - 3 Kolom */
+    @media (min-width: 1024px) {
+        #gamescreen-layout {
+            grid-template-rows: 1fr; /* 1 baris */
+            grid-template-columns: 320px 1fr 384px; /* w-80, 1fr, w-96 */
+            grid-template-areas: 
+                "info chat character";
+            height: 100%;
+        }
+        
+        /* Sembunyikan wrapper mobile */
+        #gamescreen-layout > [data-panel="chat-container-mobile"],
+        #gamescreen-layout > [data-panel="actions-mobile"] {
+            display: none;
+        }
+
+        /* Tampilkan panel desktop */
+        #gamescreen-layout > [data-panel="info"],
+        #gamescreen-layout > [data-panel="character"] {
+            display: flex; /* Tampilkan panel statis di desktop */
+            flex-direction: column;
+            overflow-y: auto;
+            height: 100%; /* Pastikan panel mengisi grid area */
+            border: 0; /* Hapus border jika ada */
+        }
+        #gamescreen-layout > [data-panel="info"] {
+            border-right: 2px solid #374151; /* gray-700 */
+        }
+         #gamescreen-layout > [data-panel="character"] {
+            border-left: 2px solid #374151; /* gray-700 */
+        }
+        
+        #gamescreen-layout > [data-panel="chat-container-desktop"] {
+            grid-area: chat;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Kontainer chat desktop */
+        }
+    }
+`;
+
 
 export const GameScreen: React.FC<GameScreenProps> = ({
 	initialCampaign,
@@ -186,11 +258,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 			(isMyTurn && character.currentHp > 0));
 
 	return (
-        // FASE 1: Layout flex-col vertikal (Mobile-First)
+        // FASE 4: Layout flex-col diubah menjadi h-screen penuh
 		<div
 			className="w-screen h-screen bg-gray-900 text-gray-200 flex flex-col font-sans"
 			onClick={() => setContextMenu(null)}
 		>
+            <style>{gridLayoutStyle}</style> {/* FASE 4: Tambahkan CSS Grid */}
+            
             {/* FASE 1: Header Baru dengan Pemicu Panel */}
             <GameHeader
                 title={campaign.title}
@@ -201,32 +275,86 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                 onToggleCharacter={() => setActivePanel(activePanel === 'character' ? null : 'character')}
             />
 
-            {/* FASE 1: Area Konten Utama (Chat/Map) */}
-			<div className="flex-grow overflow-hidden relative">
-                <GameChatPanel
-                    campaign={campaign}
-                    players={campaign.players}
-                    characterId={character.id}
-                    onObjectClick={handleObjectClick}
-                    campaignActions={campaignActions}
-                />
-            </div>
-            
-            {/* FASE 1: Area Aksi Ergonomis (Menempel di Bawah) */}
-            <div className="flex-shrink-0 z-10">
-                {shouldShowChoices && (
-                    <ChoiceButtons
-                        choices={campaign.choices}
-                        onChoiceSelect={handleActionSubmit}
+            {/* FASE 4: Layout Grid Adaptif BARU */}
+			<div 
+                id="gamescreen-layout"
+                className="flex-grow overflow-hidden relative"
+            >
+                {/* FASE 4: Panel Chat Container (Mobile) */}
+                <div data-panel="chat-container-mobile" className="lg:hidden">
+                    <GameChatPanel
+                        campaign={campaign}
+                        players={campaign.players}
+                        characterId={character.id}
+                        onObjectClick={handleObjectClick}
+                        campaignActions={campaignActions}
                     />
-                )}
-                <ActionBar
-                    disabled={isDisabled}
-                    onActionSubmit={handleActionSubmit}
-                    pendingSkill={pendingSkill}
-                />
-            </div>
-            {/* FASE 1: Akhir layout ergonomis */}
+                </div>
+                
+                {/* FASE 4: Area Aksi (Mobile) */}
+                <div data-panel="actions-mobile" className="flex-shrink-0 z-10 lg:hidden">
+                    {shouldShowChoices && (
+                        <ChoiceButtons
+                            choices={campaign.choices}
+                            onChoiceSelect={handleActionSubmit}
+                        />
+                    )}
+                    {!shouldShowChoices && (
+                        <ActionBar
+                            disabled={isDisabled}
+                            onActionSubmit={handleActionSubmit}
+                            pendingSkill={pendingSkill}
+                        />
+                    )}
+                </div>
+
+                {/* FASE 4: Panel Info (Desktop) */}
+                <div data-panel="info" className="hidden lg:flex bg-gray-800">
+                    <GameInfoPanel
+                        campaign={campaign}
+                        players={campaign.players}
+                    />
+                </div>
+
+                {/* FASE 4: Panel Chat Container (Desktop) */}
+                <div data-panel="chat-container-desktop" className="hidden lg:flex">
+                    <GameChatPanel
+                        campaign={campaign}
+                        players={campaign.players}
+                        characterId={character.id}
+                        onObjectClick={handleObjectClick}
+                        campaignActions={campaignActions}
+                    />
+                    {/* Area Aksi untuk Desktop */}
+                    <div className="flex-shrink-0 z-10">
+                        {shouldShowChoices && (
+                            <ChoiceButtons
+                                choices={campaign.choices}
+                                onChoiceSelect={handleActionSubmit}
+                            />
+                        )}
+                        {!shouldShowChoices && (
+                            <ActionBar
+                                disabled={isDisabled}
+                                onActionSubmit={handleActionSubmit}
+                                pendingSkill={pendingSkill}
+                            />
+                        )}
+                    </div>
+                </div>
+
+                {/* FASE 4: Panel Karakter (Desktop) */}
+                <div data-panel="character" className="hidden lg:flex bg-gray-800">
+                     <GameCharacterPanel
+                        character={character}
+                        campaign={campaign}
+                        combatSystem={combatSystem}
+                        onSkillSelect={handleSkillSelect}
+                        isMyTurn={isMyTurn}
+                    />
+                </div>
+			</div>
+            {/* FASE 4: Akhir layout ergonomis */}
 
 
             {/* FASE 1: Panel Overlay (Kiri/Info) */}

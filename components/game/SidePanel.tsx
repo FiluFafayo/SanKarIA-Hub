@@ -12,37 +12,45 @@ interface SidePanelProps {
 }
 
 export const SidePanel: React.FC<SidePanelProps> = ({ isOpen, onClose, position, children }) => {
+    // FASE 4: Kelas ini sekarang HANYA berlaku untuk mobile (non-lg)
     const backdropClasses = isOpen
-        ? 'opacity-100 visible'
+        ? 'opacity-100 visible lg:invisible'
         : 'opacity-0 invisible';
     
+    // FASE 4: Kelas ini sekarang HANYA berlaku untuk mobile (non-lg)
     const panelClasses = isOpen
         ? 'translate-x-0'
-        : (position === 'left' ? '-translate-x-full' : 'translate-x-full');
+        : (position === 'left' ? '-translate-x-full lg:translate-x-0' : 'translate-x-full lg:translate-x-0');
 
     return (
         // Portal (Root)
+        // FASE 4: Di desktop (lg), ini bukan lagi modal 'fixed'
+        // Kita juga tambahkan 'pointer-events-none' saat tertutup agar tidak memblokir layout desktop
+        // FASE 4 (FIX): Tambahkan 'lg:pointer-events-auto' untuk memastikan panel desktop BISA diklik
         <div 
-            className={`fixed inset-0 z-40 transition-opacity duration-300 ${backdropClasses}`}
+            className={`lg:static fixed inset-0 z-40 transition-opacity duration-300 ${backdropClasses} ${!isOpen ? 'pointer-events-none' : 'pointer-events-auto'} lg:pointer-events-auto`}
             aria-hidden={!isOpen}
         >
-            {/* Backdrop */}
+            {/* Backdrop (Hanya Mobile) */}
             <div 
-                className="absolute inset-0 bg-black/60"
+                className="absolute inset-0 bg-black/60 lg:hidden"
                 onClick={onClose}
             />
 
             {/* Konten Panel */}
+            {/* FASE 4: Di desktop (lg), ini menjadi panel statis 'relative' */}
+            {/* Tambahkan 'pointer-events-auto' agar panel di dalamnya bisa diklik */}
             <div
-                className={`absolute top-0 h-full w-full max-w-md bg-gray-800 shadow-2xl
+                className={`absolute lg:relative top-0 h-full w-full max-w-md lg:max-w-none bg-gray-800 shadow-2xl lg:shadow-none
                             flex flex-col transition-transform duration-300 ease-in-out
                             ${position === 'left' ? 'left-0' : 'right-0'}
-                            ${panelClasses}`}
+                            ${panelClasses}
+                            lg:h-full lg:w-full pointer-events-auto`} // Pastikan mengisi area grid di desktop
                 role="dialog"
-                aria-modal="true"
+                aria-modal={!isOpen} // FASE 4: Hanya modal di mobile
             >
-                {/* Header Panel Sederhana */}
-                <header className="flex-shrink-0 flex items-center justify-end p-2 border-b border-gray-700">
+                {/* Header Panel Sederhana (Hanya Mobile) */}
+                <header className="flex-shrink-0 flex items-center justify-end p-2 border-b border-gray-700 lg:hidden">
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-gray-700"

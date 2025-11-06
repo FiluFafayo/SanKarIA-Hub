@@ -827,15 +827,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 		}
 	}, [myCharacters, isCreating, selectedChar]);
 
-	// FASE 2: Fungsi ini sekarang hanya sebagai prop pass-through
-	const handleCreateCharacter = async (
-		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
-		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
-		spellData: SpellDefinition[]
-	) => {
-		// Logika dipindahkan ke handleSave di dalam wizard
-        // Prop onSaveNewCharacter akan diteruskan ke wizard
-	};
+	// FASE 4: Hapus fungsi handleCreateCharacter (kode mati)
 
 	// FASE 2: handleClose sekarang hanya mereset state LOKAL.
     // Prop onClose (dari ProfileView) akan menangani navigasi.

@@ -39,10 +39,10 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
 
     return (
         <header className="flex-shrink-0 bg-gray-800 p-3 flex items-center justify-between border-b-2 border-gray-700 z-20">
-            {/* Tombol Info (Kiri) */}
+            {/* Tombol Info (Kiri) - FASE 4: Sembunyikan di desktop */}
             <button
                 onClick={onToggleInfo}
-                className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-700"
+                className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-700 lg:hidden"
                 aria-label="Toggle Info Panel"
             >
                 <InfoIcon />
@@ -57,7 +57,7 @@ export const GameHeader: React.FC<GameHeaderProps> = ({
             <div className="flex items-center gap-2">
                  <button
                     onClick={onToggleCharacter}
-                    className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-700"
+                    className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-gray-700 lg:hidden"
                     aria-label="Toggle Character Panel"
                 >
                     <CharacterIcon />
