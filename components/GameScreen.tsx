@@ -122,6 +122,7 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		character,
 		players,
 		campaignActions,
+		onCharacterUpdate: handleRuntimeCharacterUpdate, // FASE 2 FIX
 	});
 
 	const isCombat = campaign.gameState === "combat";

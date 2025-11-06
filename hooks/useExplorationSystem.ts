@@ -21,9 +21,10 @@ interface ExplorationSystemProps {
     character: Character;
     players: Character[];
     campaignActions: CampaignActions;
+    onCharacterUpdate: (character: Character) => void; // FASE 2 FIX
 }
 
-export function useExplorationSystem({ campaign, character, players, campaignActions }: ExplorationSystemProps) {
+export function useExplorationSystem({ campaign, character, players, campaignActions, onCharacterUpdate }: ExplorationSystemProps) {
 
     // processToolCalls tetap sama (sudah di-patch G-1)
     const processToolCalls = useCallback((turnId: string, toolCalls: ToolCall[]) => {
@@ -47,13 +48,22 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                     message = `Bahaya! Musuh muncul!`;
                     break;
                 // (Poin 7) Tangani tool XP
-                case 'award_xp':
+                case 'award_xp': { // FASE 2 FIX: Ubah ke block scope
                     const player = players.find(p => p.id === call.args.characterId);
                     if (player) {
+                        // Panggil reducer. Ini akan memicu cek Level Up (Fase 1)
                         campaignActions.awardXp(call.args.characterId, call.args.amount);
                         message = `${player.name} menerima ${call.args.amount} XP untuk: ${call.args.reason}`;
+                        
+                        // FASE 2 FIX: Ambil state pasca-reducer dari campaign.players
+                        // dan panggil controller (GameScreen) untuk menyimpan SSoT.
+                        const updatedPlayerState = campaign.players.find(p => p.id === call.args.characterId);
+                        if (updatedPlayerState) {
+                            onCharacterUpdate(updatedPlayerState);
+                        }
                     }
                     break;
+                }
                 // (Poin 4) Tangani tool Opini
                 case 'update_npc_opinion':
                     const npc = campaign.npcs.find(n => n.id === call.args.npcId);
@@ -68,7 +78,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 campaignActions.logEvent({ type: 'system', text: `--- ${message} ---` }, turnId);
             }
         });
-    }, [campaignActions]);
+    }, [campaignActions, players, onCharacterUpdate, campaign.players]); // FASE 2 FIX: Tambah dependensi
 
     // processMechanics disederhanakan (G-2)
     const processMechanics = useCallback(async (
