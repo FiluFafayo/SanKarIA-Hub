@@ -37,7 +37,7 @@ const invItem = (def: ItemDefinition, qty = 1, equipped = false): Omit<Character
 });
 
 // Tipe data mentah untuk seeding
-type RawCharacterData = Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> & {
+export type RawCharacterData = Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> & {
     inventory: Omit<CharacterInventoryItem, 'instanceId'>[];
     knownSpells: SpellDefinition[];
 };
@@ -165,7 +165,7 @@ const BORIN_DATA: RawCharacterData = {
 };
 
 
-const RAW_DEFAULT_CHARACTERS: RawCharacterData[] = [
+export const RAW_DEFAULT_CHARACTERS: RawCharacterData[] = [
     VALERIUS_DATA,
     ELARA_DATA,
     BORIN_DATA,

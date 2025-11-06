@@ -24,6 +24,7 @@ import {
 import { SPRITE_PARTS } from "../../data/spriteParts"; // BARU
 import { Die } from "../Die";
 import { SelectionCard } from "../SelectionCard"; // Import SelectionCard
+import { useDataStore } from "../../store/dataStore"; // Impor baru
 
 // FASE 2: Impor SSoT Data Statis dari Registry
 import { 
@@ -38,6 +39,8 @@ import {
     RaceData, 
     ClassData, 
     BackgroundData, 
+	getRawCharacterTemplates, // Impor baru
+    RawCharacterData, // Impor baru
     EquipmentChoice // FASE 0: EquipmentChoice sekarang Tipe string, bukan Definition
 } from "../../data/registry";
 // FASE 2: Impor utilitas AI
@@ -227,8 +230,8 @@ const CreateCharacterWizard: React.FC<{
 	);
 
 	// FASE 2: State sekarang lokal menggunakan useState, bukan zustand
-    const [step, setStep] = useState(1);
-    const [statusMessage, setStatusMessage] = useState('');
+	const [step, setStep] = useState(1); // MULAI DARI LANGKAH 1 (PILIH METODE)
+	const [statusMessage, setStatusMessage] = useState('');
     const [name, setName] = useState('');
     const [gender, setGender] = useState<'Pria' | 'Wanita'>('Pria');
     const [hair, setHair] = useState('h_short_blond');
@@ -246,8 +249,12 @@ const CreateCharacterWizard: React.FC<{
     const [selectedEquipment, setSelectedEquipment] = useState<Record<number, EquipmentChoice['options'][0]>>(() => getDefaultEquipment(findClass('Fighter') || Object.values(CLASS_DEFINITIONS)[0]));
     const [isSaving, setIsSaving] = useState(false);
 
-    // Aksi Store sekarang menjadi handler lokal
-    const setCharacterStep = setStep;
+    // FASE 2: Aksi Store sekarang menjadi handler lokal
+	const { copyCharacterFromTemplate } = useDataStore(s => s.actions); // Impor aksi baru
+	const [isCopying, setIsCopying] = useState(false); // State loading template
+	const templates = getRawCharacterTemplates();
+
+	const setCharacterStep = setStep;
     const setAbilityScore = (ability: Ability, score: number) => {
         setAbilityScores(prev => ({ ...prev, [ability]: score }));
     };
@@ -273,13 +280,28 @@ const CreateCharacterWizard: React.FC<{
 	const handleAbilityRollComplete = (ability: Ability, score: number) => {
 		setAbilityScore(ability, score);
 		if (currentAbilityIndex === abilitiesToRoll.length - 1) {
-			setCharacterStep(3); // Lanjut ke Background
+			setCharacterStep(4); // Lanjut ke Background
 		}
 	};
 
 	// FASE 2: Logika finalizeCharacter (dari appStore) dipindahkan ke sini
+	const handleTemplateCopy = async (template: RawCharacterData) => {
+		setIsCopying(true);
+		setStatusMessage(`Menyalin ${template.name}...`);
+		try {
+		// Panggil aksi dataStore (yang juga menangani gambar AI)
+		await copyCharacterFromTemplate(template, userId);
+		setStatusMessage("");
+		setIsCopying(false);
+		onCancel(); // Sukses, tutup wizard
+		} catch (e: any) {
+		setIsCopying(false);
+		setStatusMessage(`Gagal menyalin: ${e.message || 'Coba lagi.'}`);
+		}
+	};
+
 	const handleSave = async () => {
-        if (Object.keys(abilityScores).length !== 6) {
+		if (Object.keys(abilityScores).length !== 6) {
             // FASE 3: Ganti alert() dengan status message
             setStatusMessage("ERROR: Selesaikan pelemparan semua dadu kemampuan.");
             // Hapus alert
@@ -406,9 +428,11 @@ const CreateCharacterWizard: React.FC<{
 	};
 
 	const handleBack = () => {
-		if (step > 1) {
+		if (step > 2) { // Jika di step 3 (Ability) atau lebih
 			setCharacterStep(step - 1);
-		} else {
+		} else if (step === 2) { // Jika di step 2 (Ras/Kelas)
+			setCharacterStep(1); // Kembali ke step 1 (Pilih Metode)
+		} else { // Jika di step 1 (Pilih Metode)
 			onCancel();
 		}
 	};
@@ -456,9 +480,53 @@ const CreateCharacterWizard: React.FC<{
 				</button>
 			)}
 
-			{/* === STEP 1: Ras, Kelas, Nama & Visual === */}
+			{/* === STEP 1: Pilih Metode === */}
 			{step === 1 && (
-                // FASE 0: Tambah padding internal untuk step
+				<div className="p-4 flex flex-col items-center flex-grow animate-fade-in-fast">
+					<h3 className="font-cinzel text-xl text-blue-200 mb-4">Bagaimana Anda ingin memulai?</h3>
+					<button 
+						onClick={() => setStep(2)} 
+						disabled={isCopying}
+						className="w-full max-w-sm font-cinzel text-lg bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-lg shadow-lg disabled:bg-gray-600"
+					>
+						Mulai dari Awal
+					</button>
+
+					<div className="flex items-center gap-4 my-4 w-full max-w-sm">
+						<div className="flex-grow border-t border-blue-400/30"></div>
+						<span className="text-blue-200/70 text-sm">ATAU</span>
+						<div className="flex-grow border-t border-blue-400/30"></div>
+					</div>
+
+					<h4 className="font-cinzel text-lg mb-2">Pilih dari Template</h4>
+					{statusMessage && <p className={`text-center text-sm mb-2 ${statusMessage.startsWith('ERROR:') ? 'text-red-400' : 'text-amber-300'}`}>{statusMessage}</p>}
+
+					<div className="grid grid-cols-3 gap-4 w-full max-w-sm">
+					{templates.map(template => (
+						<div key={template.name} className="relative">
+							<SelectionCard 
+								key={template.name}
+								title={template.name}
+								description={`${template.race} ${template.class}`}
+								imageUrl={template.image}
+								isSelected={isCopying && statusMessage.includes(template.name)}
+								onClick={() => !isCopying && handleTemplateCopy(template)}
+							/>
+							{isCopying && statusMessage.includes(template.name) && (
+								<div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded-lg animate-fade-in-fast">
+									<div className="w-8 h-8 border-2 border-t-amber-400 border-gray-600 rounded-full animate-spin"></div>
+								</div>
+							)}
+						</div>
+					))}
+					</div>
+					<div className="flex-grow"></div>
+				</div>
+			)}
+
+			{/* === STEP 2: Ras, Kelas, Nama & Visual (Dulu Step 1) === */}
+			{step === 2 && (
+				// FASE 0: Tambah padding internal untuk step
 				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
                     {/* Grid 2 Kolom untuk Info Dasar */}
                     <div className="grid grid-cols-2 gap-x-4">
@@ -592,13 +660,13 @@ const CreateCharacterWizard: React.FC<{
 					<div className="flex-grow"></div>
 					<div className="flex justify-between">
 						<button
-							onClick={onCancel}
+							onClick={handleBack}
 							className="font-cinzel text-gray-300 hover:text-white"
 						>
-							Batal
+							&larr; Kembali
 						</button>
 						<button
-							onClick={() => name.trim() && setCharacterStep(2)}
+							onClick={() => name.trim() && setCharacterStep(3)}
 							disabled={!name.trim()}
 							className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"
 						>
@@ -608,8 +676,8 @@ const CreateCharacterWizard: React.FC<{
 				</div>
 			)}
 
-			{/* === STEP 2: Ability Scores === */}
-			{step === 2 && currentAbilityIndex < abilitiesToRoll.length && (
+			{/* === STEP 3: Ability Scores (Dulu Step 2) === */}
+			{step === 3 && currentAbilityIndex < abilitiesToRoll.length && (
 				<AbilityRoller
 					key={abilitiesToRoll[currentAbilityIndex]}
 					ability={abilitiesToRoll[currentAbilityIndex]}
@@ -620,8 +688,8 @@ const CreateCharacterWizard: React.FC<{
 				/>
 			)}
 
-			{/* === STEP 3: Background === */}
-			{step === 3 && (
+			{/* === STEP 4: Background (Dulu Step 3) === */}
+			{step === 4 && (
                 // FASE 0: Tambah padding internal untuk step
 				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
 					<label className="block mb-1 font-cinzel text-sm">Background</label>
@@ -655,13 +723,13 @@ const CreateCharacterWizard: React.FC<{
 					<div className="flex-grow"></div>
 					<div className="flex justify-between">
 						<button
-							onClick={() => setCharacterStep(2)}
+							onClick={() => setCharacterStep(3)}
 							className="font-cinzel text-gray-300 hover:text-white"
 						>
 							&larr; Lempar Ulang
 						</button>
 						<button
-							onClick={() => setCharacterStep(4)}
+							onClick={() => setCharacterStep(5)}
 							className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded"
 						>
 							Lanjutkan
@@ -670,8 +738,8 @@ const CreateCharacterWizard: React.FC<{
 				</div>
 			)}
 
-			{/* === STEP 4: Pilihan Skill (BARU) === */}
-			{step === 4 && (
+			{/* === STEP 5: Pilihan Skill (Dulu Step 4) === */}
+			{step === 5 && (
                 // FASE 0: Tambah padding internal untuk step
 				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
 					<h4 className="font-cinzel text-xl text-blue-200 mb-2">
@@ -705,13 +773,13 @@ const CreateCharacterWizard: React.FC<{
 					<div className="flex-grow"></div>
 					<div className="flex justify-between">
 						<button
-							onClick={() => setCharacterStep(3)}
+							onClick={() => setCharacterStep(4)}
 							className="font-cinzel text-gray-300 hover:text-white"
 						>
 							&larr; Ganti Background
 						</button>
 						<button
-							onClick={() => setStep(5)}
+							onClick={() => setStep(6)}
 							disabled={
 								selectedSkills.length !==
 								selectedClass.proficiencies.skills.choices
@@ -724,8 +792,8 @@ const CreateCharacterWizard: React.FC<{
 				</div>
 			)}
 
-			{/* === STEP 5: Pilihan Equipment (BARU) === */}
-			{step === 5 && (
+			{/* === STEP 6: Pilihan Equipment (Dulu Step 5) === */}
+			{step === 6 && (
                 // FASE 0: Tambah padding internal untuk step
 				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
 					<h4 className="font-cinzel text-xl text-blue-200 mb-2">
@@ -764,13 +832,13 @@ const CreateCharacterWizard: React.FC<{
 					<div className="flex-grow"></div>
 					<div className="flex justify-between">
 						<button
-							onClick={() => setCharacterStep(4)}
+							onClick={() => setCharacterStep(5)}
 							className="font-cinzel text-gray-300 hover:text-white"
 						>
 							&larr; Ganti Skill
 						</button>
 						<button
-							onClick={() => setCharacterStep(6)}
+							onClick={() => setCharacterStep(7)}
 							className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded"
 						>
 							Lanjutkan
@@ -779,8 +847,8 @@ const CreateCharacterWizard: React.FC<{
 				</div>
 			)}
 
-			{/* === STEP 6: Review & Finalisasi (Dulu Step 4) === */}
-			{step === 6 && (
+			{/* === STEP 7: Review & Finalisasi (Dulu Step 6) === */}
+			{step === 7 && (
                 // FASE 0: Tambah padding internal untuk step
 				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
 					<p className="text-center text-lg text-gray-300 mb-4">
@@ -812,7 +880,7 @@ const CreateCharacterWizard: React.FC<{
 					<div className="flex-grow"></div>
 					<div className="flex justify-between">
 						<button
-							onClick={() => setCharacterStep(5)}
+							onClick={() => setCharacterStep(6)}
 							className="font-cinzel text-gray-300 hover:text-white"
 							disabled={isSaving}
 						>

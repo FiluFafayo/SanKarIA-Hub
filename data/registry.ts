@@ -9,7 +9,11 @@ import { BackgroundData, BACKGROUNDS } from './backgrounds';
 import { ItemDefinition, ITEM_DEFINITIONS } from './items';
 import { SpellDefinition, SPELL_DEFINITIONS } from './spells';
 import { MonsterDefinition, MONSTER_DEFINITIONS } from './monsters';
-import { Ability, Skill } from '@/types';
+import { Ability, Skill, Character, CharacterInventoryItem, SpellDefinition, ItemDefinition } from '@/types';
+import { RawCharacterData, RAW_DEFAULT_CHARACTERS } from './defaultCharacters';
+
+// Ekspor tipe agar file lain bisa pakai
+export type { RawCharacterData };
 
 // Helper internal
 const findByName = <T extends { name: string }>(arr: T[], name: string): T | undefined => {
@@ -42,6 +46,9 @@ export const findSpell = (name: string): SpellDefinition | undefined => findByNa
 // Monsters
 export const getAllMonsters = (): MonsterDefinition[] => MONSTER_DEFINITIONS;
 export const findMonster = (name: string): MonsterDefinition | undefined => findByName(MONSTER_DEFINITIONS, name);
+
+// API baru untuk mengambil template mentah
+export const getRawCharacterTemplates = (): RawCharacterData[] => RAW_DEFAULT_CHARACTERS;
 
 // Helper fallback (digunakan oleh appStore)
 export const getItemDef = (name: string): ItemDefinition => {

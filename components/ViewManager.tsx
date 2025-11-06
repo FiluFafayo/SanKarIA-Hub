@@ -55,6 +55,7 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
           characters={characters.filter(c => c.ownerId === userId)} // Hanya karakter milikku
           onSelect={onCharacterSelection}
           onClose={returnToNexus}
+          userId={userId}
         />
       );
     }

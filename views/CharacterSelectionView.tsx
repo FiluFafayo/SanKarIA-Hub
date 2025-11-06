@@ -1,15 +1,44 @@
 // REFAKTOR G-4: Disederhanakan, props data dihapus
-import React from 'react';
+import React, { useState } from 'react';
 import { ViewWrapper } from '../components/ViewWrapper';
-import { Character } from '../types';
+import { Character, Location } from '../types';
+import { getRawCharacterTemplates, RawCharacterData } from '../data/registry'; // Impor template
+import { useDataStore } from '../store/dataStore'; // Impor dataStore
+import { useAppStore } from '../store/appStore'; // Impor appStore
+import { SelectionCard } from '../components/SelectionCard'; // Impor SelectionCard
 
 interface CharacterSelectionViewProps {
   characters: Character[]; // SSoT Karakter milikku (tetap di-pass dari ViewManager)
   onSelect: (character: Character) => void;
   onClose: () => void;
+  userId: string; // Ambil userId
 }
 
-export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ characters, onSelect, onClose }) => {
+export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ characters, onSelect, onClose, userId }) => {
+  const templates = getRawCharacterTemplates();
+  const copyCharacterFromTemplate = useDataStore(s => s.actions.copyCharacterFromTemplate);
+  const navigateTo = useAppStore(s => s.actions.navigateTo);
+  const [isCopying, setIsCopying] = useState<string | null>(null); // State loading
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleCopyAndSelect = async (template: RawCharacterData) => {
+    setIsCopying(template.name);
+    setErrorMessage('');
+    try {
+      const newCharacter = await copyCharacterFromTemplate(template, userId);
+      onSelect(newCharacter); // Lanjutkan alur join campaign
+    } catch (e: any) {
+      console.error("Gagal menyalin template:", e);
+      setErrorMessage(`Gagal menyalin ${template.name}. Coba lagi.`);
+      setIsCopying(null);
+    }
+  };
+
+  const handleCreateNew = () => {
+    navigateTo(Location.MirrorOfSouls); // Arahkan ke Cermin Jiwa
+    onClose(); // Tutup view ini
+  };
+
   return (
     <ViewWrapper onClose={onClose} title="Pilih Karakter Anda">
         {/* FASE 0: Hapus h-full, biarkan padding ViewWrapper bekerja */}
@@ -19,10 +48,47 @@ export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ 
                 <p className="text-center text-gray-300 mb-6">Pahlawan mana yang akan memulai petualangan ini?</p>
                 
                 {characters.length === 0 ? (
-                <p className="text-center text-red-400">Anda tidak punya karakter. Mohon buat satu di Cermin Jiwa terlebih dahulu.</p>
-                ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                    {characters.map(char => (
+              <div className="text-center">
+                <p className="text-amber-200 mb-4">Anda belum memiliki karakter untuk bergabung. <br/>Pilih salah satu template siap pakai di bawah ini, atau buat karakter baru.</p>
+
+                <h3 className="font-cinzel text-xl text-amber-100 mb-4">Pilih Template Siap Pakai</h3>
+                {errorMessage && <p className="text-red-400 text-sm mb-2">{errorMessage}</p>}
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  {templates.map(template => (
+                    <div key={template.name} className="relative">
+                      <SelectionCard
+                        title={template.name}
+                        description={`${template.race} ${template.class}`}
+                        imageUrl={template.image}
+                        isSelected={isCopying === template.name}
+                        onClick={() => !isCopying && handleCopyAndSelect(template)}
+                      />
+                      {isCopying === template.name && (
+                        <div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded-lg animate-fade-in-fast">
+                          <div className="w-8 h-8 border-2 border-t-amber-400 border-gray-600 rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-4 my-4">
+                    <div className="flex-grow border-t border-amber-700/50"></div>
+                    <span className="text-amber-200/70 text-sm">ATAU</span>
+                    <div className="flex-grow border-t border-amber-700/50"></div>
+                </div>
+
+                <button
+                  onClick={handleCreateNew}
+                  disabled={!!isCopying}
+                  className="w-full bg-blue-600 hover:bg-blue-500 font-cinzel text-lg py-3 rounded-lg shadow-lg disabled:bg-gray-600"
+                >
+                  Buat Karakter Baru
+                </button>
+              </div>
+            ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                {characters.map(char => (
                     <div
                         key={char.id}
                         onClick={() => onSelect(char)} // REFAKTOR: Kirim objek char penuh
