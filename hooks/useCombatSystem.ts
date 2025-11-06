@@ -90,7 +90,7 @@ export const useCombatSystem = ({
                             
                             const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
                             if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
-                                console.log(`[useCombatSystem] ${updatedPlayerState.name} siap Level Up!`);
+                                // FASE 5: Hapus console.log
                                 useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
                             }
                         }

@@ -67,7 +67,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                             // FASE 3: Cek Level Up
                             const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
                             if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
-                                console.log(`[useExplorationSystem] ${updatedPlayerState.name} siap Level Up!`);
+                                // FASE 5: Hapus console.log
                                 useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
                             }
                         }

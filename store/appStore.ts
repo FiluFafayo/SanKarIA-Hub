@@ -97,7 +97,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         triggerLevelUp: (character) => {
             // Cek untuk mencegah modal muncul berulang kali jika state belum di-save
             if (get().levelUp.characterToLevel) return;
-            console.log(`[LevelUp] Memicu modal Level Up untuk ${character.name}`);
+            // FASE 5: Hapus console.log
             set(state => ({ levelUp: { characterToLevel: character } }));
         },
         closeLevelUp: () => {
