@@ -649,7 +649,7 @@ export const useCampaign = (
 				}
 			},
 		};
-	}, [campaign.gameState]); // <-- dependensi disederhanakan
+	}, []); // (dispatch dijamin stabil, gameState tidak diperlukan)
 
 	const fullCampaignState = useMemo(
 		() => ({

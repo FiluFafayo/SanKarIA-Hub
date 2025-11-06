@@ -338,7 +338,14 @@ export const useCombatSystem = ({
 				campaignActions.endTurn();
 			}
 		},
-		[campaign, players, campaignActions, onCharacterUpdate] // FASE 1 (Tugas 3)
+		[
+			players,
+			campaign.monsters,
+			campaign.turnId,
+			campaign.initiativeOrder,
+			campaignActions,
+			onCharacterUpdate,
+		] // FASE 1 (Tugas 3)
 	); // <-- processToolCalls dihapus dari dependensi
 
 	// =================================================================
