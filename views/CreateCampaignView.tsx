@@ -21,7 +21,8 @@ interface CampaignFramework {
 }
 
 const Page: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="p-4 sm:p-6 md:p-8 text-gray-800 flex flex-col h-full bg-amber-50 rounded-lg shadow-xl">{children}</div>
+  // FASE 2 FIX: Hapus 'h-full'. Tambahkan 'min-h-[60vh]' agar tombol tetap di bawah pada layar pendek, tapi biarkan konten tumbuh.
+  <div className="p-4 sm:p-6 md:p-8 text-gray-800 flex flex-col min-h-[60vh] bg-amber-50 rounded-lg shadow-xl">{children}</div>
 );
 
 export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose, onCreateCampaign }) => {

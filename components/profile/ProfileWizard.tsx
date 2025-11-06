@@ -859,9 +859,11 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 	return (
         // FASE 2: Hapus ModalWrapper. Ganti dengan div layout halaman standar.
         // Styling modal (backdrop-blur, w-[90vw], h-[80vh]) dihapus total.
-		<div className="bg-bg-secondary border border-blue-400/30 rounded-xl shadow-2xl text-white flex flex-col md:flex-row min-h-[700px]">
+        // FASE 2 FIX: Hapus 'min-h-[700px]' agar halaman bisa di-scroll alami di mobile.
+		<div className="bg-bg-secondary border border-blue-400/30 rounded-xl shadow-2xl text-white flex flex-col md:flex-row">
 			{/* Left Panel: Mirror and Character Sheet */}
-			<div className="w-full md:w-2/3 p-6 flex flex-col items-center">
+            {/* FASE 2 FIX: Hapus 'items-center' agar konten wizard tidak terpusat secara horizontal */}
+			<div className="w-full md:w-2/3 p-6 flex flex-col">
 					<h2 className="font-cinzel text-3xl mb-4">Cermin Jiwa</h2>
 					<div className="w-full h-full bg-black/30 border-2 border-blue-300/50 rounded-lg p-4 flex flex-col">
 						{isCreating ? (
