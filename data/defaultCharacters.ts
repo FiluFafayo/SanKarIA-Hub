@@ -1,45 +1,28 @@
 // data/defaultCharacters.ts
 import { Character, Ability, Skill, AbilityScores, CharacterSpellSlot, CharacterInventoryItem, ItemDefinition, SpellDefinition, CharacterFeature } from '../types';
 import { generateId } from '../utils';
-// REFAKTOR G-5: File data statis tidak boleh saling impor, 
-// tapi karena ini adalah file definisi, kita izinkan impor definisi dasar.
-import { ITEM_DEFINITIONS } from './items';
-import { SPELL_DEFINITIONS } from './spells';
+// REFAKTOR G-5: Hapus impor circular
+// import { ITEM_DEFINITIONS } from './items';
+// import { SPELL_DEFINITIONS } from './spells';
 import { CLASS_DEFINITIONS } from './classes';
 import { RACES } from './races';
 
-// Helper untuk mengambil definisi item berdasarkan nama
-const item = (name: string): ItemDefinition => {
-    const definition = ITEM_DEFINITIONS.find(i => i.name.toLowerCase() === name.toLowerCase());
-    if (!definition) {
-        console.warn(`[G-5 DefaultChars] ItemDefinition not found for seeding: ${name}. Using a placeholder.`);
-        return { 
-            id: generateId('item-fallback'), 
-            name: name, type: 'other', isMagical: false, 
-            rarity: 'common', requiresAttunement: false 
-        };
-    }
-    return { ...definition, id: definition.id || name };
-};
-
-// Helper untuk mengambil definisi spell berdasarkan nama
-const spell = (name: string): SpellDefinition => {
-    const definition = SPELL_DEFINITIONS.find(s => s.name.toLowerCase() === name.toLowerCase());
-    if (!definition) throw new Error(`[G-5 DefaultChars] SpellDefinition not found for seeding: ${name}`);
-    return { ...definition, id: definition.id || name };
-};
-
-// Helper untuk membuat item inventory
-const invItem = (def: ItemDefinition, qty = 1, equipped = false): Omit<CharacterInventoryItem, 'instanceId'> => ({
-    item: def,
+// REFAKTOR: Helper sekarang HANYA mengembalikan data mentah yang dibutuhkan.
+const invItem = (name: string, qty = 1, equipped = false): { itemName: string, quantity: number, isEquipped: boolean } => ({
+    itemName: name,
     quantity: qty,
     isEquipped: equipped,
 });
 
+// REFAKTOR: Helper sekarang HANYA mengembalikan nama string.
+const spell = (name: string): string => {
+    return name;
+};
+
 // Tipe data mentah untuk seeding
 export type RawCharacterData = Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> & {
-    inventory: Omit<CharacterInventoryItem, 'instanceId'>[];
-    knownSpells: SpellDefinition[];
+    inventory: { itemName: string, quantity: number, isEquipped: boolean }[];
+    knownSpells: string[];
 };
 
 const VALERIUS_DATA: RawCharacterData = {
@@ -55,8 +38,8 @@ const VALERIUS_DATA: RawCharacterData = {
     bond: 'Saya masih setia pada komandan lama saya.',
     flaw: 'Saya buta terhadap kesalahan atasan saya.',
     abilityScores: {
-      [Ability.Strength]: 16, [Ability.Dexterity]: 13, [Ability.Constitution]: 15,
-      [Ability.Intelligence]: 9, [Ability.Wisdom]: 12, [Ability.Charisma]: 11,
+        [Ability.Strength]: 16, [Ability.Dexterity]: 13, [Ability.Constitution]: 15,
+        [Ability.Intelligence]: 9, [Ability.Wisdom]: 12, [Ability.Charisma]: 11,
     },
     maxHp: 12, // (10 + 2 CON)
     currentHp: 12,
@@ -71,11 +54,11 @@ const VALERIUS_DATA: RawCharacterData = {
     racialTraits: RACES.find(r => r.name === 'Human')?.traits || [],
     classFeatures: CLASS_DEFINITIONS['Fighter'].features,
     inventory: [
-      invItem(item('Chain Mail'), 1, true),
-      invItem(item('Longsword'), 1, true),
-      invItem(item('Shield'), 1, true),
-      invItem(item('Light Crossbow'), 1),
-      invItem(item('Bolts'), 20),
+        invItem('Chain Mail', 1, true),
+        invItem('Longsword', 1, true),
+        invItem('Shield', 1, true),
+        invItem('Light Crossbow', 1),
+        invItem('Bolts', 20),
     ],
     spellSlots: [],
     knownSpells: [],
@@ -94,8 +77,8 @@ const ELARA_DATA: RawCharacterData = {
     bond: 'Sebuah luka di hutan saya adalah luka bagi saya.',
     flaw: 'Saya sedikit terlalu menyukai minuman keras.',
     abilityScores: {
-      [Ability.Strength]: 12, [Ability.Dexterity]: 17, [Ability.Constitution]: 13,
-      [Ability.Intelligence]: 10, [Ability.Wisdom]: 15, [Ability.Charisma]: 8,
+        [Ability.Strength]: 12, [Ability.Dexterity]: 17, [Ability.Constitution]: 13,
+        [Ability.Intelligence]: 10, [Ability.Wisdom]: 15, [Ability.Charisma]: 8,
     },
     maxHp: 11, // (10 + 1 CON)
     currentHp: 11,
@@ -108,12 +91,12 @@ const ELARA_DATA: RawCharacterData = {
     proficientSkills: [Skill.Stealth, Skill.Survival, Skill.Perception],
     proficientSavingThrows: [Ability.Strength, Ability.Dexterity],
     racialTraits: RACES.find(r => r.name === 'Elf')?.traits || [],
-    classFeatures: [ { name: 'Favored Enemy', description: 'Kamu ahli melawan satu tipe musuh.'}, { name: 'Natural Explorer', description: 'Kamu ahli di satu tipe medan.'} ], // (Contoh fitur Ranger)
+    classFeatures: [{ name: 'Favored Enemy', description: 'Kamu ahli melawan satu tipe musuh.' }, { name: 'Natural Explorer', description: 'Kamu ahli di satu tipe medan.' }], // (Contoh fitur Ranger)
     inventory: [
-      invItem(item('Leather Armor'), 1, true),
-      invItem(item('Longbow'), 1, true),
-      invItem(item('Arrows'), 20),
-      invItem(item('Shortsword'), 2),
+        invItem('Leather Armor', 1, true),
+        invItem('Longbow', 1, true),
+        invItem('Arrows', 20),
+        invItem('Shortsword', 2),
     ],
     spellSlots: [],
     knownSpells: [],
@@ -132,8 +115,8 @@ const BORIN_DATA: RawCharacterData = {
     bond: 'Saya berutang nyawa kepada pendeta yang menolong saya.',
     flaw: 'Saya sangat mempercayai hierarki kuil saya.',
     abilityScores: {
-      [Ability.Strength]: 14, [Ability.Dexterity]: 8, [Ability.Constitution]: 16,
-      [Ability.Intelligence]: 10, [Ability.Wisdom]: 16, [Ability.Charisma]: 12,
+        [Ability.Strength]: 14, [Ability.Dexterity]: 8, [Ability.Constitution]: 16,
+        [Ability.Intelligence]: 10, [Ability.Wisdom]: 16, [Ability.Charisma]: 12,
     },
     maxHp: 11, // (8 + 3 CON)
     currentHp: 11,
@@ -149,18 +132,18 @@ const BORIN_DATA: RawCharacterData = {
     racialTraits: RACES.find(r => r.name === 'Dwarf')?.traits || [],
     classFeatures: CLASS_DEFINITIONS['Cleric'].features,
     inventory: [
-      invItem(item('Scale Mail'), 1, true),
-      invItem(item('Warhammer'), 1, true),
-      invItem(item('Shield'), 1, true),
-      invItem(item('Holy Symbol'), 1),
+        invItem('Scale Mail', 1, true),
+        invItem('Warhammer', 1, true),
+        invItem('Shield', 1, true),
+        invItem('Holy Symbol', 1),
     ],
     spellSlots: [{ level: 1, max: 2, spent: 0 }], // (File lama salah, cleric Lvl 1 punya 2 slot)
     knownSpells: [
-      spell('Guidance'),
-      spell('Light'),
-      spell('Cure Wounds'),
-      spell('Guiding Bolt'),
-      spell('Bless'),
+        spell('Guidance'),
+        spell('Light'),
+        spell('Cure Wounds'),
+        spell('Guiding Bolt'),
+        spell('Bless'),
     ],
 };
 
@@ -176,30 +159,10 @@ export const RAW_DEFAULT_CHARACTERS: RawCharacterData[] = [
  * dengan ID unik untuk instance inventory, siap untuk disimpan ke DB.
  * INI HANYA UNTUK SEEDING DATABASE BARU.
  */
-export const generateDefaultCharacters = (ownerId: string): Omit<Character, 'id'>[] => {
-    return RAW_DEFAULT_CHARACTERS.map(rawChar => {
-        
-        // Buat inventory relasional
-        const newInventory: CharacterInventoryItem[] = rawChar.inventory.map(inv => ({
-            ...inv,
-            instanceId: generateId('inv'), // ID unik untuk baris 'character_inventory'
-        }));
-        
-        // Buat spell relasional
-        const newSpells: SpellDefinition[] = rawChar.knownSpells.map(s => ({
-            ...s,
-            // (ID sudah di-set dari helper 'spell()')
-        }));
-
-        // Gabungkan
-        return {
-            ...rawChar,
-            ownerId: ownerId,
-            inventory: newInventory,
-            knownSpells: newSpells
-        };
-    });
-};
+/**
+ * (Fungsi 'generateDefaultCharacters' dipindah ke data/registry.ts
+ * untuk menyelesaikan circular dependency.)
+ */
 
 /**
  * (Fungsi seeding 'getRawCharactersForSeeding' dan 'getRawCharacterRelationsForSeeding'

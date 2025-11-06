@@ -11,6 +11,7 @@ import { SpellDefinition, SPELL_DEFINITIONS } from './spells';
 import { MonsterDefinition, MONSTER_DEFINITIONS } from './monsters';
 import { Ability, Skill, Character, CharacterInventoryItem, SpellDefinition, ItemDefinition } from '@/types';
 import { RawCharacterData, RAW_DEFAULT_CHARACTERS } from './defaultCharacters';
+import { generateId } from '../utils';
 
 // Ekspor tipe agar file lain bisa pakai
 export type { RawCharacterData };
@@ -49,6 +50,51 @@ export const findMonster = (name: string): MonsterDefinition | undefined => find
 
 // API baru untuk mengambil template mentah
 export const getRawCharacterTemplates = (): RawCharacterData[] => RAW_DEFAULT_CHARACTERS;
+
+/**
+ * (Dipindah dari data/defaultCharacters.ts untuk memutus circular dependency)
+ * Fungsi ini mengubah data mentah menjadi data karakter lengkap 
+ * dengan ID unik untuk instance inventory, siap untuk disimpan ke DB.
+ * INI HANYA UNTUK SEEDING DATABASE BARU.
+ */
+export const generateDefaultCharacters = (ownerId: string): Omit<Character, 'id'>[] => {
+    return RAW_DEFAULT_CHARACTERS.map(rawChar => {
+
+        // Buat inventory relasional (SEKARANG RESOLVE STRINGS)
+        const newInventory: CharacterInventoryItem[] = rawChar.inventory.map(inv => {
+            const definition = findItem(inv.itemName);
+            if (!definition) {
+                console.warn(`[Registry Seeding] ItemDefinition not found: ${inv.itemName}`);
+                // Buat fallback SSoT-compatible
+                return {
+                    instanceId: generateId('inv-seed'),
+                    item: { id: inv.itemName, name: inv.itemName, type: 'other', isMagical: false, rarity: 'common', requiresAttunement: false },
+                    quantity: inv.quantity,
+                    isEquipped: inv.isEquipped
+                };
+            }
+            return {
+                instanceId: generateId('inv-seed'),
+                item: definition,
+                quantity: inv.quantity,
+                isEquipped: inv.isEquipped
+            };
+        });
+
+        // Buat spell relasional (SEKARANG RESOLVE STRINGS)
+        const newSpells: SpellDefinition[] = rawChar.knownSpells
+            .map(spellName => findSpell(spellName))
+            .filter(Boolean) as SpellDefinition[];
+
+        // Gabungkan
+        return {
+            ...rawChar,
+            ownerId: ownerId,
+            inventory: newInventory,
+            knownSpells: newSpells
+        };
+    });
+};
 
 // Helper fallback (digunakan oleh appStore)
 export const getItemDef = (name: string): ItemDefinition => {

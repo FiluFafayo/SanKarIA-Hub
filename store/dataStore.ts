@@ -247,8 +247,9 @@ export const useDataStore = create<DataStore>((set, get) => ({
 
         // 2. Resolve Inventory (dari data mentah template)
         const inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[] = templateData.inventory.map(inv => ({
-            ...inv,
-            item: getItemDef(inv.item.name) // Resolve string ke full definition
+            item: getItemDef(inv.itemName), // Resolve string ke full definition
+            quantity: inv.quantity,
+            isEquipped: inv.isEquipped
         }));
 
         // 3. Hitung AC (sama seperti di ProfileWizard)
@@ -267,7 +268,7 @@ export const useDataStore = create<DataStore>((set, get) => ({
         if (shieldIndex > -1) armorClass += 2;
 
         // 4. Resolve Spells (dari data mentah template)
-        const spellData: SpellDefinition[] = templateData.knownSpells.map(s => findSpell(s.name)).filter(Boolean) as SpellDefinition[];
+        const spellData: SpellDefinition[] = templateData.knownSpells.map(spellName => findSpell(spellName)).filter(Boolean) as SpellDefinition[];
 
         // 5. Susun Data Karakter
         const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
