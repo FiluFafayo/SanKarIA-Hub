@@ -4,16 +4,16 @@
 // Ini membongkar logic tersebut dari App.tsx (God Object).
 
 import { create } from 'zustand';
-import { 
-    Campaign, Character, GameEvent, CampaignState, 
+import {
+    Campaign, Character, GameEvent, CampaignState,
     CharacterInventoryItem, SpellDefinition, AbilityScores, ItemDefinition
 } from '../types';
 import { dataService } from '../services/dataService';
 import { generationService } from '../services/ai/generationService';
 // Impor baru untuk aksi template
-import { 
-    RawCharacterData, findClass, findRace, findBackground, 
-    findSpell, getItemDef 
+import {
+    RawCharacterData, findClass, findRace, findBackground,
+    findSpell, getItemDef
 } from '../data/registry';
 import { getAbilityModifier } from '../utils';
 import { renderCharacterLayout } from '../services/pixelRenderer';
@@ -58,11 +58,11 @@ interface DataActions {
         userId: string
     ) => Promise<void>;
     createCampaign: (
-        campaignData: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | 'monsters' | 'players' | 'playerIds' | 'choices' | 'turnId' | 'initiativeOrder'>, 
+        campaignData: Omit<Campaign, 'id' | 'ownerId' | 'eventLog' | 'monsters' | 'players' | 'playerIds' | 'choices' | 'turnId' | 'initiativeOrder'>,
         userId: string
     ) => Promise<Campaign>; // Kembalikan campaign untuk alur join
     addPlayerToCampaign: (campaignId: string, characterId: string) => Promise<void>;
-copyCharacterFromTemplate: (templateData: RawCharacterData, userId: string) => Promise<Character>;
+    copyCharacterFromTemplate: (templateData: RawCharacterData, userId: string) => Promise<Character>;
 }
 
 type DataStore = {
@@ -83,8 +83,8 @@ export const useDataStore = create<DataStore>((set, get) => ({
         _setLoading: (status) => set(state => ({ state: { ...state.state, isLoading: status } })),
         _setCampaigns: (campaigns) => set(state => ({ state: { ...state.state, campaigns } })),
         _setCharacters: (characters) => set(state => ({ state: { ...state.state, characters } })),
-        _addCampaign: (campaign) => set(state => ({ 
-            state: { ...state.state, campaigns: [...state.state.campaigns, campaign] } 
+        _addCampaign: (campaign) => set(state => ({
+            state: { ...state.state, campaigns: [...state.state.campaigns, campaign] }
         })),
         _updateCampaign: (campaign) => set(state => ({
             state: {
@@ -105,9 +105,9 @@ export const useDataStore = create<DataStore>((set, get) => ({
         // --- Aksi Publik (Thunks) ---
         fetchInitialData: async (userId) => {
             if (get().state.hasLoaded || get().state.isLoading) return; // Mencegah load ganda
-            
+
             get().actions._setLoading(true);
-            
+
             try {
                 await dataService.cacheGlobalData();
                 let fetchedCharacters = await dataService.getMyCharacters(userId); // Ganti jadi 'let'
@@ -116,7 +116,7 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 const myCharacterIds = fetchedCharacters.map(c => c.id);
                 const fetchedCampaigns = await dataService.getMyCampaigns(myCharacterIds);
                 get().actions._setCampaigns(fetchedCampaigns);
-                
+
                 set(state => ({ state: { ...state.state, hasLoaded: true } }));
             } catch (error) {
                 console.error("Gagal memuat data:", error);
@@ -135,13 +135,13 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 } = campaign as CampaignState;
 
                 const savedCampaign = await dataService.saveCampaign(campaignToSave);
-                
+
                 // Update SSoT store
                 get().actions._updateCampaign({
-                    ...savedCampaign, 
-                    eventLog: [], monsters: [], players: [], 
+                    ...savedCampaign,
+                    eventLog: [], monsters: [], players: [],
                     playerIds: campaignToSave.playerIds, // Pastikan playerIds tetap ada
-                    choices: [], turnId: null 
+                    choices: [], turnId: null
                 });
             } catch (e) {
                 console.error("Gagal menyimpan kampanye:", e);
@@ -155,9 +155,9 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 const savedCharacter = await dataService.saveCharacter(character);
                 get().actions._updateCharacter(savedCharacter);
             } catch (e) {
-                 console.error("Gagal menyimpan karakter (SSoT):", e);
-                 // FASE 4: Hapus alert()
-                 console.error("Gagal menyimpan progres karakter. Periksa koneksi Anda.");
+                console.error("Gagal menyimpan karakter (SSoT):", e);
+                // FASE 4: Hapus alert()
+                console.error("Gagal menyimpan progres karakter. Periksa koneksi Anda.");
             }
         },
 
@@ -177,13 +177,13 @@ export const useDataStore = create<DataStore>((set, get) => ({
             try {
                 const newCampaign = await dataService.createCampaign(campaignData, userId);
                 const openingScene = await generationService.generateOpeningScene(newCampaign);
-                
+
                 const openingEvent: Omit<GameEvent, 'id' | 'timestamp'> & { campaignId: string } = {
-                   campaignId: newCampaign.id,
-                   type: 'dm_narration',
-                   text: openingScene,
-                   turnId: 'turn-0',
-                   characterId: null
+                    campaignId: newCampaign.id,
+                    type: 'dm_narration',
+                    text: openingScene,
+                    turnId: 'turn-0',
+                    characterId: null
                 };
                 await dataService.logGameEvent(openingEvent);
 
@@ -200,7 +200,7 @@ export const useDataStore = create<DataStore>((set, get) => ({
         addPlayerToCampaign: async (campaignId, characterId) => {
             try {
                 await dataService.addPlayerToCampaign(campaignId, characterId);
-                
+
                 // Update SSoT campaign lokal untuk merefleksikan player baru
                 const campaign = get().state.campaigns.find(c => c.id === campaignId);
                 if (campaign) {
@@ -224,7 +224,7 @@ export const useDataStore = create<DataStore>((set, get) => ({
 
     copyCharacterFromTemplate: async (templateData, userId) => {
         // Ini adalah gabungan dari handleSave di ProfileWizard dan logika AI
-        const { 
+        const {
             name, class: className, race: raceName, background: bgName,
             abilityScores, gender, bodyType, scars, hair, facialHair, headAccessory
         } = templateData;
@@ -278,7 +278,7 @@ export const useDataStore = create<DataStore>((set, get) => ({
             armorClass: armorClass,
             speed: selectedRace.speed,
             hitDice: { [selectedClass.hitDice]: { max: 1, spent: 0 } },
-            deathSaves: { successes: 0, failures: 0},
+            deathSaves: { successes: 0, failures: 0 },
             conditions: [],
             racialTraits: selectedRace.traits,
             classFeatures: selectedClass.features,
@@ -306,5 +306,5 @@ export const useDataStore = create<DataStore>((set, get) => ({
         // 9. Kembalikan karakter baru
         return newCharacter;
     }
-}
+
 }));
