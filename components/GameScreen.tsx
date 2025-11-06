@@ -1,8 +1,9 @@
-// FASE 1: File di-REPLACE TOTAL.
-// Arsitektur 3-kolom/tab-mobile DIHAPUS.
-// Diganti dengan layout flex-col (Mobile-First) yang ergonomis.
-// ActionBar/Choices menempel di bawah.
-// Info/Character menjadi SidePanel (overlay).
+// FASE 0: ROMBAK TOTAL.
+// Menghapus arsitektur 3-kolom/tab-mobile/SidePanel yang dipaksakan.
+// Mengganti dengan layout flex-col (Mobile-First Murni) yang ergonomis.
+// ActionBar/Pilihan/Tab menempel di bawah.
+// Panel Info/Karakter sekarang menjadi "halaman" tab, bukan overlay.
+// Layout 3-kolom desktop (lg:) dicapai secara responsif.
 
 import React, { useState, useEffect, useCallback, MouseEvent } from "react";
 import { Campaign, Character, DiceRoll, RollRequest, Skill, CampaignState } from "../types";
@@ -10,18 +11,19 @@ import { useCampaign } from "../hooks/useCampaign";
 import { useCombatSystem } from "../hooks/useCombatSystem";
 import { useExplorationSystem } from "../hooks/useExplorationSystem";
 
-// FASE 1: Impor komponen UI BARU
+// FASE 0: Impor komponen UI BARU (Header disederhanakan, Tab baru)
 import { GameHeader } from "./game/GameHeader";
-import { SidePanel } from "./game/SidePanel";
+import { GameTabs, GameTab } from "./game/GameTabs";
+// (SidePanel DIHAPUS)
 
-// FASE 1: Impor KONTEN Panel Modular
+// FASE 0: Impor KONTEN Panel Modular (tidak berubah)
 import { GameChatPanel } from "./game/panels/GameChatPanel";
 import { GameCharacterPanel } from "./game/panels/GameCharacterPanel";
 import { GameInfoPanel } from "./game/panels/GameInfoPanel";
 
 // Import komponen UI (tidak berubah)
-import { ChoiceButtons } from "./game/ChoiceButtons"; // FASE 1: Diimpor di sini
-import { ActionBar } from "./game/ActionBar";       // FASE 1: Diimpor di sini
+import { ChoiceButtons } from "./game/ChoiceButtons";
+import { ActionBar } from "./game/ActionBar";
 import { RollModal } from "./game/RollModal";
 import { ModalWrapper } from "./ModalWrapper";
 import { Die } from "./Die";
@@ -47,78 +49,7 @@ interface ContextMenuState {
 	objectId: string;
 }
 
-// FASE 4: CSS Grid Adaptif (Memperbaiki Regresi Desktop)
-// Mobile-first (default): grid 2 baris (chat + actionbar)
-// Desktop (lg+): grid 3 kolom (info | chat+actionbar | character)
-const gridLayoutStyle = `
-    /* Mobile (Default) - 2 Baris */
-    #gamescreen-layout {
-        display: grid;
-        grid-template-rows: 1fr auto;
-        grid-template-columns: 100%;
-        grid-template-areas: 
-            "chat"
-            "actions";
-        height: 100%; /* Pastikan mengisi flex-grow */
-    }
-    /* Sembunyikan panel desktop di mobile */
-    #gamescreen-layout > [data-panel="info"],
-    #gamescreen-layout > [data-panel="character"] {
-        display: none;
-    }
-    #gamescreen-layout > [data-panel="chat-container-mobile"] {
-        grid-area: chat;
-        overflow: hidden; /* Area chat bisa di-scroll internal */
-        display: flex; /* Pastikan flex-col berfungsi */
-        flex-direction: column;
-    }
-    #gamescreen-layout > [data-panel="actions-mobile"] {
-        grid-area: actions;
-        flex-shrink: 0;
-    }
-
-
-    /* Desktop (lg+) - 3 Kolom */
-    @media (min-width: 1024px) {
-        #gamescreen-layout {
-            grid-template-rows: 1fr; /* 1 baris */
-            grid-template-columns: 320px 1fr 384px; /* w-80, 1fr, w-96 */
-            grid-template-areas: 
-                "info chat character";
-            height: 100%;
-        }
-        
-        /* Sembunyikan wrapper mobile */
-        #gamescreen-layout > [data-panel="chat-container-mobile"],
-        #gamescreen-layout > [data-panel="actions-mobile"] {
-            display: none;
-        }
-
-        /* Tampilkan panel desktop */
-        #gamescreen-layout > [data-panel="info"],
-        #gamescreen-layout > [data-panel="character"] {
-            display: flex; /* Tampilkan panel statis di desktop */
-            flex-direction: column;
-            overflow-y: auto;
-            height: 100%; /* Pastikan panel mengisi grid area */
-            border: 0; /* Hapus border jika ada */
-        }
-        #gamescreen-layout > [data-panel="info"] {
-            border-right: 2px solid #374151; /* gray-700 */
-        }
-         #gamescreen-layout > [data-panel="character"] {
-            border-left: 2px solid #374151; /* gray-700 */
-        }
-        
-        #gamescreen-layout > [data-panel="chat-container-desktop"] {
-            grid-area: chat;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* Kontainer chat desktop */
-        }
-    }
-`;
-
+// FASE 0: CSS Grid layout hack (gridLayoutStyle) DIHAPUS TOTAL.
 
 export const GameScreen: React.FC<GameScreenProps> = ({
 	initialCampaign,
@@ -128,7 +59,6 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 	userId,
 }) => {
 	// (Logika hook (useAppStore, useDataStore, useCampaign) tidak berubah)
-    // ... (kode hook identik dari Search) ...
     const { 
         _setRuntimeCampaignState, _setRuntimeCharacterState,
         characterToLevel, triggerLevelUp, closeLevelUp
@@ -168,14 +98,12 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		_setRuntimeCampaignState(campaign);
 	}, [campaign, _setRuntimeCampaignState]);
 
-	// FASE 1: Hapus state 'activeMobileTab'. Ganti dengan state panel overlay.
-	const [activePanel, setActivePanel] = useState<'info' | 'character' | null>(null);
+	// FASE 0: State UI baru untuk tab ergonomis
+	const [activeTab, setActiveTab] = useState<GameTab>('chat');
 	
     const [pendingSkill, setPendingSkill] = useState<Skill | null>(null);
 	const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 	const isMyTurn = campaign.currentPlayerId === character.id;
-
-    // FASE 1: Hapus useEffect yang mengatur activeMobileTab
 
 	const memoizedUpdateCharacter = useCallback(
 		async (updatedChar: Character) => {
@@ -216,12 +144,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		}
 		setPendingSkill(null);
 		setContextMenu(null);
+        setActiveTab('chat'); // FASE 0: Otomatis kembali ke chat setelah aksi
 	};
 
-	// FASE 1: handleSkillSelect sekarang menutup panel
+	// FASE 0: handleSkillSelect sekarang mengganti tab
 	const handleSkillSelect = (skill: Skill) => {
 		setPendingSkill(skill);
-		setActivePanel(null); // Tutup panel karakter
+		setActiveTab('chat'); // Kembali ke tab chat untuk mengetik
 	};
 
 	const handleRollComplete = (roll: DiceRoll, request: RollRequest) => {
@@ -257,75 +186,87 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 		(campaign.gameState === "exploration" ||
 			(isMyTurn && character.currentHp > 0));
 
+
+    // FASE 0: Helper untuk merender konten tab mobile
+    const renderMobileTabContent = () => {
+        switch(activeTab) {
+            case 'chat':
+                return (
+                    <GameChatPanel
+                        campaign={campaign}
+                        players={campaign.players}
+                        characterId={character.id}
+                        onObjectClick={handleObjectClick}
+                        campaignActions={campaignActions}
+                    />
+                );
+            case 'character':
+                return (
+                    <GameCharacterPanel
+                        character={character}
+                        campaign={campaign}
+                        combatSystem={combatSystem}
+                        onSkillSelect={handleSkillSelect}
+                        isMyTurn={isMyTurn}
+                    />
+                );
+            case 'info':
+                 return (
+                    <GameInfoPanel
+                        campaign={campaign}
+                        players={campaign.players}
+                    />
+                );
+            default:
+                return null;
+        }
+    };
+
 	return (
-        // FASE 4: Layout flex-col diubah menjadi h-screen penuh
+        // FASE 0: Layout flex-col murni (mobile-first)
 		<div
 			className="w-screen h-screen bg-gray-900 text-gray-200 flex flex-col font-sans"
 			onClick={() => setContextMenu(null)}
 		>
-            <style>{gridLayoutStyle}</style> {/* FASE 4: Tambahkan CSS Grid */}
-            
-            {/* FASE 1: Header Baru dengan Pemicu Panel */}
+            {/* FASE 0: Header Baru (Sederhana) */}
             <GameHeader
                 title={campaign.title}
                 thinkingState={campaign.thinkingState}
                 hasActiveRoll={!!campaign.activeRollRequest}
                 onExit={() => onExit(campaign)}
-                onToggleInfo={() => setActivePanel(activePanel === 'info' ? null : 'info')}
-                onToggleCharacter={() => setActivePanel(activePanel === 'character' ? null : 'character')}
+                // (Tombol toggle panel dihapus)
             />
 
-            {/* FASE 4: Layout Grid Adaptif BARU */}
-			<div 
-                id="gamescreen-layout"
-                className="flex-grow overflow-hidden relative"
-            >
-                {/* FASE 4: Panel Chat Container (Mobile) */}
-                <div data-panel="chat-container-mobile" className="lg:hidden">
-                    <GameChatPanel
-                        campaign={campaign}
-                        players={campaign.players}
-                        characterId={character.id}
-                        onObjectClick={handleObjectClick}
-                        campaignActions={campaignActions}
-                    />
-                </div>
+            {/* FASE 0: Layout Grid Responsif (Desktop) / Flex (Mobile) */}
+            <div className="flex-grow overflow-hidden flex lg:grid lg:grid-cols-[320px_1fr_384px]">
                 
-                {/* FASE 4: Area Aksi (Mobile) */}
-                <div data-panel="actions-mobile" className="flex-shrink-0 z-10 lg:hidden">
-                    {shouldShowChoices && (
-                        <ChoiceButtons
-                            choices={campaign.choices}
-                            onChoiceSelect={handleActionSubmit}
-                        />
-                    )}
-                    {!shouldShowChoices && (
-                        <ActionBar
-                            disabled={isDisabled}
-                            onActionSubmit={handleActionSubmit}
-                            pendingSkill={pendingSkill}
-                        />
-                    )}
-                </div>
-
-                {/* FASE 4: Panel Info (Desktop) */}
-                <div data-panel="info" className="hidden lg:flex bg-gray-800">
+                {/* Kolom 1: Info (HANYA Desktop) */}
+                <aside className="hidden lg:flex flex-col h-full bg-gray-800 border-r-2 border-gray-700 overflow-y-auto">
                     <GameInfoPanel
                         campaign={campaign}
                         players={campaign.players}
                     />
-                </div>
+                </aside>
 
-                {/* FASE 4: Panel Chat Container (Desktop) */}
-                <div data-panel="chat-container-desktop" className="hidden lg:flex">
-                    <GameChatPanel
-                        campaign={campaign}
-                        players={campaign.players}
-                        characterId={character.id}
-                        onObjectClick={handleObjectClick}
-                        campaignActions={campaignActions}
-                    />
-                    {/* Area Aksi untuk Desktop */}
+                {/* Kolom 2: Main Content (Chat/Map) + Input */}
+                <main className="flex-grow flex flex-col h-full overflow-hidden lg:border-r-2 lg:border-gray-700">
+                    
+                    {/* Area Konten Utama (Mobile: render tab, Desktop: render chat) */}
+                    <div className="flex-grow overflow-hidden lg:hidden">
+                        {renderMobileTabContent()}
+                    </div>
+                    <div className="flex-grow overflow-hidden hidden lg:flex">
+                        {/* Desktop selalu menampilkan chat/map */}
+                        <GameChatPanel
+                            campaign={campaign}
+                            players={campaign.players}
+                            characterId={character.id}
+                            onObjectClick={handleObjectClick}
+                            campaignActions={campaignActions}
+                        />
+                    </div>
+
+                    {/* Area Input (Selalu di atas tab mobile, atau di bawah chat desktop) */}
                     <div className="flex-shrink-0 z-10">
                         {shouldShowChoices && (
                             <ChoiceButtons
@@ -341,10 +282,10 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                             />
                         )}
                     </div>
-                </div>
+                </main>
 
-                {/* FASE 4: Panel Karakter (Desktop) */}
-                <div data-panel="character" className="hidden lg:flex bg-gray-800">
+                {/* Kolom 3: Karakter (HANYA Desktop) */}
+                <aside className="hidden lg:flex flex-col h-full bg-gray-800 overflow-y-auto">
                      <GameCharacterPanel
                         character={character}
                         campaign={campaign}
@@ -352,37 +293,18 @@ export const GameScreen: React.FC<GameScreenProps> = ({
                         onSkillSelect={handleSkillSelect}
                         isMyTurn={isMyTurn}
                     />
-                </div>
-			</div>
-            {/* FASE 4: Akhir layout ergonomis */}
+                </aside>
+            </div>
+            {/* FASE 0: Akhir layout flex/grid */}
 
 
-            {/* FASE 1: Panel Overlay (Kiri/Info) */}
-            <SidePanel
-                isOpen={activePanel === 'info'}
-                onClose={() => setActivePanel(null)}
-                position="left"
-            >
-                <GameInfoPanel
-                    campaign={campaign}
-                    players={campaign.players}
-                />
-            </SidePanel>
+            {/* FASE 0: Tab Ergonomis Baru (HANYA Mobile) */}
+            <GameTabs
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+            />
 
-            {/* FASE 1: Panel Overlay (Kanan/Karakter) */}
-             <SidePanel
-                isOpen={activePanel === 'character'}
-                onClose={() => setActivePanel(null)}
-                position="right"
-            >
-                <GameCharacterPanel
-                    character={character}
-                    campaign={campaign}
-                    combatSystem={combatSystem}
-                    onSkillSelect={handleSkillSelect}
-                    isMyTurn={isMyTurn}
-                />
-            </SidePanel>
+            {/* FASE 0: (SidePanel DIHAPUS) */}
             
 
 			{/* (Render Modal tidak berubah) */}
