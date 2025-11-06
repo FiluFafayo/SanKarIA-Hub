@@ -5,6 +5,7 @@ import React from 'react';
 import { ProfileModal } from '../components/modals/ProfileModal';
 import { useAppStore } from '../store/appStore';
 import { useDataStore } from '../store/dataStore';
+import { ViewWrapper } from '../components/ViewWrapper'; // FASE 2: Impor ViewWrapper
 
 interface ProfileViewProps {
   onClose: () => void;
@@ -24,14 +25,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onClose, userId }) => 
     onClose(); // (Prop onClose dari ViewManager)
   };
 
+  // FASE 2: ProfileModal sekarang di-render di dalam ViewWrapper (halaman),
+  // bukan sebagai modalnya sendiri.
   return (
-    <ProfileModal 
-      onClose={handleClose}
-      characters={characters.filter(c => c.ownerId === userId)} // Kirim SSoT karakter milikku
-      userId={userId}
-      // Aksi saveNewCharacter sekarang di-resolve DI SINI,
-      // bukan di App.tsx
-      onSaveNewCharacter={saveNewCharacter}
-    />
+    <ViewWrapper onClose={handleClose} title="Cermin Jiwa">
+      <ProfileModal 
+        onClose={handleClose} // onClose tetap di-pass untuk tombol Batal/Selesai di Wizard
+        characters={characters.filter(c => c.ownerId === userId)} // Kirim SSoT karakter milikku
+        userId={userId}
+        // Aksi saveNewCharacter sekarang di-resolve DI SINI,
+        // bukan di App.tsx
+        onSaveNewCharacter={saveNewCharacter}
+      />
+    </ViewWrapper>
   );
 };

@@ -60,7 +60,7 @@ interface ProfileModalProps {
 		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
 		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
 		spellData: SpellDefinition[]
-	) => Promise<void>;
+	) => Promise<void>; // FASE 2: Prop ini BUKAN lagi (..userId: string) => ..
 }
 
 // =================================================================
@@ -208,7 +208,7 @@ const CreateCharacterWizard: React.FC<{
 		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
 		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
 		spellData: SpellDefinition[]
-	) => Promise<void>;
+	) => Promise<void>; // FASE 2: Prop ini BUKAN lagi (..userId: string) => ..
 }> = ({ onCancel, userId, onSaveNewCharacter }) => {
 	// FASE 2: Ambil data SSoT statis dari registry, bukan (window)
 	const RACES: RaceData[] = useMemo(() => getAllRaces() || [], []);
@@ -368,7 +368,8 @@ const CreateCharacterWizard: React.FC<{
             // --- AKHIR PANGGILAN AI ---
 
             setStatusMessage("Menyimpan ke database...");
-            await onSaveNewCharacter(newCharData, inventoryData, spellData, userId);
+            // FASE 2: Hapus 'userId' dari panggilan, sudah ditangani oleh ProfileView/dataStore
+            await onSaveNewCharacter(newCharData, inventoryData, spellData);
 
             onCancel(); // Sukses, tutup wizard
 
@@ -836,25 +837,39 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         // Prop onSaveNewCharacter akan diteruskan ke wizard
 	};
 
-	// FASE 2: Bungkus onClose untuk mereset state LOKAL
-	const handleClose = () => {
-		setIsCreating(false);
-		onClose();
+	// FASE 2: handleClose sekarang hanya mereset state LOKAL.
+    // Prop onClose (dari ProfileView) akan menangani navigasi.
+	const handleWizardCancel = () => {
+        // Jika tidak ada karakter, 'Batal' tidak melakukan apa-apa (tetap di mode create)
+        if (myCharacters.length > 0) {
+		    setIsCreating(false);
+        }
 	};
+    
+    // FASE 2: Handler untuk Selesai/Sukses membuat karakter
+    const handleWizardSave = async (
+        charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+		spellData: SpellDefinition[]
+    ) => {
+        await onSaveNewCharacter(charData, inventoryData, userId);
+        setIsCreating(false); // Kembali ke daftar karakter
+    };
 
 	return (
-		<ModalWrapper onClose={handleClose} title="Cermin Jiwa">
-			<div className="bg-gray-900/70 backdrop-blur-sm border border-blue-400/30 rounded-xl shadow-2xl w-[90vw] max-w-4xl text-white flex h-[80vh] max-h-[700px]">
-				{/* Left Panel: Mirror and Character Sheet */}
-				<div className="w-2/3 p-6 flex flex-col items-center">
+        // FASE 2: Hapus ModalWrapper. Ganti dengan div layout halaman standar.
+        // Styling modal (backdrop-blur, w-[90vw], h-[80vh]) dihapus total.
+		<div className="bg-bg-secondary border border-blue-400/30 rounded-xl shadow-2xl text-white flex flex-col md:flex-row min-h-[700px]">
+			{/* Left Panel: Mirror and Character Sheet */}
+			<div className="w-full md:w-2/3 p-6 flex flex-col items-center">
 					<h2 className="font-cinzel text-3xl mb-4">Cermin Jiwa</h2>
 					<div className="w-full h-full bg-black/30 border-2 border-blue-300/50 rounded-lg p-4 flex flex-col">
 						{isCreating ? (
-							// FASE 2: onCancel mereset state lokal, onSaveNewCharacter diteruskan
+							// FASE 2: onCancel mereset state lokal, onSaveNewCharacter diganti handleWizardSave
 							<CreateCharacterWizard
-								onCancel={() => setIsCreating(false)}
+								onCancel={handleWizardCancel}
 								userId={userId}
-                                onSaveNewCharacter={onSaveNewCharacter}
+                                onSaveNewCharacter={handleWizardSave} // Kirim handler save
 							/>
 						) : selectedChar ? (
 							<>
@@ -991,9 +1006,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 					</div>
 				</div>
 				{/* Right Panel: Soul Rack */}
-				<div className="w-1/3 bg-black/20 border-l border-blue-400/30 p-6 flex flex-col">
+				<div className="w-full md:w-1/3 bg-black/20 border-t md:border-t-0 md:border-l border-blue-400/30 p-6 flex flex-col">
 					<h3 className="font-cinzel text-xl text-center mb-4">Rak Jiwa</h3>
-					<div className="flex flex-wrap justify-center gap-4 mb-6 overflow-y-auto">
+					<div className="flex flex-row md:flex-col flex-wrap justify-center gap-4 mb-6 overflow-y-auto">
 						{myCharacters.map((char) => (
 							// FASE 2: onClick sekarang mereset state lokal
 							<div
@@ -1022,12 +1037,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 					{/* FASE 2: onClick sekarang memicu state lokal */}
 					<button
 						onClick={() => setIsCreating(true)}
-						className="mt-auto w-full font-cinzel bg-blue-800/50 hover:bg-blue-700/50 py-2 rounded border border-blue-500/50"
+                        disabled={isCreating}
+						className="mt-auto w-full font-cinzel bg-blue-800/50 hover:bg-blue-700/50 py-2 rounded border border-blue-500/50
+                                   disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
 					>
 						+ Ciptakan Baru
 					</button>
 				</div>
 			</div>
-		</ModalWrapper>
 	);
 };
