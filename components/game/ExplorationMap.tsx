@@ -14,7 +14,8 @@ interface ExplorationMapProps {
   // markers: MapMarker[]; // Kita belum gunakan marker di grid ini
 }
 
-const TILE_SIZE_PX = 8; // Buat tile kecil untuk peta dunia 100x100
+// FASE 3: Hapus TILE_SIZE_PX. Ukuran akan di-handle oleh canvas scaling.
+// const TILE_SIZE_PX = 8; 
 const PLAYER_COLOR = "#FFFF00"; // Kuning
 const FOG_COLOR = "#111827"; // (Warna BG Abu-900)
 
@@ -33,11 +34,16 @@ export const ExplorationMap: React.FC<ExplorationMapProps> = ({ grid, fog, playe
     const mapHeight = grid.length; // 100
     const mapWidth = grid[0].length; // 100
 
-    // Set ukuran canvas agar sesuai (100 * 8px = 800px)
-    canvas.width = mapWidth * TILE_SIZE_PX;
-    canvas.height = mapHeight * TILE_SIZE_PX;
+    // FASE 3: Set ukuran canvas ke dimensi grid (misal 100x100).
+    // CSS akan men-scale ini ke atas.
+    canvas.width = mapWidth;
+    canvas.height = mapHeight;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // FASE 3: Hitung ukuran 1 tile (yaitu 1 piksel di canvas ini)
+    const TILE_WIDTH = 1;
+    const TILE_HEIGHT = 1;
 
     // Render Peta (diadaptasi dari P2)
     for (let y = 0; y < mapHeight; y++) {
@@ -46,26 +52,26 @@ export const ExplorationMap: React.FC<ExplorationMapProps> = ({ grid, fog, playe
         if (fog[y][x]) {
             // 1. Gambar FOG
             ctx.fillStyle = FOG_COLOR;
-            ctx.fillRect(x * TILE_SIZE_PX, y * TILE_SIZE_PX, TILE_SIZE_PX, TILE_SIZE_PX);
+            ctx.fillRect(x * TILE_WIDTH, y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT);
         } else {
             // 2. Gambar Tile yang Terlihat
             const tileId = grid[y][x];
             const tile = EXPLORATION_TILESET[tileId as keyof typeof EXPLORATION_TILESET];
             ctx.fillStyle = tile ? tile.color : '#FF00FF'; // Magenta jika error
-            ctx.fillRect(x * TILE_SIZE_PX, y * TILE_SIZE_PX, TILE_SIZE_PX, TILE_SIZE_PX);
+            ctx.fillRect(x * TILE_WIDTH, y * TILE_HEIGHT, TILE_WIDTH, TILE_HEIGHT);
         }
       }
     }
 
     // 3. Gambar Token Pemain (diadaptasi dari P2)
     // Pastikan token hanya terlihat jika tidak di dalam fog
-    if (!fog[playerPos.y][playerPos.x]) {
+    if (playerPos.y >= 0 && playerPos.y < mapHeight && playerPos.x >= 0 && playerPos.x < mapWidth && !fog[playerPos.y][playerPos.x]) {
         ctx.fillStyle = PLAYER_COLOR;
         ctx.beginPath();
         ctx.arc(
-            playerPos.x * TILE_SIZE_PX + TILE_SIZE_PX / 2, 
-            playerPos.y * TILE_SIZE_PX + TILE_SIZE_PX / 2, 
-            TILE_SIZE_PX / 1.5, // Buat token sedikit lebih besar
+            playerPos.x + TILE_WIDTH / 2, // 0.5
+            playerPos.y + TILE_HEIGHT / 2, // 0.5
+            TILE_WIDTH * 1.2, // Radius 1.2px
             0, 
             2 * Math.PI
         );

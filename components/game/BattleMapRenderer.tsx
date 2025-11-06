@@ -19,7 +19,7 @@ interface BattleMapRendererProps {
 // Ukuran grid (bisa diubah)
 const BATTLE_GRID_WIDTH = 30;
 const BATTLE_GRID_HEIGHT = 20;
-const CELL_SIZE_PX = 40; // Ukuran sel dalam piksel
+// FASE 3: CELL_SIZE_PX dihapus. Ukuran akan responsif.
 
 export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleState, campaignActions, currentUserId }) => {
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(battleState.activeUnitId);
@@ -65,19 +65,22 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
     return 'rgba(255, 255, 255, 0.1)'; // Overlay grid tipis
   };
   
-  const mapPixelWidth = BATTLE_GRID_WIDTH * CELL_SIZE_PX;
-  const mapPixelHeight = BATTLE_GRID_HEIGHT * CELL_SIZE_PX;
+  // FASE 3: Hapus kalkulasi piksel tetap
+  // const mapPixelWidth = BATTLE_GRID_WIDTH * CELL_SIZE_PX;
+  // const mapPixelHeight = BATTLE_GRID_HEIGHT * CELL_SIZE_PX;
+  
+  // FASE 3: Hitung rasio aspek dari konstanta grid
+  const aspectRatio = `${BATTLE_GRID_WIDTH} / ${BATTLE_GRID_HEIGHT}`;
 
   return (
-    <div className="w-full h-full bg-gray-900 flex items-center justify-center overflow-auto p-4">
+    // FASE 3: Wrapper sekarang mengisi area (w-full h-full) dan menggunakan padding/aspect-ratio
+    // alih-alih overflow-auto. Ini adalah inti perbaikan Mobile-First.
+    <div className="w-full h-full bg-gray-900 flex items-center justify-center p-2 md:p-4">
         {/* Wrapper untuk menjaga rasio aspek & sentering */}
         <div
-            className="relative bg-gray-800 bg-cover bg-center shadow-lg"
+            className="relative bg-gray-800 bg-cover bg-center shadow-lg w-full max-w-full max-h-full"
             style={{
-                width: mapPixelWidth,
-                height: mapPixelHeight,
-                minWidth: mapPixelWidth,
-                minHeight: mapPixelHeight,
+                aspectRatio: aspectRatio, // Biarkan CSS menangani ukuran
                 backgroundImage: battleState.mapImageUrl ? `url(${battleState.mapImageUrl})` : 'none',
                 backgroundColor: battleState.mapImageUrl ? 'transparent' : '#333'
             }}
@@ -87,8 +90,7 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
                 className="absolute inset-0 grid"
                 style={{ 
                     gridTemplateColumns: `repeat(${BATTLE_GRID_WIDTH}, 1fr)`,
-                    width: mapPixelWidth,
-                    height: mapPixelHeight,
+                    // FASE 3: Hapus width/height tetap. Biarkan 'inset-0' mengisi parent.
                 }}
             >
                 {battleState.gridMap.flat().map((cell, index) => {
@@ -118,27 +120,43 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
             </div>
             
             {/* 2. Render Units (Tokens) (diadaptasi dari P2) */}
-            {battleState.units.map(unit => (
-                <div
-                    key={unit.id}
-                    className={`absolute w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 transform -translate-x-1/2 -translate-y-1/2 ${
-                        unit.isPlayer ? 'bg-blue-600' : 'bg-red-600'
-                    } ${
-                        selectedUnitId === unit.id ? 'ring-4 ring-yellow-400 z-10' : 'ring-2 ring-black/70'
-                    } ${
-                        unit.id === battleState.activeUnitId ? 'animate-pulse' : ''
-                    }`}
-                    style={{
-                        width: CELL_SIZE_PX * 0.8,
-                        height: CELL_SIZE_PX * 0.8,
-                        left: unit.gridPosition.x * CELL_SIZE_PX + CELL_SIZE_PX / 2,
-                        top: unit.gridPosition.y * CELL_SIZE_PX + CELL_SIZE_PX / 2,
-                    }}
-                    onClick={() => setSelectedUnitId(unit.id)}
-                >
-                    {unit.name.substring(0, 1)}
-                </div>
-            ))}
+            {battleState.units.map(unit => {
+                // FASE 3: Kalkulasi posisi/ukuran responsif (persentase)
+                const cellWidthPercent = 100 / BATTLE_GRID_WIDTH;
+                const cellHeightPercent = 100 / BATTLE_GRID_HEIGHT;
+                
+                // Ukuran unit adalah 80% dari lebar sel (dalam persentase parent)
+                const unitWidthPercent = cellWidthPercent * 0.8;
+                // Ukuran unit adalah 80% dari tinggi sel (dalam persentase parent)
+                const unitHeightPercent = cellHeightPercent * 0.8;
+                
+                const leftPercent = (unit.gridPosition.x / BATTLE_GRID_WIDTH) * 100 + (cellWidthPercent / 2);
+                const topPercent = (unit.gridPosition.y / BATTLE_GRID_HEIGHT) * 100 + (cellHeightPercent / 2);
+
+                return (
+                    <div
+                        key={unit.id}
+                        // FASE 3: Hapus 'w-8 h-8'
+                        className={`absolute rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 transform -translate-x-1/2 -translate-y-1/2 ${
+                            unit.isPlayer ? 'bg-blue-600' : 'bg-red-600'
+                        } ${
+                            selectedUnitId === unit.id ? 'ring-4 ring-yellow-400 z-10' : 'ring-2 ring-black/70'
+                        } ${
+                            unit.id === battleState.activeUnitId ? 'animate-pulse' : ''
+                        }`}
+                        style={{
+                            // FASE 3: Ukuran dan Posisi Responsif (Persentase)
+                            width: `${unitWidthPercent}%`,
+                            height: `${unitHeightPercent}%`,
+                            left: `${leftPercent}%`,
+                            top: `${topPercent}%`,
+                        }}
+                        onClick={() => setSelectedUnitId(unit.id)}
+                    >
+                        {unit.name.substring(0, 1)}
+                    </div>
+                );
+            })}
 
             {/* 3. Loading Overlay (jika mapImageUrl belum ada) */}
             {!battleState.mapImageUrl &&
