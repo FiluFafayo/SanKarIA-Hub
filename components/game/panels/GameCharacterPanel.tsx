@@ -42,7 +42,7 @@ export const GameCharacterPanel: React.FC<GameCharacterPanelProps> = ({
 				combatSystem={combatSystem}
 				gameState={gameState}
 				onSkillSelect={onSkillSelect}
-                updateCharacter={() => {}} // Prop ini tidak lagi digunakan oleh CharPanel, tapi hook membutuhkannya
+                // updateCharacter={() => {}} // FASE 1: Prop ini dihapus total
 			/>
 		</div>
     );

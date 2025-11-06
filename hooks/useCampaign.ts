@@ -31,7 +31,8 @@ import {
     TerrainType,
     Unit,
 } from "../types";
-import { generateId } from "../utils";
+import { generateId, xpToNextLevel } from "../utils"; // FASE 1 (Tugas 5)
+import { useAppStore } from "../store/appStore"; // FASE 1 (Tugas 5)
 // import { MONSTER_DEFINITIONS } from "../data/monsters"; // <-- FASE 3: Dihapus, gunakan registry
 
 export interface CampaignState extends Campaign {
@@ -374,13 +375,35 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
         // (Poin 7) Reducer untuk XP
         case "AWARD_XP": {
             const { characterId, amount } = action.payload;
+            let characterToLevelUp: Character | null = null;
+            
+            const newPlayers = state.players.map(p => {
+                if (p.id === characterId) {
+                    const newXp = (p.xp || 0) + amount;
+                    const nextLevelXp = xpToNextLevel(p.level);
+                    
+                    const updatedPlayer = { ...p, xp: newXp };
+
+                    // FASE 1 (Tugas 5): Cek Level Up di sini
+                    if (nextLevelXp > 0 && newXp >= nextLevelXp) {
+                        console.log(`[useCampaign] ${p.name} siap Level Up!`);
+                        characterToLevelUp = updatedPlayer;
+                    }
+                    return updatedPlayer;
+                }
+                return p;
+            });
+
+            // FASE 1 (Tugas 5): Panggil aksi triggerLevelUp di luar map
+            if (characterToLevelUp) {
+                // Panggil store global. Ini aman di dalam reducer
+                // karena ini adalah side-effect yang di-trigger *oleh* reducer.
+                useAppStore.getState().actions.triggerLevelUp(characterToLevelUp);
+            }
+
             return {
                 ...state,
-                players: state.players.map(p => 
-                    p.id === characterId 
-                        ? { ...p, xp: (p.xp || 0) + amount } 
-                        : p
-                ),
+                players: newPlayers,
             };
         }
         // (Poin 4) Reducer untuk Opini NPC

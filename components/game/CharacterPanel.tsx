@@ -37,7 +37,7 @@ interface CharacterPanelProps {
   monsters: MonsterInstance[]; // REFAKTOR: MonsterInstance
   isMyTurn: boolean;
   combatSystem: ReturnType<typeof useCombatSystem>;
-  updateCharacter: (character: Character) => Promise<void>; // (Tidak dipakai di sini, tapi combatSystem memakainya)
+  // updateCharacter: (character: Character) => Promise<void>; // FASE 1: Prop ini dihapus total
   gameState: 'exploration' | 'combat';
   onSkillSelect: (skill: Skill) => void;
 }

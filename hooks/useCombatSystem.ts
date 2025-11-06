@@ -38,7 +38,7 @@ interface CombatSystemProps {
 	character: Character; // Karakter *kita*
 	players: Character[]; // SEMUA karakter di sesi ini
 	campaignActions: CampaignActions;
-	updateCharacter: (character: Character) => Promise<void>; // Ini untuk SSoT
+	onCharacterUpdate: (character: Character) => void; // FASE 1 (Tugas 3)
 }
 
 export const useCombatSystem = ({
@@ -46,7 +46,7 @@ export const useCombatSystem = ({
 	character,
 	players,
 	campaignActions,
-	updateCharacter,
+	onCharacterUpdate, // FASE 1 (Tugas 3)
 }: CombatSystemProps) => {
 	const processToolCalls = useCallback(
 		(turnId: string, toolCalls: ToolCall[]) => {
@@ -132,7 +132,7 @@ export const useCombatSystem = ({
 							currentHp: 1,
 							deathSaves: { successes: 0, failures: 0 },
 						};
-						await updateCharacter(updatedChar);
+						onCharacterUpdate(updatedChar); // FASE 1 (Tugas 3)
 						campaignActions.logEvent({ type: "system", text: message }, turnId);
 						campaignActions.endTurn();
 						return;
@@ -150,7 +150,7 @@ export const useCombatSystem = ({
 
 				campaignActions.logEvent({ type: "system", text: message }, turnId);
 				const updatedChar = { ...playerToSave, deathSaves: newSaves };
-				await updateCharacter(updatedChar);
+				onCharacterUpdate(updatedChar); // FASE 1 (Tugas 3)
 
 				if (newSaves.successes >= 3) {
 					campaignActions.logEvent(
@@ -294,7 +294,7 @@ export const useCombatSystem = ({
 						conditions: attacker.conditions.filter((c) => c !== "Hidden"),
 					};
 					// Update SSoT penyerang
-					await updateCharacter(attackerToSave);
+					onCharacterUpdate(attackerToSave); // FASE 1 (Tugas 3)
 					campaignActions.logEvent(
 						{
 							type: "system",
@@ -311,11 +311,11 @@ export const useCombatSystem = ({
 					if (attackerToSave && target.id === attackerToSave.id) {
 						// State 'attackerToSave' sudah punya update 'Hidden', tambahkan update 'currentHp'
 						const updatedTarget = { ...attackerToSave, currentHp: newHp };
-						await updateCharacter(updatedTarget);
+						onCharacterUpdate(updatedTarget); // FASE 1 (Tugas 3)
 					} else {
 						// Target adalah orang lain, simpan HP target
 						const updatedTarget = { ...target, currentHp: newHp };
-						await updateCharacter(updatedTarget);
+						onCharacterUpdate(updatedTarget); // FASE 1 (Tugas 3)
 					}
 				} else {
 					// it's a Monster
@@ -338,7 +338,7 @@ export const useCombatSystem = ({
 				campaignActions.endTurn();
 			}
 		},
-		[campaign, players, campaignActions, updateCharacter]
+		[campaign, players, campaignActions, onCharacterUpdate] // FASE 1 (Tugas 3)
 	); // <-- processToolCalls dihapus dari dependensi
 
 	// =================================================================
@@ -945,13 +945,15 @@ export const useCombatSystem = ({
 			currentHp: newHp,
 			usedBonusAction: true,
 		});
-	}, [
-		character,
-		campaign.turnId,
-		campaign.currentPlayerId,
-		updateCharacter,
-		campaignActions,
-	]);
+	},
+		[
+			character,
+			campaign.turnId,
+			campaign.currentPlayerId,
+			onCharacterUpdate, // FASE 1 (Tugas 3)
+			campaignActions,
+		]
+	);
 
 	const handleItemUse = useCallback(
 		async (item: CharacterInventoryItem) => {
@@ -1002,7 +1004,7 @@ export const useCombatSystem = ({
 			character,
 			campaign.turnId,
 			campaign.currentPlayerId,
-			updateCharacter,
+			onCharacterUpdate, // FASE 1 (Tugas 3)
 			campaignActions,
 		]
 	);
@@ -1100,8 +1102,8 @@ export const useCombatSystem = ({
 			character,
 			campaign.turnId,
 			campaign.currentPlayerId,
+			onCharacterUpdate, // FASE 1 (Tugas 3)
 			campaignActions,
-			updateCharacter,
 		]
 	);
 

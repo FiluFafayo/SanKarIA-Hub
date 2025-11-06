@@ -73,27 +73,13 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 	const ssotCharacters = useDataStore((s) => s.state.characters);
     const dataStore = useDataStore.getState();
 	const { campaign, campaignActions } = useCampaign(initialCampaign, players);
-	useEffect(() => {
-		const runtimePlayerIds = new Set(campaign.players.map((p) => p.id));
-		const relevantSsotChars = ssotCharacters.filter((c) =>
-			runtimePlayerIds.has(c.id)
-		);
-		relevantSsotChars.forEach((ssotChar) => {
-			const runtimeChar = campaign.players.find((p) => p.id === ssotChar.id);
-			if (runtimeChar && JSON.stringify(runtimeChar) !== JSON.stringify(ssotChar)) {
-				campaignActions.updateCharacterInCampaign(ssotChar);
-			}
-		});
-	}, [ssotCharacters, campaignActions, campaign.players]);
-    const xpForNextLevel = xpToNextLevel(character.level);
-    useEffect(() => {
-        if (xpForNextLevel > 0 && character.xp >= xpForNextLevel) {
-            const ssotCharacter = dataStore.state.characters.find(c => c.id === character.id);
-            if (ssotCharacter && ssotCharacter.level === character.level) {
-                 triggerLevelUp(character);
-            }
-        }
-    }, [character.xp, character.level, xpForNextLevel, triggerLevelUp, character, dataStore.state.characters]);
+    // FASE 1: Hapus useEffect sinkronisasi SSoT (Tugas 1)
+	// useEffect(() => { ... });
+    
+    // FASE 1: Hapus useEffect Level Up (Tugas 5)
+    // const xpForNextLevel = xpToNextLevel(character.level);
+    // useEffect(() => { ... });
+
 	useEffect(() => {
 		_setRuntimeCampaignState(campaign);
 	}, [campaign, _setRuntimeCampaignState]);
@@ -107,19 +93,28 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 
 	const memoizedUpdateCharacter = useCallback(
 		async (updatedChar: Character) => {
+            // FASE 1 (Tugas 4): Handler ini HANYA update SSoT (dataStore)
+            // dan state root GameScreen (gameStore).
 			await updateCharacter(updatedChar);
-			campaignActions.updateCharacterInCampaign(updatedChar);
 			_setRuntimeCharacterState(updatedChar);
 		},
-		[updateCharacter, campaignActions, _setRuntimeCharacterState]
+		[updateCharacter, _setRuntimeCharacterState]
 	);
+    
+    // FASE 1 (Tugas 4): Buat handler gabungan untuk di-pass ke hooks
+    const handleRuntimeCharacterUpdate = (updatedChar: Character) => {
+        // 1. Update state runtime (useCampaign)
+        campaignActions.updateCharacterInCampaign(updatedChar);
+        // 2. Update state SSoT (dataStore) + state root (gameStore)
+        memoizedUpdateCharacter(updatedChar);
+    };
 
 	const combatSystem = useCombatSystem({
 		campaign,
 		character,
 		players,
 		campaignActions,
-		updateCharacter: memoizedUpdateCharacter,
+		onCharacterUpdate: handleRuntimeCharacterUpdate, // FASE 1 (Tugas 3)
 	});
 
 	const explorationSystem = useExplorationSystem({
