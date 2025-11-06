@@ -13,6 +13,8 @@ interface ProfileViewProps {
   userId: string;
 }
 
+import { Character, CharacterInventoryItem, SpellDefinition } from '../types'; // FASE 2 FIX: Impor tipe
+
 export const ProfileView: React.FC<ProfileViewProps> = ({ onClose, userId }) => {
   // Ambil SSoT data dari dataStore
   const { characters } = useDataStore(s => s.state);
@@ -26,6 +28,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onClose, userId }) => 
     onClose(); // (Prop onClose dari ViewManager)
   };
 
+  // FASE 2 FIX: Buat handler yang menyuntikkan userId
+  // (Sesuai definisi di dataStore.ts: (charData, inventoryData, spellData, userId))
+  const handleSaveNewCharacter = (
+    charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
+    inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
+    spellData: SpellDefinition[]
+  ) => {
+    // Panggil aksi dataStore dengan userId yang sudah disuntikkan
+    return saveNewCharacter(charData, inventoryData, spellData, userId);
+  };
+
   // FASE 2: ProfileModal sekarang di-render di dalam ViewWrapper (halaman),
   // bukan sebagai modalnya sendiri.
   return (
@@ -36,10 +49,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onClose, userId }) => 
       <ProfileWizard 
         onClose={handleClose} // onClose tetap di-pass untuk tombol Batal/Selesai di Wizard
         characters={characters.filter(c => c.ownerId === userId)} // Kirim SSoT karakter milikku
-        userId={userId}
+        userId={userId} // Tetap kirim userId untuk UI wizard
         // Aksi saveNewCharacter sekarang di-resolve DI SINI,
         // bukan di App.tsx
-        onSaveNewCharacter={saveNewCharacter}
+        onSaveNewCharacter={handleSaveNewCharacter} // FASE 2 FIX: Gunakan handler baru
       />
     </ViewWrapper>
   );
