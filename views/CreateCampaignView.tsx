@@ -70,9 +70,13 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
   };
 
   const handlePillarChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const { name, value } = e.target;
-      setPillars({ ...pillars, [name]: value });
-  };
+     // FASE 3: Hapus pesan error saat pengguna mulai mengetik lagi
+     if (loadingMessage.startsWith("ERROR:")) {
+         setLoadingMessage("");
+     }
+     const { name, value } = e.target;
+     setPillars({ ...pillars, [name]: value });
+ };
 
   const generateFramework = async () => {
       if (!pillars.premise.trim() || !pillars.keyElements.trim()) {
@@ -86,12 +90,15 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
       try {
           const result = await generationService.generateCampaignFramework(pillars);
           setFramework({ ...result, description: pillars.premise });
-          setStep(2); // FASE 0: Ganti ke state lokal
-      } catch (e) {
-          console.error("Gagal membuat kerangka kampanye:", e);
-          // FASE 4: Hapus alert()
-          console.error("Gagal berkomunikasi dengan AI untuk membuat kerangka. Coba lagi.");
-      } finally {
+         setLoadingMessage(""); // Hapus pesan loading sukses
+         setStep(2); // FASE 0: Ganti ke state lokal
+     } catch (e: any) { // FASE 3: Tangkap error
+         console.error("Gagal membuat kerangka kampanye:", e);
+         // FASE 3: Tampilkan error ke UI
+         setLoadingMessage(`ERROR: Gagal membuat kerangka. ${e.message || 'Coba lagi.'}`);
+         // FASE 4: Hapus alert()
+         // console.error("Gagal berkomunikasi dengan AI untuk membuat kerangka. Coba lagi."); // Redundan
+     } finally {
           setIsLoading(false);
       }
   };
@@ -270,8 +277,16 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                     <label className="font-cinzel text-yellow-800 mt-6">Tujuan Akhir (Opsional)</label>
                     <input name="endGoal" value={pillars.endGoal} onChange={handlePillarChange} className="bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 text-base p-1" placeholder="Contoh: Mengembalikan artefak dan mengakhiri musim dingin." />
 
-                    <div className="flex-grow"></div>
-                    <button onClick={generateFramework} className="self-end font-cinzel bg-yellow-800 text-white px-6 py-2 rounded hover:bg-yellow-700 transition-colors">
+                   <div className="flex-grow"></div>
+                   
+                   {/* FASE 3: Tampilkan pesan error/status */}
+                   {loadingMessage && !isLoading && (
+                       <p className={`self-end text-sm mb-2 ${loadingMessage.startsWith("ERROR:") ? 'text-red-600' : 'text-yellow-700'}`}>
+                           {loadingMessage}
+                       </p>
+                   )}
+
+                   <button onClick={generateFramework} className="self-end font-cinzel bg-yellow-800 text-white px-6 py-2 rounded hover:bg-yellow-700 transition-colors">
                       Elaborasi dengan AI
                     </button>
                 </Page>
