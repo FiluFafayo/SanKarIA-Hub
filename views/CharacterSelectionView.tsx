@@ -7,7 +7,6 @@ import { getRawCharacterTemplates, RawCharacterData } from '../data/registry'; /
 // import { useDataStore } from '../store/dataStore'; 
 import { useAppStore } from '../store/appStore'; // Impor appStore
 import { SelectionCard } from '../components/SelectionCard'; // Impor SelectionCard
-import { Location } from '../types'; // FASE 2
 
 interface CharacterSelectionViewProps {
   characters: Character[]; // SSoT Karakter milikku (tetap di-pass dari ViewManager)
