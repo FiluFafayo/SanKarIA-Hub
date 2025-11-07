@@ -304,12 +304,12 @@ const CreateCharacterWizard: React.FC<{
 			setName(template.name);
 			setGender(template.gender);
 			setHair(template.hair);
-			setFacialHair(template.facialHair);
-			setHeadAccessory(template.headAccessory);
-			setBodyType(template.bodyType);
-			setScars(template.scars);
+   		setFacialHair(template.facialHair);
+   		setHeadAccessory(template.headAccessory);
+   		setBodyType(template.bodyType);
+   		setScars(template.scars || []); // FASE 5 FIX: Tambahkan fallback defensive
 
-			const race = findRace(template.race);
+   		const race = findRace(template.race);
 			if (race) setSelectedRace(race);
 
 			const classData = findClass(template.class);
@@ -539,13 +539,13 @@ const CreateCharacterWizard: React.FC<{
 
 		// ================== RENDER WIZARD ==================
 		return (
-			// FASE 0: Hapus padding, biarkan parent (panel kiri) yang mengelola
-			<div className="w-full h-full flex flex-col">
-				<h3 className="font-cinzel text-2xl text-blue-200 mb-4 text-center pt-4">
-					Menciptakan Jiwa Baru (Langkah {step}/6)
-				</h3>
+   		// FASE 0: Hapus padding, biarkan parent (panel kiri) yang mengelola
+   		<div className="w-full h-full flex flex-col">
+   			<h3 className="font-cinzel text-2xl text-blue-200 mb-4 text-center pt-4">
+   				Menciptakan Jiwa Baru (Langkah {step}/7)
+   			</h3>
 
-				{step > 1 && (
+   			{step > 1 && (
 					<button
 						onClick={handleBack}
 						className="absolute top-4 left-4 font-cinzel text-gray-300 hover:text-white z-10"

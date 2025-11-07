@@ -50,6 +50,7 @@ const VALERIUS_DATA: RawCharacterData = {
     hitDice: { 'd10': { max: 1, spent: 0 } },
     deathSaves: { successes: 0, failures: 0 },
     conditions: [],
+    scars: [], // FASE 5 FIX: Menambahkan data 'scars' yang hilang
     proficientSkills: [Skill.Athletics, Skill.Intimidation],
     proficientSavingThrows: [Ability.Strength, Ability.Constitution],
     racialTraits: RACES.find(r => r.name === 'Human')?.traits || [],
@@ -95,6 +96,7 @@ const ELARA_DATA: RawCharacterData = {
     hitDice: { 'd8': { max: 1, spent: 0 } }, // (Perbaikan: Rogue d8)
     deathSaves: { successes: 0, failures: 0 },
     conditions: [],
+    scars: [], // FASE 5 FIX: Menambahkan data 'scars' yang hilang
     proficientSkills: [Skill.Stealth, Skill.Survival, Skill.Perception, Skill.Acrobatics], // (Rogue dapat 4 skill)
     proficientSavingThrows: [Ability.Dexterity, Ability.Intelligence], // (Perbaikan: Rogue DEX/INT)
     racialTraits: RACES.find(r => r.name === 'Elf')?.traits || [],
@@ -139,6 +141,7 @@ const BORIN_DATA: RawCharacterData = {
     hitDice: { 'd8': { max: 1, spent: 0 } },
     deathSaves: { successes: 0, failures: 0 },
     conditions: [],
+    scars: [], // FASE 5 FIX: Menambahkan data 'scars' yang hilang
     proficientSkills: [Skill.Insight, Skill.Religion],
     proficientSavingThrows: [Ability.Wisdom, Ability.Charisma],
     racialTraits: RACES.find(r => r.name === 'Dwarf')?.traits || [],

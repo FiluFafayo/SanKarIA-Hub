@@ -64,7 +64,7 @@ export const renderCharacterLayout = (character: Character): string => {
         armor_legs: SPRITE_PARTS.armor_legs.find(p => p.name.toLowerCase().includes(character.class.toLowerCase())) || getPart('armor_legs', '', 'al_common_pants'),
         weapon_right: SPRITE_PARTS.weapon_right_hand[0],
         weapon_left: SPRITE_PARTS.weapon_left_hand[0],
-        scar: SPRITE_PARTS.facial_feature.find(p => character.scars.includes(p.id)) // Ambil scar pertama
+        scar: SPRITE_PARTS.facial_feature.find(p => (character.scars || []).includes(p.id)) // FASE 5 FIX: Tambahkan fallback defensive
     };
 
     // --- Logika Render Berbasis Layer ---
