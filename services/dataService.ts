@@ -756,7 +756,7 @@ class DataService {
             responseLength: response_length,
             gameState: game_state,
             currentPlayerId: current_player_id,
-            initiative_order: initiative_order,
+            initiativeOrder: initiative_order || [], // Map snake_case ke camelCase + beri fallback array kosong
             long_term_memory: long_term_memory,
             currentTime: parseInt(current_time, 10) || 43200, // FASE 1: Konversi bigint (string) ke number
             currentWeather: current_weather,
