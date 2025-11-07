@@ -14,14 +14,19 @@ const MAP_TILE_SIZE = 10; // 10x10px per tile di layout
 
 // Shim sederhana untuk OffscreenCanvas jika tersedia, fallback ke DOM Canvas
 const createCanvas = (width: number, height: number): HTMLCanvasElement => {
-    if (typeof OffscreenCanvas !== 'undefined') {
-        return new OffscreenCanvas(width, height) as any;
-    }
-    // Fallback ke elemen DOM (diperlukan untuk lingkungan non-worker)
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    return canvas;
+   // FASE 6 FIX: Hapus logika OffscreenCanvas.
+   // Alur ini dipanggil secara sinkron oleh handleSave dan membutuhkan .toDataURL(),
+   // yang TIDAK ADA di OffscreenCanvas (yang menggunakan .convertToBlob() async).
+   // Kita HARUS menggunakan elemen DOM canvas standar.
+   // if (typeof OffscreenCanvas !== 'undefined') {
+   //     return new OffscreenCanvas(width, height) as any;
+   // }
+   
+   // Selalu gunakan elemen DOM (diperlukan untuk .toDataURL() sinkron)
+   const canvas = document.createElement('canvas');
+   canvas.width = width;
+   canvas.height = height;
+   return canvas;
 };
 
 /**
