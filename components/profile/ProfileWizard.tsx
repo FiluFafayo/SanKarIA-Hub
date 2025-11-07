@@ -358,15 +358,23 @@ const CreateCharacterWizard: React.FC<{
             const spellSlots = selectedClass.spellcasting?.spellSlots || [];
             
             // FASE 0: Refaktor untuk me-resolve string 'spellName'
-            const spellData: SpellDefinition[] = [];
-            (selectedClass.spellcasting?.knownCantrips || []).forEach(spellName => {
-                const def = findSpell(spellName);
-                if (def) spellData.push(def); else console.warn(`[ProfileWizard] Gagal menemukan definisi spell: ${spellName}`);
-            });
-            (selectedClass.spellcasting?.knownSpells || []).forEach(spellName => {
-                const def = findSpell(spellName);
-                if (def) spellData.push(def); else console.warn(`[ProfileWizard] Gagal menemukan definisi spell: ${spellName}`);
-            });
+         const spellData: SpellDefinition[] = [];
+         (selectedClass.spellcasting?.knownCantrips || []).forEach(spellName => {
+             const def = findSpell(spellName);
+             if (def) { // FASE FINAL FIX: Memastikan 'def' adalah truthy
+                 spellData.push(def); 
+             } else {
+                 console.warn(`[ProfileWizard] Gagal menemukan definisi spell: ${spellName}`);
+             }
+         });
+         (selectedClass.spellcasting?.knownSpells || []).forEach(spellName => {
+             const def = findSpell(spellName);
+             if (def) { // FASE FINAL FIX: Memastikan 'def' adalah truthy
+                 spellData.push(def); 
+             } else {
+                 console.warn(`[ProfileWizard] Gagal menemukan definisi spell: ${spellName}`);
+             }
+         });
 
 
             const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {

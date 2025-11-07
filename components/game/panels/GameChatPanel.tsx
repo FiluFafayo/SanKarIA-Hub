@@ -34,7 +34,8 @@ export const GameChatPanel: React.FC<GameChatPanelProps> = React.memo(({
 }) => {
 
     // Tentukan apakah kita harus merender Peta Tempur
-    const showBattleMap = gameState === 'combat' && battleState;
+    // FASE FINAL FIX: Cek boolean (!!) battleState, bukan hanya 'truthy'
+    const showBattleMap = gameState === 'combat' && !!battleState;
 
     return (
         <main className="flex-grow flex flex-col h-full overflow-hidden">
