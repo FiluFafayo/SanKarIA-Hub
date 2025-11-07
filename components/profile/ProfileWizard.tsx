@@ -1026,9 +1026,15 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
 		spellData: SpellDefinition[]
 	) => {
-		// FASE 1: Ganti nama prop
-		// FASE 2 FIX (dari Fase 0 Roadmap): Kirim userId
-		await onSaveNewCharacter(charData, inventoryData, spellData);
+		// FIX: Tangkap karakter baru yang dikembalikan
+		const newCharacter = await onSaveNewCharacter(charData, inventoryData, spellData);
+		
+        // Cek jika alur join/game start (Alur B) sudah menangani navigasi
+		// Jika newCharacter ada (tidak terjadi error), update state lokal
+		if (newCharacter) {
+			setSelectedChar(newCharacter); // Set karakter baru sebagai yang terpilih
+		}
+		
 		setIsCreating(false); // Kembali ke daftar karakter
 	};
 
