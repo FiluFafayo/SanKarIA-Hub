@@ -1,4 +1,4 @@
-import React, { useRef, useLayoutEffect, MouseEvent } from 'react';
+import React, { useRef, useLayoutEffect, MouseEvent, useMemo } from 'react';
 import { GameEvent, Character, ThinkingState } from '../../types';
 import { TypingIndicator } from './TypingIndicator';
 import { RenderedHtml } from '../RenderedHtml';
@@ -11,18 +11,18 @@ interface ChatLogProps {
     onObjectClick: (objectName: string, objectId: string, event: MouseEvent<HTMLButtonElement>) => void;
 }
 
-export const ChatLog: React.FC<ChatLogProps> = ({ events, players, characterId, thinkingState, onObjectClick }) => {
+export const ChatLog: React.FC<ChatLogProps> = React.memo(({ events, players, characterId, thinkingState, onObjectClick }) => {
     const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
     useLayoutEffect(() => {
         endOfMessagesRef.current?.scrollIntoView({ behavior: 'auto' });
     }, [events, thinkingState]);
 
-    return (
-        <div className="flex-grow bg-black/30 p-4 overflow-y-auto flex flex-col gap-4">
-            {events.map(event => {
-                switch (event.type) {
-                    case 'dm_narration':
+    // FASE 3: Memoize the mapping of events to prevent re-mapping when only thinkingState changes
+    const renderedEvents = useMemo(() => {
+        return events.map(event => {
+            switch (event.type) {
+                case 'dm_narration':
                         return (
                             <div key={event.id} className="flex flex-col items-start">
                                 <div className="text-xs text-gray-400 px-2">Dungeon Master</div>
@@ -80,9 +80,14 @@ export const ChatLog: React.FC<ChatLogProps> = ({ events, players, characterId, 
                     default:
                         return null;
                 }
-            })}
+            });
+        }, [events, players, characterId, onObjectClick]); // Dependencies for the map
+
+    return (
+        <div className="flex-grow bg-black/30 p-4 overflow-y-auto flex flex-col gap-4">
+            {renderedEvents}
             {thinkingState !== 'idle' && <TypingIndicator state={thinkingState} />}
             <div ref={endOfMessagesRef} />
         </div>
     );
-};
+});

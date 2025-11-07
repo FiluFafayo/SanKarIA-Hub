@@ -4,9 +4,10 @@ import { formatDndTime } from '../../utils'; // (Poin 5) Impor helper format
 import { QuestLogPanel } from './QuestLogPanel';
 import { NpcTrackerPanel } from './NpcTrackerPanel';
 import { ExplorationMap } from './ExplorationMap'; // BARU: FASE 5
+import { InfoPanelPropsSlice } from './panels/GameInfoPanel'; // FASE 3
 
 interface InfoPanelProps {
-  campaign: Campaign;
+  campaign: InfoPanelPropsSlice; // FASE 3: Gunakan slice
   players: Character[];
 }
 

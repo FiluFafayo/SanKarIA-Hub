@@ -1,20 +1,42 @@
-// FASE 1: Direfaktor.
-// Komponen ini tidak lagi menjadi <aside> (panel layout).
-// Sekarang ini HANYA KONTEN (InfoPanel) yang akan dimasukkan ke dalam SidePanel.
+// FASE 3: Memoized. Props di-slice.
 
 import React from 'react';
-import { CampaignState, Character } from '../../../types';
+// FASE 3: Impor tipe-tipe slice
+import { 
+    Character, Quest, NPC, WorldWeather, 
+    MapMarker 
+} from '../../../types';
 import { InfoPanel } from '../InfoPanel';
 
+// FASE 3: Definisikan tipe props yang di-slice
+// (Ini diekspor agar InfoPanel.tsx bisa menggunakannya)
+export interface InfoPanelPropsSlice {
+    title: string;
+    description: string;
+    joinCode: string;
+    mapImageUrl?: string;
+    explorationGrid: number[][];
+    fogOfWar: boolean[][];
+    playerGridPosition: { x: number; y: number };
+    currentTime: number;
+    currentWeather: WorldWeather;
+    quests: Quest[];
+    npcs: NPC[];
+}
+
 interface GameInfoPanelProps {
-    campaign: CampaignState;
+    campaignSlice: InfoPanelPropsSlice;
     players: Character[];
 }
 
-export const GameInfoPanel: React.FC<GameInfoPanelProps> = ({ campaign, players }) => {
+export const GameInfoPanel: React.FC<GameInfoPanelProps> = React.memo(({ 
+    campaignSlice, 
+    players 
+}) => {
     return (
-        // FASE 1: Hapus <aside> dan <div> wrapper.
-        // InfoPanel sudah memiliki overflow-y-auto dan padding.
-        <InfoPanel campaign={campaign} players={players} />
+        <InfoPanel 
+            campaign={campaignSlice} // InfoPanel sekarang menerima slice
+            players={players} 
+        />
     );
-};
+});

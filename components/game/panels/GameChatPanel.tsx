@@ -1,30 +1,37 @@
-// FASE 1: Direfaktor.
-// Komponen ini SEKARANG HANYA bertanggung jawab untuk merender ChatLog atau BattleMap.
-// ActionBar/ChoiceButtons telah DIPINDAHKAN ke GameScreen untuk anchoring ergonomis.
+// FASE 3: Memoized. Props di-slice.
 
 import React, { MouseEvent } from 'react';
-import { CampaignState, Character, CampaignActions } from '../../../types'; // Hapus Skill, MobileTab, dll.
+// FASE 3: Impor tipe-tipe slice
+import { 
+    GameEvent, ThinkingState, GameState, BattleState, 
+    Character, CampaignActions 
+} from '../../../types';
 import { BattleMapRenderer } from '../BattleMapRenderer';
 import { ChatLog } from '../ChatLog';
-// Hapus ChoiceButtons dan ActionBar
 
 interface GameChatPanelProps {
-    campaign: CampaignState;
+    // FASE 3: Props di-slice untuk memoization
+    eventLog: GameEvent[];
+    thinkingState: ThinkingState;
+    gameState: GameState;
+    battleState: BattleState | null;
+    // Props lain
     players: Character[];
     characterId: string;
     onObjectClick: (objectName: string, objectId: string, event: MouseEvent<HTMLButtonElement>) => void;
     campaignActions: CampaignActions; // Untuk BattleMap
 }
 
-export const GameChatPanel: React.FC<GameChatPanelProps> = ({
-    campaign,
+export const GameChatPanel: React.FC<GameChatPanelProps> = React.memo(({
+    eventLog,
+    thinkingState,
+    gameState,
+    battleState,
     players,
     characterId,
     onObjectClick,
     campaignActions,
 }) => {
-
-    const { gameState, battleState, eventLog, thinkingState } = campaign;
 
     // Tentukan apakah kita harus merender Peta Tempur
     const showBattleMap = gameState === 'combat' && battleState;
@@ -46,9 +53,6 @@ export const GameChatPanel: React.FC<GameChatPanelProps> = ({
                     onObjectClick={onObjectClick}
                 />
             )}
-           
-            {/* FASE 1: Wrapper Input (ActionBar/ChoiceButtons) DIHAPUS DARI SINI.
-                Mereka sekarang hidup langsung di GameScreen.tsx. */}
         </main>
     );
-};
+});

@@ -1,29 +1,41 @@
-// FASE 1: Direfaktor.
-// Komponen ini tidak lagi menjadi <aside> (panel layout).
-// Sekarang ini HANYA KONTEN yang akan dimasukkan ke dalam SidePanel.
+// FASE 3: Memoized. Props di-slice.
 
 import React from 'react';
-import { Character, Skill, CampaignState } from '../../../types';
+// FASE 3: Impor tipe-tipe slice
+import { 
+    Character, Skill, MonsterInstance, 
+    GameState 
+} from '../../../types';
 import { useCombatSystem } from '../../../hooks/useCombatSystem';
 import { CombatTracker } from '../CombatTracker';
 import { CharacterPanel } from '../CharacterPanel';
 
 interface GameCharacterPanelProps {
     character: Character;
-    campaign: CampaignState;
+    // FASE 3: Props di-slice
+    players: Character[];
+    monsters: MonsterInstance[];
+    initiativeOrder: string[];
+    currentPlayerId: string | null;
+    gameState: GameState;
+    // Props lain
     combatSystem: ReturnType<typeof useCombatSystem>;
     onSkillSelect: (skill: Skill) => void;
     isMyTurn: boolean;
 }
 
-export const GameCharacterPanel: React.FC<GameCharacterPanelProps> = ({
+export const GameCharacterPanel: React.FC<GameCharacterPanelProps> = React.memo(({
     character,
-    campaign,
+    players,
+    monsters,
+    initiativeOrder,
+    currentPlayerId,
+    gameState,
     combatSystem,
     onSkillSelect,
     isMyTurn
 }) => {
-    const { players, monsters, initiativeOrder, currentPlayerId, gameState } = campaign;
+    // (Slice campaign dihapus, props sudah di-slice)
 
     return (
         // FASE 1: Hapus <aside> wrapper.
@@ -46,4 +58,4 @@ export const GameCharacterPanel: React.FC<GameCharacterPanelProps> = ({
 			/>
 		</div>
     );
-};
+});
