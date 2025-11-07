@@ -36,7 +36,8 @@ export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ 
 
   const handleCreateNew = () => {
     navigateTo(Location.MirrorOfSouls); // Arahkan ke Cermin Jiwa
-    onClose(); // Tutup view ini
+    // FASE 1 FIX: Hapus onClose(). Memanggil onClose() akan me-reset alur join (returnToNexus)
+    // onClose(); 
   };
 
   return (

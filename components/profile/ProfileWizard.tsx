@@ -64,10 +64,10 @@ interface ProfileWizardProps {
 	characters: Character[]; // SSoT Karakter milikku
 	userId: string;
 	onSaveNewCharacter: (
-		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
-		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
-		spellData: SpellDefinition[]
-	) => Promise<void>; // FASE 2: Prop ini BUKAN lagi (..userId: string) => ..
+ 	charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+ 	inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+ 	spellData: SpellDefinition[]
+ ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
 }
 
 // =================================================================
@@ -213,10 +213,10 @@ const CreateCharacterWizard: React.FC<{
 	userId: string;
     // FASE 2: Ambil prop onSaveNewCharacter (dari dataStore)
     onSaveNewCharacter: (
-		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
-		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
-		spellData: SpellDefinition[]
-	) => Promise<void>; // FASE 2: Prop ini BUKAN lagi (..userId: string) => ..
+ 	charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+ 	inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+ 	spellData: SpellDefinition[]
+ ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
 }> = ({ onCancel, userId, onSaveNewCharacter }) => {
 	// FASE 2: Ambil data SSoT statis dari registry, bukan (window)
 	const RACES: RaceData[] = useMemo(() => getAllRaces() || [], []);
@@ -410,12 +410,14 @@ const CreateCharacterWizard: React.FC<{
             // --- AKHIR PANGGILAN AI ---
 
             setStatusMessage("Menyimpan ke database...");
-            // FASE 2: Hapus 'userId' dari panggilan, sudah ditangani oleh ProfileView/dataStore
-            await onSaveNewCharacter(newCharData, inventoryData, spellData);
+         // FASE 1 FIX: Tangkap karakter baru, jangan panggil onCancel()
+         const newChar = await onSaveNewCharacter(newCharData, inventoryData, spellData);
 
-            onCancel(); // Sukses, tutup wizard
+         // FASE 1 FIX: Kembalikan karakter baru agar ProfileView bisa menangani alur join
+         return newChar; 
+         // onCancel(); // DIHAPUS
 
-        } catch (e: any) { // FASE 3: Tambah tipe error
+     } catch (e: any) { // FASE 3: Tambah tipe error
             console.error("Gagal finalisasi karakter:", e);
             // FASE 3: Ganti alert() dengan status message
             setStatusMessage(`ERROR: Gagal menyimpan karakter. ${e.message || 'Coba lagi.'}`);
