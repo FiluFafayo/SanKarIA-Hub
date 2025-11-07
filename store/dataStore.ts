@@ -297,134 +297,127 @@ export const useDataStore = create<DataStore>((set, get) => ({
 	},
 
 	copyCharacterFromTemplate: async (templateData, userId) => {
-		// Ini adalah gabungan dari handleSave di ProfileWizard dan logika AI
-		const {
-			name,
-			class: className,
-			race: raceName,
-			background: bgName,
-			abilityScores,
-			gender,
-			bodyType,
-			scars,
-			hair,
-			facialHair,
-			headAccessory,
-		} = templateData;
+   	// FASE 1 REFAKTOR: Fungsi ini sekarang HANYA me-resolve data dan
+   	// meng-generate AI image. Fungsi ini TIDAK LAGI MENYIMPAN ke DB.
+   	// Fungsi 'saveNewCharacter' (di atas) adalah satu-satunya yang menyimpan.
+   	// Ini memperbaiki DRY violation dan bug alur "Join Campaign".
 
-		const selectedClass = findClass(className);
-		const selectedRace = findRace(raceName);
-		const selectedBackground = findBackground(bgName);
+   	const {
+   		name,
+   		class: className,
+   		race: raceName,
+   		background: bgName,
+   		abilityScores,
+   		gender,
+   		bodyType,
+   		scars,
+   		hair,
+   		facialHair,
+   		headAccessory,
+   	} = templateData;
 
-		if (!selectedClass || !selectedRace || !selectedBackground) {
-			throw new Error(
-				"Definisi template (Class/Race/Background) tidak ditemukan."
-			);
-		}
+   	const selectedClass = findClass(className);
+   	const selectedRace = findRace(raceName);
+   	const selectedBackground = findBackground(bgName);
 
-		const baseScores = abilityScores as AbilityScores;
-		const finalScores = { ...baseScores };
+   	if (!selectedClass || !selectedRace || !selectedBackground) {
+   		throw new Error(
+   			"Definisi template (Class/Race/Background) tidak ditemukan."
+   		);
+   	}
 
-		// 1. Hitung Stats (sama seperti di ProfileWizard)
-		const conModifier = getAbilityModifier(finalScores.constitution);
-		const dexModifier = getAbilityModifier(finalScores.dexterity);
-		const maxHp = selectedClass.hpAtLevel1(conModifier);
+   	const baseScores = abilityScores as AbilityScores;
+   	const finalScores = { ...baseScores };
 
-		// 2. Resolve Inventory (dari data mentah template)
-		const inventoryData: Omit<CharacterInventoryItem, "instanceId">[] =
-			templateData.inventory.map((inv) => ({
-				item: getItemDef(inv.itemName), // Resolve string ke full definition
-				quantity: inv.quantity,
-				isEquipped: inv.isEquipped,
-			}));
+   	// 1. Hitung Stats (sama seperti di ProfileWizard)
+   	const conModifier = getAbilityModifier(finalScores.constitution);
+   	const dexModifier = getAbilityModifier(finalScores.dexterity);
+   	const maxHp = selectedClass.hpAtLevel1(conModifier);
 
-		// 3. Hitung AC (sama seperti di ProfileWizard)
-		let armorClass = 10 + dexModifier;
-		let equippedArmorDef: ItemDefinition | null = null;
-		const armorIndex = inventoryData.findIndex(
-			(i) => i.item.type === "armor" && i.item.armorType !== "shield"
-		);
-		const shieldIndex = inventoryData.findIndex(
-			(i) => i.item.name === "Shield"
-		);
-		if (armorIndex > -1) {
-			inventoryData[armorIndex].isEquipped = true;
-			equippedArmorDef = inventoryData[armorIndex].item;
-		}
-		if (shieldIndex > -1) {
-			inventoryData[shieldIndex].isEquipped = true;
-		}
-		if (equippedArmorDef) {
-			const baseAc = equippedArmorDef.baseAc || 10;
-			if (equippedArmorDef.armorType === "light")
-				armorClass = baseAc + dexModifier;
-			else if (equippedArmorDef.armorType === "medium")
-				armorClass = baseAc + Math.min(2, dexModifier);
-			else if (equippedArmorDef.armorType === "heavy") armorClass = baseAc;
-		}
-		if (shieldIndex > -1) armorClass += 2;
+   	// 2. Resolve Inventory (dari data mentah template)
+   	const inventoryData: Omit<CharacterInventoryItem, "instanceId">[] =
+   		templateData.inventory.map((inv) => ({
+   			item: getItemDef(inv.itemName), // Resolve string ke full definition
+   			quantity: inv.quantity,
+   			isEquipped: inv.isEquipped,
+   		}));
 
-		// 4. Resolve Spells (dari data mentah template)
-		const spellData: SpellDefinition[] = templateData.knownSpells
-			.map((spellName) => findSpell(spellName))
-			.filter(Boolean) as SpellDefinition[];
+   	// 3. Hitung AC (sama seperti di ProfileWizard)
+   	let armorClass = 10 + dexModifier;
+   	let equippedArmorDef: ItemDefinition | null = null;
+   	const armorIndex = inventoryData.findIndex(
+   		(i) => i.item.type === "armor" && i.item.armorType !== "shield"
+   	);
+   	const shieldIndex = inventoryData.findIndex(
+   		(i) => i.item.name === "Shield"
+   	);
+   	if (armorIndex > -1) {
+   		inventoryData[armorIndex].isEquipped = true;
+   		equippedArmorDef = inventoryData[armorIndex].item;
+   	}
+   	if (shieldIndex > -1) {
+   		inventoryData[shieldIndex].isEquipped = true;
+   	}
+   	if (equippedArmorDef) {
+   		const baseAc = equippedArmorDef.baseAc || 10;
+   		if (equippedArmorDef.armorType === "light")
+   			armorClass = baseAc + dexModifier;
+   		else if (equippedArmorDef.armorType === "medium")
+   			armorClass = baseAc + Math.min(2, dexModifier);
+   		else if (equippedArmorDef.armorType === "heavy") armorClass = baseAc;
+   	}
+   	if (shieldIndex > -1) armorClass += 2;
 
-		// 5. Susun Data Karakter
-		const newCharData: Omit<
-			Character,
-			"id" | "ownerId" | "inventory" | "knownSpells"
-		> = {
-			...templateData, // Ambil semua data visual (gender, hair, dll)
-			abilityScores: finalScores,
-			maxHp: Math.max(1, maxHp),
-			currentHp: Math.max(1, maxHp),
-			armorClass: armorClass,
-			speed: selectedRace.speed,
-			hitDice: { [selectedClass.hitDice]: { max: 1, spent: 0 } },
-			deathSaves: { successes: 0, failures: 0 },
-			conditions: [],
-			racialTraits: selectedRace.traits,
-			classFeatures: selectedClass.features,
-			proficientSkills: templateData.proficientSkills, // Ambil dari template
-			proficientSavingThrows: selectedClass.proficiencies.savingThrows,
-			spellSlots: templateData.spellSlots,
-		};
+   	// 4. Resolve Spells (dari data mentah template)
+   	const spellData: SpellDefinition[] = templateData.knownSpells
+   		.map((spellName) => findSpell(spellName))
+   		.filter(Boolean) as SpellDefinition[];
 
-		// 6. Generate Gambar AI (PENTING)
-		const layout = renderCharacterLayout(newCharData as Character);
+   	// 5. Susun Data Karakter
+   	const newCharData: Omit<
+   		Character,
+   		"id" | "ownerId" | "inventory" | "knownSpells"
+   	> = {
+   		...templateData, // Ambil semua data visual (gender, hair, dll)
+   		abilityScores: finalScores,
+   		maxHp: Math.max(1, maxHp),
+   		currentHp: Math.max(1, maxHp),
+   		armorClass: armorClass,
+   		speed: selectedRace.speed,
+   		hitDice: { [selectedClass.hitDice]: { max: 1, spent: 0 } },
+   		deathSaves: { successes: 0, failures: 0 },
+   		conditions: [],
+   		racialTraits: selectedRace.traits,
+   		classFeatures: selectedClass.features,
+   		proficientSkills: templateData.proficientSkills, // Ambil dari template
+   		proficientSavingThrows: selectedClass.proficiencies.savingThrows,
+   		spellSlots: templateData.spellSlots,
+   	};
 
-		const VISUAL_STYLE_PROMPT =
-			"digital painting, fantasy art, detailed, high quality, vibrant colors, style of D&D 5e sourcebooks, character portrait, full body";
-		const getPartName = (arr: any[], id: string) =>
-			arr.find((p) => p.id === id)?.name || "";
-		const prompt = `Potret HD, ${newCharData.gender} ${newCharData.race} ${
-			newCharData.class
-		}, ${getPartName(SPRITE_PARTS.hair, newCharData.hair)}, ${getPartName(
-			SPRITE_PARTS.facial_feature,
-			newCharData.facialHair
-		)}, ${newCharData.scars
-			.map((id) => getPartName(SPRITE_PARTS.facial_feature, id))
-			.join(", ")}, ${VISUAL_STYLE_PROMPT}`;
+   	// 6. Generate Gambar AI (PENTING)
+   	const layout = renderCharacterLayout(newCharData as Character);
 
-		const imageUrl = await generationService.stylizePixelLayout(
-			layout,
-			prompt,
-			"Sprite"
-		);
-		newCharData.image = imageUrl; // Ganti gambar placeholder
+   	const VISUAL_STYLE_PROMPT =
+   		"digital painting, fantasy art, detailed, high quality, vibrant colors, style of D&D 5e sourcebooks, character portrait, full body";
+   	const getPartName = (arr: any[], id: string) =>
+   		arr.find((p) => p.id === id)?.name || "";
+   	const prompt = `Potret HD, ${newCharData.gender} ${newCharData.race} ${
+   		newCharData.class
+   	}, ${getPartName(SPRITE_PARTS.hair, newCharData.hair)}, ${getPartName(
+   		SPRITE_PARTS.facial_feature,
+   		newCharData.facialHair
+   	)}, ${newCharData.scars
+   		.map((id) => getPartName(SPRITE_PARTS.facial_feature, id))
+   		.join(", ")}, ${VISUAL_STYLE_PROMPT}`;
 
-		// 7. Simpan ke DB
-		const newCharacter = await dataService.saveNewCharacter(
-			newCharData,
-			inventoryData,
-			spellData,
-			userId
-		);
+   	const imageUrl = await generationService.stylizePixelLayout(
+   		layout,
+   		prompt,
+   		"Sprite"
+   	);
+   	newCharData.image = imageUrl; // Ganti gambar placeholder
 
-		// 8. Update SSoT Store
-		get().actions._addCharacter(newCharacter);
-
-		// 9. Kembalikan karakter baru
-		return newCharacter;
-	},
+   	// 7. KEMBALIKAN DATA MENTAH (BUKAN MENYIMPAN)
+   	return { newCharData, inventoryData, spellData };
+   },
 }));

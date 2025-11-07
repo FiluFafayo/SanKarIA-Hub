@@ -250,9 +250,9 @@ const CreateCharacterWizard: React.FC<{
     const [isSaving, setIsSaving] = useState(false);
 
     // FASE 2: Aksi Store sekarang menjadi handler lokal
-	const { copyCharacterFromTemplate } = useDataStore(s => s.actions); // Impor aksi baru
-	const [isCopying, setIsCopying] = useState(false); // State loading template
-	const templates = getRawCharacterTemplates();
+	const { copyCharacterFromTemplate } = useDataStore(s => s.actions); // Impor aksi (resolve template)
+   const [isCopying, setIsCopying] = useState(false); // State loading template
+   const templates = getRawCharacterTemplates();
 
 	const setCharacterStep = setStep;
     const setAbilityScore = (ability: Ability, score: number) => {
@@ -285,22 +285,31 @@ const CreateCharacterWizard: React.FC<{
 	};
 
 	// FASE 2: Logika finalizeCharacter (dari appStore) dipindahkan ke sini
-	const handleTemplateCopy = async (template: RawCharacterData) => {
-		setIsCopying(true);
-		setStatusMessage(`Menyalin ${template.name}...`);
-		try {
-		// Panggil aksi dataStore (yang juga menangani gambar AI)
-		await copyCharacterFromTemplate(template, userId);
-		setStatusMessage("");
-		setIsCopying(false);
-		onCancel(); // Sukses, tutup wizard
-		} catch (e: any) {
-		setIsCopying(false);
-		setStatusMessage(`Gagal menyalin: ${e.message || 'Coba lagi.'}`);
-		}
-	};
+   const handleTemplateCopy = async (template: RawCharacterData) => {
+   	setIsCopying(true);
+   	setStatusMessage(`Menyalin ${template.name}...`);
+   	try {
+   		// FASE 1 FIX: Panggil aksi dataStore (yang sekarang HANYA resolve data & render AI)
+   		const { newCharData, inventoryData, spellData } =
+   			await copyCharacterFromTemplate(template, userId);
 
-	const handleSave = async () => {
+   		setStatusMessage("Menyimpan ke database...");
+   		
+   		// FASE 1 FIX: Panggil handler 'onSaveNewCharacter' (dari ProfileView)
+   		// Handler ini sekarang menjadi SATU-SATUNYA alur yang menyimpan ke DB
+   		// dan (yang terpenting) menangani alur "Join Campaign".
+   		await onSaveNewCharacter(newCharData, inventoryData, spellData);
+   		
+   		// (onSaveNewCharacter akan menangani penutupan wizard / navigasi)
+   		setStatusMessage("");
+   		setIsCopying(false);
+   	} catch (e: any) {
+   		setIsCopying(false);
+   		setStatusMessage(`Gagal menyalin: ${e.message || 'Coba lagi.'}`);
+   	}
+   };
+
+   const handleSave = async () => {
 		if (Object.keys(abilityScores).length !== 6) {
             // FASE 3: Ganti alert() dengan status message
             setStatusMessage("ERROR: Selesaikan pelemparan semua dadu kemampuan.");
@@ -418,14 +427,15 @@ const CreateCharacterWizard: React.FC<{
             // --- AKHIR PANGGILAN AI ---
 
             setStatusMessage("Menyimpan ke database...");
-         // FASE 1 FIX: Tangkap karakter baru, jangan panggil onCancel()
-         const newChar = await onSaveNewCharacter(newCharData, inventoryData, spellData);
+         // FASE 1 FIX: Panggil handler 'onSaveNewCharacter' (dari ProfileView)
+   		// Handler ini akan menyimpan ke DB DAN menangani alur "Join Campaign".
+   		// Kita tidak perlu menangkap 'newChar' di sini karena handler
+   		// akan mengelola navigasi (menutup modal atau masuk ke game).
+   		await onSaveNewCharacter(newCharData, inventoryData, spellData);
 
-         // FASE 1 FIX: Kembalikan karakter baru agar ProfileView bisa menangani alur join
-         return newChar; 
-         // onCancel(); // DIHAPUS
+   		// onCancel(); // DIHAPUS (sudah ditangani oleh onSaveNewCharacter)
 
-     } catch (e: any) { // FASE 3: Tambah tipe error
+    } catch (e: any) { // FASE 3: Tambah tipe error
             console.error("Gagal finalisasi karakter:", e);
             // FASE 3: Ganti alert() dengan status message
             setStatusMessage(`ERROR: Gagal menyimpan karakter. ${e.message || 'Coba lagi.'}`);

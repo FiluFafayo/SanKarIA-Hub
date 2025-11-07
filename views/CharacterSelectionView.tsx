@@ -15,24 +15,30 @@ interface CharacterSelectionViewProps {
 }
 
 export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ characters, onSelect, onClose, userId }) => {
-  const templates = getRawCharacterTemplates();
-  const copyCharacterFromTemplate = useDataStore(s => s.actions.copyCharacterFromTemplate);
-  const navigateTo = useAppStore(s => s.actions.navigateTo);
-  const [isCopying, setIsCopying] = useState<string | null>(null); // State loading
+ const templates = getRawCharacterTemplates();
+ // FASE 1 FIX: Impor KEDUA aksi. copy (resolve) dan save (commit).
+ const { copyCharacterFromTemplate, saveNewCharacter } = useDataStore(s => s.actions);
+ const navigateTo = useAppStore(s => s.actions.navigateTo);
+ const [isCopying, setIsCopying] = useState<string | null>(null); // State loading
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleCopyAndSelect = async (template: RawCharacterData) => {
-    setIsCopying(template.name);
-    setErrorMessage('');
-    try {
-      const newCharacter = await copyCharacterFromTemplate(template, userId);
-      onSelect(newCharacter); // Lanjutkan alur join campaign
-    } catch (e: any) {
-      console.error("Gagal menyalin template:", e);
-      setErrorMessage(`Gagal menyalin ${template.name}. Coba lagi.`);
-      setIsCopying(null);
-    }
-  };
+   setIsCopying(template.name);
+   setErrorMessage('');
+   try {
+     // FASE 1 FIX: copyCharacterFromTemplate sekarang HANYA me-resolve data
+     const { newCharData, inventoryData, spellData } = await copyCharacterFromTemplate(template, userId);
+     
+     // FASE 1 FIX: Kita harus memanggil 'saveNewCharacter' secara eksplisit
+     const newCharacter = await saveNewCharacter(newCharData, inventoryData, spellData, userId);
+
+     onSelect(newCharacter); // Lanjutkan alur join campaign (dengan char yang sudah di-save)
+   } catch (e: any) {
+     console.error("Gagal menyalin template:", e);
+     setErrorMessage(`Gagal menyalin ${template.name}. Coba lagi.`);
+     setIsCopying(null);
+   }
+ };
 
   const handleCreateNew = () => {
     navigateTo(Location.MirrorOfSouls); // Arahkan ke Cermin Jiwa
