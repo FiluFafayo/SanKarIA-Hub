@@ -24,7 +24,8 @@ import {
 import { SPRITE_PARTS } from "../../data/spriteParts"; // BARU
 import { Die } from "../Die";
 import { SelectionCard } from "../SelectionCard"; // Import SelectionCard
-import { useDataStore } from "../../store/dataStore"; // Impor baru
+// FASE 2: Hapus useDataStore (tidak dipakai di sini)
+// import { useDataStore } from "../../store/dataStore"; // Impor baru
 
 // FASE 2: Impor SSoT Data Statis dari Registry
 import { 
@@ -60,14 +61,17 @@ const createInvItem = (
 
 // FASE 1: Ganti nama interface
 interface ProfileWizardProps {
-	onClose: () => void;
-	characters: Character[]; // SSoT Karakter milikku
-	userId: string;
-	onSaveNewCharacter: (
- 	charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
- 	inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
- 	spellData: SpellDefinition[]
- ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
+   onClose: () => void;
+   characters: Character[]; // SSoT Karakter milikku
+   userId: string;
+   onSaveNewCharacter: (
+   	charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+   	inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+   	spellData: SpellDefinition[]
+   ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
+   // FASE 2: Tambah props pre-fill
+   templateToPreFill: RawCharacterData | null;
+   clearTemplateToPreFill: () => void;
 }
 
 // =================================================================
@@ -213,13 +217,22 @@ const CreateCharacterWizard: React.FC<{
 	userId: string;
     // FASE 2: Ambil prop onSaveNewCharacter (dari dataStore)
     onSaveNewCharacter: (
- 	charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
- 	inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
- 	spellData: SpellDefinition[]
- ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
-}> = ({ onCancel, userId, onSaveNewCharacter }) => {
-	// FASE 2: Ambil data SSoT statis dari registry, bukan (window)
-	const RACES: RaceData[] = useMemo(() => getAllRaces() || [], []);
+   	charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+   	inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+   	spellData: SpellDefinition[]
+   ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
+   // FASE 2: Tambah props pre-fill
+   templateToPreFill: RawCharacterData | null;
+   clearTemplateToPreFill: () => void;
+}> = ({
+   onCancel,
+   userId,
+   onSaveNewCharacter,
+   templateToPreFill,
+   clearTemplateToPreFill,
+}) => {
+   // FASE 2: Ambil data SSoT statis dari registry, bukan (window)
+   const RACES: RaceData[] = useMemo(() => getAllRaces() || [], []);
 	const CLASS_DEFINITIONS: Record<string, ClassData> = useMemo(
 		() => getAllClasses() || {},
 		[]
@@ -249,12 +262,12 @@ const CreateCharacterWizard: React.FC<{
     const [selectedEquipment, setSelectedEquipment] = useState<Record<number, EquipmentChoice['options'][0]>>(() => getDefaultEquipment(findClass('Fighter') || Object.values(CLASS_DEFINITIONS)[0]));
     const [isSaving, setIsSaving] = useState(false);
 
-    // FASE 2: Aksi Store sekarang menjadi handler lokal
-	const { copyCharacterFromTemplate } = useDataStore(s => s.actions); // Impor aksi (resolve template)
-   const [isCopying, setIsCopying] = useState(false); // State loading template
+   // FASE 2: Aksi Store sekarang menjadi handler lokal
+   // const { copyCharacterFromTemplate } = useDataStore(s => s.actions); // FASE 2: Dihapus
+   const [isCopying, setIsCopying] = useState(false); // State loading template (tetap dipakai untuk UI Step 1)
    const templates = getRawCharacterTemplates();
 
-	const setCharacterStep = setStep;
+   const setCharacterStep = setStep;
     const setAbilityScore = (ability: Ability, score: number) => {
         setAbilityScores(prev => ({ ...prev, [ability]: score }));
     };
@@ -284,29 +297,64 @@ const CreateCharacterWizard: React.FC<{
 		}
 	};
 
-	// FASE 2: Logika finalizeCharacter (dari appStore) dipindahkan ke sini
-   const handleTemplateCopy = async (template: RawCharacterData) => {
-   	setIsCopying(true);
-   	setStatusMessage(`Menyalin ${template.name}...`);
-   	try {
-   		// FASE 1 FIX: Panggil aksi dataStore (yang sekarang HANYA resolve data & render AI)
-   		const { newCharData, inventoryData, spellData } =
-   			await copyCharacterFromTemplate(template, userId);
+	// FASE 2: Fungsi ini (preFillData) adalah inti dari refaktor DRY.
+   // Ia mengambil template mentah dan mengisi semua state React.
+   const preFillData = (template: RawCharacterData) => {
+   	setStatusMessage(`Memuat ${template.name}...`);
+   	setName(template.name);
+   	setGender(template.gender);
+   	setHair(template.hair);
+   	setFacialHair(template.facialHair);
+   	setHeadAccessory(template.headAccessory);
+   	setBodyType(template.bodyType);
+   	setScars(template.scars);
 
-   		setStatusMessage("Menyimpan ke database...");
-   		
-   		// FASE 1 FIX: Panggil handler 'onSaveNewCharacter' (dari ProfileView)
-   		// Handler ini sekarang menjadi SATU-SATUNYA alur yang menyimpan ke DB
-   		// dan (yang terpenting) menangani alur "Join Campaign".
-   		await onSaveNewCharacter(newCharData, inventoryData, spellData);
-   		
-   		// (onSaveNewCharacter akan menangani penutupan wizard / navigasi)
-   		setStatusMessage("");
-   		setIsCopying(false);
-   	} catch (e: any) {
-   		setIsCopying(false);
-   		setStatusMessage(`Gagal menyalin: ${e.message || 'Coba lagi.'}`);
+   	const race = findRace(template.race);
+   	if (race) setSelectedRace(race);
+
+   	const classData = findClass(template.class);
+   	if (classData) {
+   		setSelectedClass(classData);
+   		// Set equipment default DARI template, bukan default kelas
+   		const templateEquipment: Record<number, EquipmentChoice['options'][0]> = {};
+   		classData.startingEquipment.choices.forEach((choice, index) => {
+   			// Cari opsi di template
+   			const chosenOptionName = template.startingEquipment[index];
+   			const foundOption = choice.options.find(opt => opt.name === chosenOptionName);
+   			templateEquipment[index] = foundOption || choice.options[0]; // Fallback ke opsi pertama jika nama tidak cocok
+   		});
+   		setSelectedEquipment(templateEquipment);
+   	} else {
+   		// Fallback jika kelas tidak ditemukan (seharusnya tidak terjadi)
+   		setSelectedEquipment(getDefaultEquipment(findClass('Fighter')!));
    	}
+   	
+   	const background = findBackground(template.background);
+   	if (background) setSelectedBackground(background);
+   	
+   	setAbilityScores(template.abilityScores);
+   	setSelectedSkills(template.proficientSkills);
+   	
+   	setStatusMessage("");
+   };
+
+   // FASE 2: useEffect untuk menangani pre-fill dari alur CharacterSelectionView
+   useEffect(() => {
+   	if (templateToPreFill) {
+   		preFillData(templateToPreFill);
+   		setStep(7); // Langsung lompat ke Review
+   		clearTemplateToPreFill(); // Hapus state global
+   	}
+   }, [templateToPreFill, clearTemplateToPreFill]);
+
+   // FASE 2: handleTemplateCopy (yang dipicu DARI Step 1) sekarang
+   // hanya me-pre-fill state dan lompat ke Step 7 (Review).
+   // Ini TIDAK LAGI menyimpan ke DB.
+   const handleTemplateCopy = (template: RawCharacterData) => {
+   	setIsCopying(true); // Tetap gunakan ini untuk UI loading
+   	preFillData(template);
+   	setStep(7); // Lompat ke Review
+   	setIsCopying(false); // Selesai
    };
 
    const handleSave = async () => {
@@ -721,10 +769,10 @@ const CreateCharacterWizard: React.FC<{
 								imageUrl={`https://picsum.photos/seed/${b.name.toLowerCase()}/200`}
 								isSelected={selectedBackground.name === b.name}
 								// REFAKTOR G-3: Gunakan setSelectedBackground
-								onClick={() => setSelectedBackground(b)}
-							/>
-						))}
-					</div>
+   							onClick={() => setSelectedBackground(b)}
+   						/>
+   					))}
+   				</div>
 
 					<div className="bg-black/20 p-3 rounded text-sm space-y-2">
 						<p>{selectedBackground.description}</p>
@@ -931,11 +979,14 @@ const CreateCharacterWizard: React.FC<{
 // =================================================================
 // FASE 1: Ganti nama komponen
 export const ProfileWizard: React.FC<ProfileWizardProps> = ({
-	onClose,
-	characters,
-	// setCharacters DIHAPUS
-	userId,
-	onSaveNewCharacter,
+   onClose,
+   characters,
+   // setCharacters DIHAPUS
+   userId,
+   onSaveNewCharacter,
+   // FASE 2: Tambah props pre-fill
+   templateToPreFill,
+   clearTemplateToPreFill,
 }) => {
 	// REFAKTOR G-4: myCharacters sekarang adalah prop 'characters'
 	const myCharacters = characters;

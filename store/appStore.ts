@@ -4,8 +4,10 @@
 // State Form (campaign creation) dipindah ke state lokal React di CreateCampaignView.tsx.
 
 import { create } from 'zustand';
+// (Impor RawCharacterData)
 import { 
-    Character, MapMarker, Campaign, CampaignState, Location
+   Character, MapMarker, Campaign, CampaignState, Location,
+   RawCharacterData
 } from '../types';
 // (Impor yang tidak perlu dihapus)
 // import { dataService } from '../services/dataService'; // Tidak diperlukan di sini
@@ -19,17 +21,21 @@ type View = Location | 'nexus' | 'character-selection';
 
 // --- Slice 1: Navigation ---
 interface NavigationState {
-    currentView: View;
-    campaignToJoinOrStart: Campaign | null; // Untuk alur join
+   currentView: View;
+   campaignToJoinOrStart: Campaign | null; // Untuk alur join
+   templateToPreFill: RawCharacterData | null; // FASE 2: Untuk alur template
 }
 const initialNavigationState: NavigationState = {
-    currentView: 'nexus',
-    campaignToJoinOrStart: null,
+   currentView: 'nexus',
+   campaignToJoinOrStart: null,
+   templateToPreFill: null, // FASE 2
 };
 interface NavigationActions {
-    navigateTo: (view: Location) => void;
-    returnToNexus: () => void;
-    startJoinFlow: (campaign: Campaign) => void;
+   navigateTo: (view: Location) => void;
+   returnToNexus: () => void;
+   startJoinFlow: (campaign: Campaign) => void;
+   startTemplateFlow: (template: RawCharacterData) => void; // FASE 2
+   clearTemplateToPreFill: () => void; // FASE 2
 }
 
 // --- Slice 2: Game Runtime (DIHAPUS) ---
@@ -85,13 +91,29 @@ export const useAppStore = create<AppStore>((set, get) => ({
             set(state => ({ navigation: { ...state.navigation, currentView: view } }));
         },
         returnToNexus: () => {
-            set({ navigation: initialNavigationState });
-        },
-        startJoinFlow: (campaign) => set(state => ({
-            navigation: { ...state.navigation, currentView: 'character-selection', campaignToJoinOrStart: campaign }
-        })),
+           set({ navigation: initialNavigationState });
+       },
+       startJoinFlow: (campaign) => set(state => ({
+           navigation: { ...state.navigation, currentView: 'character-selection', campaignToJoinOrStart: campaign }
+       })),
+       
+       // FASE 2: Aksi alur template
+       startTemplateFlow: (template) => set(state => ({
+           navigation: {
+               ...state.navigation,
+               currentView: Location.MirrorOfSouls, // Arahkan ke Cermin Jiwa
+               templateToPreFill: template,
+               // campaignToJoinOrStart tetap ada jika alur ini dimulai dari CharacterSelectionView
+           }
+       })),
+       clearTemplateToPreFill: () => set(state => ({
+           navigation: {
+               ...state.navigation,
+               templateToPreFill: null
+           }
+       })),
 
-        // --- Runtime Actions (DIHAPUS) ---
+       // --- Runtime Actions (DIHAPUS) ---
 
         // --- Level Up Actions (Poin 7) ---
         triggerLevelUp: (character) => {

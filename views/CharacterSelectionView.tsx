@@ -3,39 +3,40 @@ import React, { useState } from 'react';
 import { ViewWrapper } from '../components/ViewWrapper';
 import { Character, Location } from '../types';
 import { getRawCharacterTemplates, RawCharacterData } from '../data/registry'; // Impor template
-import { useDataStore } from '../store/dataStore'; // Impor dataStore
+// FASE 2: Hapus dataStore
+// import { useDataStore } from '../store/dataStore'; 
 import { useAppStore } from '../store/appStore'; // Impor appStore
 import { SelectionCard } from '../components/SelectionCard'; // Impor SelectionCard
+import { Location } from '../types'; // FASE 2
 
 interface CharacterSelectionViewProps {
-  characters: Character[]; // SSoT Karakter milikku (tetap di-pass dari ViewManager)
-  onSelect: (character: Character) => void;
-  onClose: () => void;
-  userId: string; // Ambil userId
+ characters: Character[]; // SSoT Karakter milikku (tetap di-pass dari ViewManager)
+ onSelect: (character: Character) => void;
+ onClose: () => void;
+ userId: string; // Ambil userId
 }
 
 export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ characters, onSelect, onClose, userId }) => {
  const templates = getRawCharacterTemplates();
- // FASE 1 FIX: Impor KEDUA aksi. copy (resolve) dan save (commit).
- const { copyCharacterFromTemplate, saveNewCharacter } = useDataStore(s => s.actions);
- const navigateTo = useAppStore(s => s.actions.navigateTo);
- const [isCopying, setIsCopying] = useState<string | null>(null); // State loading
-  const [errorMessage, setErrorMessage] = useState('');
+ // FASE 2: Ganti aksi dataStore dengan aksi appStore
+ const { navigateTo, startTemplateFlow } = useAppStore(s => s.actions);
+ const [isCopying, setIsCopying] = useState<string | null>(null); // State loading (tetap lokal)
+ const [errorMessage, setErrorMessage] = useState(''); // State error (tetap lokal)
 
-  const handleCopyAndSelect = async (template: RawCharacterData) => {
+ const handleCopyAndSelect = (template: RawCharacterData) => {
+   // FASE 2: Fungsi ini tidak lagi async.
+   // Fungsi ini HANYA menavigasi ke Wizard Cermin Jiwa
+   // dengan membawa data template. Alur "Join Campaign"
+   // akan ditangani oleh Wizard (ProfileView/ProfileWizard).
    setIsCopying(template.name);
    setErrorMessage('');
    try {
-     // FASE 1 FIX: copyCharacterFromTemplate sekarang HANYA me-resolve data
-     const { newCharData, inventoryData, spellData } = await copyCharacterFromTemplate(template, userId);
-     
-     // FASE 1 FIX: Kita harus memanggil 'saveNewCharacter' secara eksplisit
-     const newCharacter = await saveNewCharacter(newCharData, inventoryData, spellData, userId);
-
-     onSelect(newCharacter); // Lanjutkan alur join campaign (dengan char yang sudah di-save)
+     startTemplateFlow(template);
+     // navigateTo(Location.MirrorOfSouls) TIDAK DIPERLUKAN,
+     // startTemplateFlow sudah melakukannya.
    } catch (e: any) {
-     console.error("Gagal menyalin template:", e);
-     setErrorMessage(`Gagal menyalin ${template.name}. Coba lagi.`);
+     console.error("Gagal memulai alur template:", e);
+     setErrorMessage(`Gagal memuat template ${template.name}.`);
      setIsCopying(null);
    }
  };
