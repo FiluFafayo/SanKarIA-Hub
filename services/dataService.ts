@@ -437,6 +437,7 @@ class DataService {
             .filter(spell => spell.character_id === dbChar.id)
             .map(this.mapDbSpell.bind(this));
 
+        // --- VERSI LENGKAP DENGAN BIDANG VISUAL ---
         return {
             id: dbChar.id,
             ownerId: dbChar.owner_id,
@@ -446,6 +447,16 @@ class DataService {
             level: dbChar.level,
             xp: dbChar.xp,
             image: dbChar.image,
+
+            // --- TAMBAHKAN BIDANG YANG HILANG INI ---
+            gender: dbChar.gender as 'Pria' | 'Wanita', // Ambil dari DB
+            bodyType: dbChar.body_type,                   // Ambil dari DB
+            scars: dbChar.scars || [],                    // Ambil dari DB (dengan fallback)
+            hair: dbChar.hair,                            // Ambil dari DB
+            facialHair: dbChar.facial_hair,               // Ambil dari DB
+            headAccessory: dbChar.head_accessory,         // Ambil dari DB
+            // ------------------------------------
+
             background: dbChar.background,
             personalityTrait: dbChar.personality_trait || '',
             ideal: dbChar.ideal || '',
