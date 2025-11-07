@@ -227,7 +227,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash-image-preview', // (P0 FIX) Ganti ke model yang sesuai
+                model: 'gemini-2.0-flash-preview-image-generation', // (P0 FIX) Ganti ke model yang sesuai
                 contents: { parts: [{ text: prompt }] },
                 config: { responseModalities: [Modality.IMAGE] },
             });
@@ -262,7 +262,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash-image-preview',
+                model: 'gemini-2.0-flash-preview-image-generation',
                 contents: { parts: [imagePart, textPart] },
                 config: { responseModalities: [Modality.IMAGE] },
             });
@@ -307,7 +307,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash-image-preview',
+                model: 'gemini-2.0-flash-preview-image-generation',
                 contents: {
                     parts: [
                         imagePart,
