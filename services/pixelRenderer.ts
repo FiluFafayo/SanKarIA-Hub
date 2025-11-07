@@ -62,8 +62,8 @@ export const renderCharacterLayout = (character: Character): string => {
         head_accessory: getPart('head_accessory', character.headAccessory, 'ha_none'),
         armor_torso: SPRITE_PARTS.armor_torso.find(p => p.name.toLowerCase().includes(character.class.toLowerCase())) || getPart('armor_torso', '', 'at_common_clothes'),
         armor_legs: SPRITE_PARTS.armor_legs.find(p => p.name.toLowerCase().includes(character.class.toLowerCase())) || getPart('armor_legs', '', 'al_common_pants'),
-        weapon_right: SPRITE_PARTS.weapon_right_hand[0], 
-        weapon_left: SPRITE_PARTS.weapon_left_hand[0], 
+        weapon_right: SPRITE_PARTS.weapon_right_hand[0],
+        weapon_left: SPRITE_PARTS.weapon_left_hand[0],
         scar: SPRITE_PARTS.facial_feature.find(p => character.scars.includes(p.id)) // Ambil scar pertama
     };
 
@@ -80,7 +80,7 @@ export const renderCharacterLayout = (character: Character): string => {
     // 2. Armor Kaki
     ctx.fillStyle = parts.armor_legs.color;
     ctx.fillRect(centerX - bodyWidth / 2, bodyY + (bodyHeight / 4), bodyWidth, bodyHeight / 2);
-    
+
     // 3. Armor Torso
     ctx.fillStyle = parts.armor_torso.color;
     ctx.fillRect(centerX - bodyWidth / 2, bodyY - bodyHeight / 2, bodyWidth, bodyHeight / 2);
@@ -92,13 +92,13 @@ export const renderCharacterLayout = (character: Character): string => {
         ctx.arc(centerX, headY - 2, headRadius + 2, 0.8 * Math.PI, 0.2 * Math.PI, true); // Sedikit di atas kepala
         ctx.fill();
     }
-    
+
     // 5. Jenggot / Fitur Wajah
     if (parts.facial_hair.id !== 'ff_none') {
         ctx.fillStyle = parts.facial_hair.color;
         ctx.fillRect(centerX - headRadius / 2, headY + headRadius / 2, headRadius, headRadius / 2); // Area jenggot
     }
-    
+
     // 6. Aksesori Kepala (Tanduk, dll)
     if (parts.head_accessory.id !== 'ha_none') {
         ctx.fillStyle = parts.head_accessory.color;
@@ -118,7 +118,7 @@ export const renderCharacterLayout = (character: Character): string => {
         ctx.fillRect(centerX + bodyWidth / 2, bodyY - bodyHeight / 2, (CHAR_CANVAS_WIDTH - centerX - bodyWidth / 2), bodyHeight); // Hapus area tangan kanan
         ctx.globalCompositeOperation = 'source-over'; // Kembali normal
     }
-    
+
     return canvas.toDataURL('image/png');
 };
 
@@ -130,12 +130,12 @@ export const renderCharacterLayout = (character: Character): string => {
  * @returns string data URL base64 (image/png)
  */
 export const renderMapLayout = (
-    grid: number[][], 
+    grid: number[][],
     isBattleMap: boolean = true
 ): string => {
-    
+
     if (!grid || grid.length === 0) throw new Error("Grid tidak boleh kosong");
-    
+
     const mapHeight = grid.length;
     const mapWidth = grid[0].length;
     const tileset = isBattleMap ? BATTLE_TILESET : EXPLORATION_TILESET;
@@ -150,11 +150,11 @@ export const renderMapLayout = (
         for (let x = 0; x < mapWidth; x++) {
             const tileId = grid[y][x];
             const tile = tileset[tileId as keyof typeof tileset];
-            
+
             // Logika P2
             ctx.fillStyle = tile ? tile.color : '#FF00FF'; // Magenta untuk error
             ctx.fillRect(x * MAP_TILE_SIZE, y * MAP_TILE_SIZE, MAP_TILE_SIZE, MAP_TILE_SIZE);
-            
+
             // Blueprint Hitam/Putih/Abu dari P2 (ai-native...)
             if (tile?.isImpassable) {
                 ctx.fillStyle = 'black';
@@ -166,6 +166,6 @@ export const renderMapLayout = (
             ctx.fillRect(x * MAP_TILE_SIZE, y * MAP_TILE_SIZE, MAP_TILE_SIZE, MAP_TILE_SIZE);
         }
     }
-    
+
     return canvas.toDataURL('image/png');
 };

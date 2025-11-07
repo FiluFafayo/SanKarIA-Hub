@@ -23,16 +23,16 @@ class GeminiService {
 
     public getClient(): GoogleGenAI {
         if (this.genAI) return this.genAI;
-        
+
         if (this.apiKeys.length === 0 || !this.apiKeys[this.currentKeyIndex]) {
-             throw new Error("Tidak ada Kunci API Gemini yang valid.");
+            throw new Error("Tidak ada Kunci API Gemini yang valid.");
         }
-        
+
         const key = this.apiKeys[this.currentKeyIndex];
-        
+
         try {
-             this.genAI = new GoogleGenAI({ apiKey: key });
-             return this.genAI;
+            this.genAI = new GoogleGenAI({ apiKey: key });
+            return this.genAI;
         } catch (error) {
             console.error(`Gagal inisialisasi GoogleGenAI dengan kunci #${this.currentKeyIndex + 1}:`, error);
             // Coba rotasi jika gagal inisialisasi (misal kunci format salah)
@@ -55,20 +55,20 @@ class GeminiService {
         const maxAttempts = Math.max(1, this.apiKeys.length);
 
         while (attempts < maxAttempts) {
-             try {
+            try {
                 const client = this.getClient(); // Dapatkan klien (mungkin baru setelah rotasi)
-                const timeoutPromise = new Promise<never>((_, reject) => 
+                const timeoutPromise = new Promise<never>((_, reject) =>
                     setTimeout(() => reject(new Error(`API call timed out after 30 seconds (Attempt ${attempts + 1}/${maxAttempts})`)), 30000)
                 );
-                
+
                 // @ts-ignore
                 const result = await Promise.race([call(client), timeoutPromise]);
                 return result;
-                
+
             } catch (error: any) {
                 console.error(`[G-2] Upaya API ${attempts + 1}/${maxAttempts} gagal:`, error.message);
                 attempts++;
-                
+
                 // Jika masih ada upaya tersisa, rotasi kunci
                 if (attempts < maxAttempts && this.apiKeys.length > 1) {
                     this.rotateKey();
@@ -107,7 +107,7 @@ class GeminiService {
                 return { success: false, message: 'Kunci API tidak valid. Periksa kembali kunci Anda.' };
             }
             if (error.message && error.message.includes('fetch')) {
-                 return { success: false, message: 'Gagal menghubungi server Google. Periksa koneksi jaringan Anda.' };
+                return { success: false, message: 'Gagal menghubungi server Google. Periksa koneksi jaringan Anda.' };
             }
             return { success: false, message: 'Kunci API tidak valid atau terjadi kesalahan jaringan.' };
         }

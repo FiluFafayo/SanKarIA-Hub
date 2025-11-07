@@ -32,11 +32,10 @@ const CampaignPortal: React.FC<{
 				className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
 			/>
 			<div
-				className={`absolute inset-0 bg-gradient-to-t from-black/90 to-transparent transition-all duration-300 border-4 ${
-					isMyTurn
+				className={`absolute inset-0 bg-gradient-to-t from-black/90 to-transparent transition-all duration-300 border-4 ${isMyTurn
 						? "border-amber-400 animate-pulse"
 						: "border-transparent group-hover:border-amber-400"
-				}`}
+					}`}
 			></div>
 			<div className="absolute bottom-0 left-0 p-4 text-white w-full">
 				<h3 className="font-cinzel text-xl leading-tight">{campaign.title}</h3>
@@ -44,7 +43,7 @@ const CampaignPortal: React.FC<{
 					<p className="text-sm font-bold text-amber-300">Giliran Anda!</p>
 				)}
 				<p className="text-xs opacity-80">
-                    {/* FASE 0: eventLog tidak ada di SSoT, periksa playerIds saja */}
+					{/* FASE 0: eventLog tidak ada di SSoT, periksa playerIds saja */}
 					{campaign.playerIds.length > 0
 						? `${campaign.playerIds.length} pemain bergabung`
 						: "Belum dimulai"}
@@ -55,11 +54,10 @@ const CampaignPortal: React.FC<{
 			</div>
 			<button
 				onClick={handlePublishToggle}
-				className={`absolute bottom-3 right-3 text-xs px-3 py-1.5 rounded-full transition-all duration-200 transform ${
-					campaign.isPublished
+				className={`absolute bottom-3 right-3 text-xs px-3 py-1.5 rounded-full transition-all duration-200 transform ${campaign.isPublished
 						? "bg-red-600 hover:bg-red-500 text-white"
 						: "bg-green-600 hover:bg-green-500 text-white"
-				} opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2`}
+					} opacity-0 group-hover:opacity-100 group-hover:translate-y-0 translate-y-2`}
 			>
 				{campaign.isPublished ? "Batal Terbit" : "Terbitkan"}
 			</button>

@@ -11,14 +11,14 @@ function safeJsonParse<T>(text: string, fallback: T): T {
     if (typeof text !== 'string' || !text.trim()) {
         return fallback;
     }
-     try {
+    try {
         const firstBracket = text.indexOf('{');
         const lastBracket = text.lastIndexOf('}');
-        
+
         if (firstBracket === -1 || lastBracket === -1 || lastBracket < firstBracket) {
-           return fallback;
+            return fallback;
         }
-        
+
         const jsonString = text.substring(firstBracket, lastBracket + 1);
         return JSON.parse(jsonString);
     } catch (error) {
@@ -35,10 +35,10 @@ function safeJsonParse<T>(text: string, fallback: T): T {
  */
 export const parseStructuredApiResponse = (responseText: string): Omit<StructuredApiResponse, 'tool_calls'> => {
     const fallbackNarration = "DM terdiam sejenak, mungkin kehilangan kata-kata...";
-    
+
     // Fallback awal jika parsing gagal total
-    const fallbackResult: Omit<StructuredApiResponse, 'tool_calls'> = { 
-        reaction: undefined, 
+    const fallbackResult: Omit<StructuredApiResponse, 'tool_calls'> = {
+        reaction: undefined,
         narration: fallbackNarration,
         choices: ["Coba lagi...", "Lihat sekeliling"], // Fallback mekanik yang aman
         rollRequest: undefined,
@@ -55,7 +55,7 @@ export const parseStructuredApiResponse = (responseText: string): Omit<Structure
     const reaction = parsed.reaction || undefined;
     // Pastikan narasi tidak pernah string kosong
     const narration = parsed.narration && parsed.narration.trim() ? parsed.narration.trim() : fallbackNarration;
-    
+
     const choices = parsed.choices || undefined;
     const rollRequest = parsed.rollRequest || undefined;
 

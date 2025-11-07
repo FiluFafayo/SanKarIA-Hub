@@ -297,15 +297,15 @@ export const useDataStore = create<DataStore>((set, get) => ({
 	},
 
 	// FASE 2 REFAKTOR: Fungsi ini (copyCharacterFromTemplate) dihapus
-   	// untuk menghilangkan duplikasi logika (DRY violation).
-   	// Seluruh logika pembuatan karakter (manual DAN template)
-   	// sekarang dikonsolidasikan di dalam `components/profile/ProfileWizard.tsx`
-   	// dan alur penyimpanannya (saveNewCharacter) di atas.
-   	// Alur UI "Pilih Template" (di CharacterSelectionView/ProfileWizard)
-   	// sekarang akan me-pre-fill state Wizard dan memanggil `saveNewCharacter`.
-   	copyCharacterFromTemplate: async (templateData, userId) => {
-   		// Logika ini mati dan tidak boleh dipanggil.
-   		console.error("[DEPRECATED] copyCharacterFromTemplate dipanggil. Alur ini rusak.");
-   		throw new Error("Fungsi copyCharacterFromTemplate telah dihapus dan tidak digunakan lagi.");
-   	},
+	// untuk menghilangkan duplikasi logika (DRY violation).
+	// Seluruh logika pembuatan karakter (manual DAN template)
+	// sekarang dikonsolidasikan di dalam `components/profile/ProfileWizard.tsx`
+	// dan alur penyimpanannya (saveNewCharacter) di atas.
+	// Alur UI "Pilih Template" (di CharacterSelectionView/ProfileWizard)
+	// sekarang akan me-pre-fill state Wizard dan memanggil `saveNewCharacter`.
+	copyCharacterFromTemplate: async (templateData, userId) => {
+		// Logika ini mati dan tidak boleh dipanggil.
+		console.error("[DEPRECATED] copyCharacterFromTemplate dipanggil. Alur ini rusak.");
+		throw new Error("Fungsi copyCharacterFromTemplate telah dihapus dan tidak digunakan lagi.");
+	},
 }));

@@ -4,9 +4,9 @@
 // dalam SATU panggilan.
 
 import { Type, FunctionDeclaration } from "@google/genai";
-import { 
-    Campaign, Character, StructuredApiResponse, ToolCall, 
-    GameEvent, RollRequest 
+import {
+    Campaign, Character, StructuredApiResponse, ToolCall,
+    GameEvent, RollRequest
 } from '../../types';
 import { geminiService } from "../geminiService"; // Import klien inti
 import { parseStructuredApiResponse } from "../responseParser"; // Import parser
@@ -22,53 +22,53 @@ import { parseStructuredApiResponse } from "../responseParser"; // Import parser
 // SKEMA G-2 (BARU): Menggabungkan Narasi dan Mekanik menjadi SATU skema respons.
 // Ini adalah inti dari perbaikan 'AI DM STUCK'.
 export const COMBINED_RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    reaction: {
-      type: Type.STRING,
-      description: "Reaksi langsung yang singkat dan cepat terhadap tindakan pemain (1-2 kalimat). Opsional.",
-      nullable: true,
-    },
-    narration: {
-      type: Type.STRING,
-      description: "Narasi cerita yang lebih rinci yang mengikuti reaksi. Ini menjelaskan dunia dan apa yang terjadi selanjutnya. WAJIB ADA.",
-    },
-    // Mekanik digabung di sini
-    choices: {
-      type: Type.ARRAY,
-      description: "Daftar 3-4 tindakan yang dapat diambil pemain. HARUS KOSONG jika ada rollRequest atau spawn_monsters.",
-      nullable: true,
-      items: { type: Type.STRING }
-    },
-    rollRequest: {
-      type: Type.OBJECT,
-      description: "Permintaan bagi pemain untuk melempar dadu. HARUS NULL jika ada choices atau spawn_monsters.",
-      nullable: true,
-      properties: {
-        type: { type: Type.STRING, enum: ['skill', 'savingThrow', 'attack'] },
-        reason: { type: Type.STRING },
-        skill: { type: Type.STRING, nullable: true },
-        ability: { type: Type.STRING, enum: ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'], nullable: true },
-        dc: { type: Type.INTEGER, description: "Wajib diisi untuk tipe 'skill' dan 'savingThrow'.", nullable: true },
-        target: {
-          type: Type.OBJECT,
-          description: "Wajib untuk tipe 'attack'.",
-          nullable: true,
-          properties: {
-              id: { type: Type.STRING, description: "ID Karakter atau InstanceId Monster target." },
-              name: { type: Type.STRING, description: "Nama NPC atau makhluk target." },
-              ac: { type: Type.INTEGER, description: "Armor Class target." }
-          }
+    type: Type.OBJECT,
+    properties: {
+        reaction: {
+            type: Type.STRING,
+            description: "Reaksi langsung yang singkat dan cepat terhadap tindakan pemain (1-2 kalimat). Opsional.",
+            nullable: true,
         },
-        // Adv/Disadv ditambahkan
-        isAdvantage: { type: Type.BOOLEAN, description: "Set true jika pemain punya advantage.", nullable: true },
-        isDisadvantage: { type: Type.BOOLEAN, description: "Set true jika pemain punya disadvantage.", nullable: true },
-      },
-      // Target tidak wajib required, karena DC bisa dipakai untuk non-serangan
-      required: ['type', 'reason']
-    }
-  },
-  required: ['narration']
+        narration: {
+            type: Type.STRING,
+            description: "Narasi cerita yang lebih rinci yang mengikuti reaksi. Ini menjelaskan dunia dan apa yang terjadi selanjutnya. WAJIB ADA.",
+        },
+        // Mekanik digabung di sini
+        choices: {
+            type: Type.ARRAY,
+            description: "Daftar 3-4 tindakan yang dapat diambil pemain. HARUS KOSONG jika ada rollRequest atau spawn_monsters.",
+            nullable: true,
+            items: { type: Type.STRING }
+        },
+        rollRequest: {
+            type: Type.OBJECT,
+            description: "Permintaan bagi pemain untuk melempar dadu. HARUS NULL jika ada choices atau spawn_monsters.",
+            nullable: true,
+            properties: {
+                type: { type: Type.STRING, enum: ['skill', 'savingThrow', 'attack'] },
+                reason: { type: Type.STRING },
+                skill: { type: Type.STRING, nullable: true },
+                ability: { type: Type.STRING, enum: ['strength', 'dexterity', 'constitution', 'intelligence', 'wisdom', 'charisma'], nullable: true },
+                dc: { type: Type.INTEGER, description: "Wajib diisi untuk tipe 'skill' dan 'savingThrow'.", nullable: true },
+                target: {
+                    type: Type.OBJECT,
+                    description: "Wajib untuk tipe 'attack'.",
+                    nullable: true,
+                    properties: {
+                        id: { type: Type.STRING, description: "ID Karakter atau InstanceId Monster target." },
+                        name: { type: Type.STRING, description: "Nama NPC atau makhluk target." },
+                        ac: { type: Type.INTEGER, description: "Armor Class target." }
+                    }
+                },
+                // Adv/Disadv ditambahkan
+                isAdvantage: { type: Type.BOOLEAN, description: "Set true jika pemain punya advantage.", nullable: true },
+                isDisadvantage: { type: Type.BOOLEAN, description: "Set true jika pemain punya disadvantage.", nullable: true },
+            },
+            // Target tidak wajib required, karena DC bisa dipakai untuk non-serangan
+            required: ['type', 'reason']
+        }
+    },
+    required: ['narration']
 };
 
 
@@ -188,12 +188,12 @@ class GameService {
 
     private buildPrompt(campaign: Campaign, players: Character[], playerAction: string, actingCharacterId: string | null): string { // (Poin 6)
         const worldState = `Saat ini adalah ${formatDndTime(campaign.currentTime)} hari, dengan cuaca ${campaign.currentWeather}.`;
-        
+
         // (Poin 4) Konteks Quest/NPC diperkaya
         const questContext = `Misi Aktif: ${JSON.stringify(campaign.quests.filter(q => q.status === 'active').map(q => ({ title: q.title, id: q.id }))) || 'Tidak ada'}`;
         // (Poin 4) Kirim opini NPC (tapi BUKAN rahasia)
         const npcContext = `Konteks NPC: ${JSON.stringify(campaign.npcs.map(n => ({ id: n.id, name: n.name, disposition: n.disposition, location: n.location, opinion: n.opinion || {} }))) || 'Tidak ada NPC'}`;
-        
+
         const recentEvents = campaign.eventLog.slice(-10).map((event: GameEvent) => {
             switch (event.type) {
                 case 'player_action':
@@ -211,10 +211,10 @@ class GameService {
                     return '';
             }
         }).filter(Boolean).join('\n');
-        
+
         // (Poin 6) Temukan pelaku aksi dan inventarisnya
         const actingCharacter = players.find(p => p.id === actingCharacterId);
-        const inventoryContext = actingCharacter 
+        const inventoryContext = actingCharacter
             ? `Inventaris ${actingCharacter.name}: ${actingCharacter.inventory.map(i => `${i.item.name} (x${i.quantity})`).join(', ') || 'Kosong'}`
             : 'Inventaris pemain tidak diketahui.';
 
@@ -237,9 +237,9 @@ class GameService {
     // FUNGSI INTI (BARU - G-2): Menggantikan generateNarration + determineNextStep
     // =================================================================
     async generateTurnResponse(
-        campaign: Campaign, 
-        players: Character[], 
-        playerAction: string, 
+        campaign: Campaign,
+        players: Character[],
+        playerAction: string,
         actingCharacterId: string | null, // (Poin 6) ID pelaku aksi
         onStateChange: (state: 'thinking' | 'retrying') => void
     ): Promise<StructuredApiResponse> {
@@ -276,7 +276,7 @@ class GameService {
         5.  PILIHAN KE-3: Pilihan 1 & 2 harus logis. Pilihan 3 harus sedikit 'brilian', berbahaya, atau acak/kreatif.
         6.  ALAT SEKUNDER: Anda BISA memanggil 'add_items', 'update_quest', 'log_npc', atau 'award_xp' BERSAMAAN dengan mekanik utama.
         7.  JANGAN panggil 'spawn_monsters' BERSAMAAN dengan 'choices' or 'rollRequest'.`;
-        
+
         const prompt = this.buildPrompt(campaign, players, playerAction, actingCharacterId); // (Poin 6)
 
         const call = async (client: any) => {
@@ -294,7 +294,7 @@ class GameService {
 
             // response.text DIJAMIN JSON karena responseSchema
             const jsonText = response.text;
-            
+
             // 1. Urai Objek JSON Utama (Narasi, Choices, RollRequest)
             const mainResponse = parseStructuredApiResponse(jsonText);
 
@@ -302,7 +302,7 @@ class GameService {
             const tool_calls: ToolCall[] = [];
             if (response.functionCalls) {
                 for (const fc of response.functionCalls) {
-                     tool_calls.push({
+                    tool_calls.push({
                         functionName: fc.name as ToolCall['functionName'],
                         args: fc.args
                     });
@@ -315,11 +315,11 @@ class GameService {
                 tool_calls: tool_calls.length > 0 ? tool_calls : undefined,
             };
         };
-        
+
         try {
             return await geminiService.makeApiCall(call);
         } catch (error) {
-             console.error("[G-2] Gagal total menghasilkan TurnResponse:", error);
+            console.error("[G-2] Gagal total menghasilkan TurnResponse:", error);
             // Kembalikan respons fallback yang aman
             return {
                 reaction: "DM tampak bingung sejenak...",

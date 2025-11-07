@@ -3,9 +3,9 @@
 
 import { useCallback } from 'react';
 import { CampaignState, CampaignActions } from './useCampaign';
-import { 
-    Character, DiceRoll, RollRequest, Skill, StructuredApiResponse, 
-    ToolCall, GameEvent, NPC 
+import {
+    Character, DiceRoll, RollRequest, Skill, StructuredApiResponse,
+    ToolCall, GameEvent, NPC
 } from '../types';
 // FASE 0: Hapus dependensi UI store dari hook logika
 // import { useAppStore } from '../store/appStore'; 
@@ -57,7 +57,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                         // Panggil reducer.
                         campaignActions.awardXp(call.args.characterId, call.args.amount);
                         message = `${player.name} menerima ${call.args.amount} XP untuk: ${call.args.reason}`;
-                        
+
                         // FASE 2 FIX: Ambil state pasca-reducer dari campaign.players
                         // dan panggil controller (GameScreen) untuk menyimpan SSoT.
                         // FASE 3: Cek Level Up di sini (setelah state reducer ter-update).
@@ -92,11 +92,11 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
 
     // processMechanics disederhanakan (G-2)
     const processMechanics = useCallback(async (
-        turnId: string, 
-        response: Omit<StructuredApiResponse, 'reaction' | 'narration'>, 
+        turnId: string,
+        response: Omit<StructuredApiResponse, 'reaction' | 'narration'>,
         originalActionText: string
     ) => {
-        
+
         const hasTools = response.tool_calls && response.tool_calls.length > 0;
         if (hasTools) {
             processToolCalls(turnId, response.tool_calls!);
@@ -108,7 +108,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         if (didSpawnMonsters) {
             // Combat akan mengambil alih. 'useCombatSystem' akan menangani 'advanceTurn'.
             // Kita TIDAK memanggil endTurn() di sini.
-            return; 
+            return;
         }
 
         const hasChoices = response.choices && response.choices.length > 0;
@@ -145,15 +145,15 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             if ((event.type === 'dm_narration' || event.type === 'dm_reaction') && event.text) {
                 // Cari NPC
                 const lastNpc = campaign.npcs
-                                .filter(npc => event.text.toLowerCase().includes(npc.name.toLowerCase()))
-                                .sort((a,b) => event.text.toLowerCase().lastIndexOf(b.name.toLowerCase()) - event.text.toLowerCase().lastIndexOf(a.name.toLowerCase()))[0];
-                 if (lastNpc && !npcMentioned) {
+                    .filter(npc => event.text.toLowerCase().includes(npc.name.toLowerCase()))
+                    .sort((a, b) => event.text.toLowerCase().lastIndexOf(b.name.toLowerCase()) - event.text.toLowerCase().lastIndexOf(a.name.toLowerCase()))[0];
+                if (lastNpc && !npcMentioned) {
                     npcMentioned = lastNpc;
-                 }
-                 // Cari [OBJECT]
+                }
+                // Cari [OBJECT]
                 const objectMatch = event.text.match(/\[OBJECT:([^|]+)\|([^\]]+)\]/g);
                 if (objectMatch && !objectMentioned) {
-                    const lastObjectString = objectMatch[objectMatch.length-1];
+                    const lastObjectString = objectMatch[objectMatch.length - 1];
                     const parts = lastObjectString.match(/\[OBJECT:([^|]+)\|([^\]]+)\]/);
                     if (parts) {
                         objectMentioned = { name: parts[1], id: parts[2] };
@@ -181,15 +181,15 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
     const handlePlayerAction = useCallback(async (actionText: string, pendingSkill: Skill | null) => {
         if (campaign.turnId) return; // Mencegah aksi ganda
 
-        const turnId = campaignActions.startTurn(); 
+        const turnId = campaignActions.startTurn();
         campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: actionText }, turnId);
-        campaignActions.clearChoices(); 
+        campaignActions.clearChoices();
 
         // --- BARU: FASE 5 (Fog of War Reveal) ---
         // Diadaptasi dari P2 (pixel-vtt-stylizer ExplorationView)
         const FOG_REVEAL_RADIUS = 3.5;
         const { explorationGrid, fogOfWar, playerGridPosition } = campaign;
-        
+
         // FASE 4 FIX: Periksa apakah grid/fog valid dan memiliki dimensi
         // (DataService Fase 1 sekarang memuat ini, tetapi kampanye lama mungkin tidak memilikinya)
         if (
@@ -201,7 +201,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             const mapHeight = explorationGrid.length;
             const mapWidth = explorationGrid[0].length;
             const newFog = fogOfWar.map(row => [...row]);
-            
+
             for (let y = 0; y < mapHeight; y++) {
                 for (let x = 0; x < mapWidth; x++) {
                     const distance = Math.sqrt(Math.pow(x - playerGridPosition.x, 2) + Math.pow(y - playerGridPosition.y, 2));
@@ -221,7 +221,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             // FASE 4: Hapus console.warn debug
             // console.warn("[Fase 2] Random Encounter Terpicu!");
             const encounterActionText = "Sedang bepergian, tiba-tiba ada ancaman baru muncul dari bayang-bayang...";
-            
+
             try {
                 const response = await gameService.generateTurnResponse(
                     campaign,
@@ -230,22 +230,22 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                     null, // (Poin 6) Aksi 'random encounter' tidak punya pelaku spesifik
                     campaignActions.setThinkingState
                 );
-                
+
                 // Log narasi encounter
                 parseAndLogNarration(response.narration, turnId, campaignActions);
                 if (response.reaction) {
                     campaignActions.logEvent({ type: 'dm_reaction', text: response.reaction }, turnId);
                 }
-                
+
                 // Proses mekanik encounter (HARUSNYA spawn_monsters)
                 await processMechanics(turnId, response, encounterActionText);
-                
+
             } catch (error) {
                 // Fallback jika AI random encounter gagal
                 console.error("[Fase 2] Gagal generate Random Encounter:", error);
                 // (Lanjutkan ke aksi normal pemain di bawah)
             }
-            
+
             return; // Hentikan eksekusi aksi asli pemain
         }
 
@@ -254,7 +254,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             if (campaign.worldEventCounter >= WORLD_EVENT_THRESHOLD) {
                 // Gunakan generationService (G-2)
                 // (Poin 5) Ganti updateWorldState
-                const worldEventResult = await generationService.generateWorldEvent(campaign); 
+                const worldEventResult = await generationService.generateWorldEvent(campaign);
                 campaignActions.logEvent({ type: 'system', text: worldEventResult.event }, turnId);
                 campaignActions.advanceTime(worldEventResult.secondsToAdd); // Tambahkan waktu
                 campaignActions.setWeather(worldEventResult.nextWeather); // Atur cuaca
@@ -277,7 +277,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             }
             // (Poin 3) Gunakan parser baru untuk dialog
             parseAndLogNarration(response.narration, turnId, campaignActions);
-            
+
             // 2. Proses Mekanik (Sekarang dijamin ada atau fallback)
             await processMechanics(turnId, response, actionText);
 
@@ -288,7 +288,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 type: 'system',
                 text: "Terjadi kesalahan kritis saat menghubungi AI. DM perlu waktu sejenak."
             }, turnId);
-            
+
             // Gunakan fallback hardcoded untuk mencegah 'stuck'
             const fallbackChoices = generateContextualFallbackChoices(campaign.eventLog);
             campaignActions.setChoices(fallbackChoices);
@@ -302,11 +302,11 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
     // =================================================================
     const handleRollComplete = useCallback(async (roll: DiceRoll, request: RollRequest, turnId: string) => {
         if (!turnId) {
-             console.error("[G-2] RollComplete dipanggil tanpa turnId aktif.");
-             return;
+            console.error("[G-2] RollComplete dipanggil tanpa turnId aktif.");
+            return;
         };
 
-        campaignActions.setActiveRollRequest(null); 
+        campaignActions.setActiveRollRequest(null);
         campaignActions.logEvent({ type: 'roll_result', characterId: character.id, roll: roll, reason: request.reason }, turnId);
 
         // Input baru untuk AI adalah hasil dari lemparan
@@ -327,21 +327,21 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             if (response.reaction) { campaignActions.logEvent({ type: 'dm_reaction', text: response.reaction }, turnId); }
             // (Poin 3) Gunakan parser baru untuk dialog
             parseAndLogNarration(response.narration, turnId, campaignActions);
-            
+
             // 2. Proses Mekanik
             await processMechanics(turnId, response, actionText);
 
         } catch (error) {
-             // FALLBACK PESIMIS G-2 (Visi #5)
-             console.error("[G-2] Gagal mendapatkan TurnResponse setelah roll:", error);
-             campaignActions.logEvent({
-                 type: 'system',
-                 text: "Terjadi kesalahan kritis setelah lemparan. DM perlu waktu sejenak."
-             }, turnId);
-             
-             const fallbackChoices = generateContextualFallbackChoices(campaign.eventLog);
-             campaignActions.setChoices(fallbackChoices);
-             campaignActions.endTurn(); // Pastikan giliran berakhir
+            // FALLBACK PESIMIS G-2 (Visi #5)
+            console.error("[G-2] Gagal mendapatkan TurnResponse setelah roll:", error);
+            campaignActions.logEvent({
+                type: 'system',
+                text: "Terjadi kesalahan kritis setelah lemparan. DM perlu waktu sejenak."
+            }, turnId);
+
+            const fallbackChoices = generateContextualFallbackChoices(campaign.eventLog);
+            campaignActions.setChoices(fallbackChoices);
+            campaignActions.endTurn(); // Pastikan giliran berakhir
         }
     }, [campaign, character.id, character.name, players, campaignActions, processMechanics, generateContextualFallbackChoices]);
 

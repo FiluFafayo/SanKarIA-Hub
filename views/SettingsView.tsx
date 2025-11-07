@@ -32,21 +32,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 					<nav className="flex flex-row md:flex-col gap-2">
 						<button
 							onClick={() => setActiveStation("Audio")}
-							className={`flex-1 md:flex-none p-3 rounded text-center md:text-left font-cinzel transition-colors ${
-								activeStation === "Audio"
+							className={`flex-1 md:flex-none p-3 rounded text-center md:text-left font-cinzel transition-colors ${activeStation === "Audio"
 									? "bg-amber-700 text-white"
 									: "hover:bg-amber-800/50"
-							}`}
+								}`}
 						>
 							Audio
 						</button>
 						<button
 							onClick={() => setActiveStation("Display")}
-							className={`flex-1 md:flex-none p-3 rounded text-center md:text-left font-cinzel transition-colors ${
-								activeStation === "Display"
+							className={`flex-1 md:flex-none p-3 rounded text-center md:text-left font-cinzel transition-colors ${activeStation === "Display"
 									? "bg-amber-700 text-white"
 									: "hover:bg-amber-800/50"
-							}`}
+								}`}
 						>
 							Tampilan
 						</button>

@@ -153,34 +153,34 @@ type Action =
 	| { type: "SET_BATTLE_UNITS"; payload: Unit[] }
 	| { type: "SET_ACTIVE_BATTLE_UNIT"; payload: string | null }
 	| {
-			type: "MOVE_UNIT";
-			payload: {
-				unitId: string;
-				newPosition: { x: number; y: number };
-				cost: number;
-			};
-	  }
+		type: "MOVE_UNIT";
+		payload: {
+			unitId: string;
+			newPosition: { x: number; y: number };
+			cost: number;
+		};
+	}
 	| { type: "SET_FOG_OF_WAR"; payload: boolean[][] } // BARU: Fase 5
 	| { type: "CLEAR_BATTLE_STATE" } // BARU
 	| {
-			type: "ADVANCE_TIME";
-			payload: number; // Detik yang ditambahkan
-	  }
+		type: "ADVANCE_TIME";
+		payload: number; // Detik yang ditambahkan
+	}
 	| {
-			// (Poin 7) Aksi baru untuk XP
-			type: "AWARD_XP";
-			payload: { characterId: string; amount: number };
-	  }
+		// (Poin 7) Aksi baru untuk XP
+		type: "AWARD_XP";
+		payload: { characterId: string; amount: number };
+	}
 	| {
-			// (Poin 4) Aksi baru untuk Opini NPC
-			type: "UPDATE_NPC_OPINION";
-			payload: { npcId: string; characterId: string; change: number };
-	  }
+		// (Poin 4) Aksi baru untuk Opini NPC
+		type: "UPDATE_NPC_OPINION";
+		payload: { npcId: string; characterId: string; change: number };
+	}
 	| {
-			// (Poin 5) Aksi terpisah untuk cuaca
-			type: "SET_WEATHER";
-			payload: WorldWeather;
-	  };
+		// (Poin 5) Aksi terpisah untuk cuaca
+		type: "SET_WEATHER";
+		payload: WorldWeather;
+	};
 
 const reducer = (state: CampaignState, action: Action): CampaignState => {
 	switch (action.type) {
@@ -349,7 +349,7 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
 
 				const lastNote =
 					existingNpc.interactionHistory[
-						existingNpc.interactionHistory.length - 1
+					existingNpc.interactionHistory.length - 1
 					];
 				if (lastNote === payload.summary) {
 					return state; // Abort update if it's a duplicate
@@ -489,10 +489,10 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
 					units: state.battleState.units.map((u) =>
 						u.id === unitId
 							? {
-									...u,
-									gridPosition: newPosition,
-									remainingMovement: u.remainingMovement - cost,
-							  }
+								...u,
+								gridPosition: newPosition,
+								remainingMovement: u.remainingMovement - cost,
+							}
 							: u
 					),
 				},

@@ -13,7 +13,7 @@ export const LoginView: React.FC = () => {
                 style={{ backgroundImage: 'url(https://picsum.photos/seed/login-bg/1920/1080)' }}
             />
             <div className="relative z-10 text-center bg-bg-secondary/50 backdrop-blur-sm p-8 md:p-12 rounded-xl shadow-2xl border border-border-primary">
-                <h1 className="font-cinzel text-5xl md:text-7xl font-bold text-white text-shadow-lg tracking-widest" style={{textShadow: '0 0 15px rgba(255,223,186,0.8)'}}>
+                <h1 className="font-cinzel text-5xl md:text-7xl font-bold text-white text-shadow-lg tracking-widest" style={{ textShadow: '0 0 15px rgba(255,223,186,0.8)' }}>
                     SanKarIA Hub
                 </h1>
                 <p className="text-amber-100 text-sm md:text-lg opacity-80 font-light tracking-wider mt-2 mb-8">Gerbang menuju Petualangan Tanpa Batas</p>

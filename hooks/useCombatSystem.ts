@@ -12,12 +12,12 @@ import {
 	StructuredApiResponse,
 	ToolCall,
 	Ability,
-    // BARU: Impor tipe dari Fase 1 & 3
-    BattleState,
-    BattleStatus,
-    GridCell,
-    TerrainType,
-    Unit,
+	// BARU: Impor tipe dari Fase 1 & 3
+	BattleState,
+	BattleStatus,
+	GridCell,
+	TerrainType,
+	Unit,
 } from "../types";
 import {
 	rollInitiative,
@@ -31,7 +31,7 @@ import {
 import { gameService } from "../services/ai/gameService";
 import { generationService } from "../services/ai/generationService";
 // BARU: Impor renderer
-import { renderMapLayout } from "../services/pixelRenderer"; 
+import { renderMapLayout } from "../services/pixelRenderer";
 import { BATTLE_TILESET } from "../data/tileset";
 // (Cleanup DRY) Impor dari utils
 import { parseAndLogNarration } from "../utils";
@@ -72,43 +72,43 @@ export const useCombatSystem = ({
 						message = `Catatan NPC diperbarui: ${call.args.npcName}`;
 						break;
 					case "spawn_monsters":
-					campaignActions.spawnMonsters(call.args.monsters);
-					message = `Bahaya! Musuh baru muncul!`;
-					break;
-                // (Poin 7) Tangani tool XP
-                case 'award_xp': { // FASE 3: Tambah block scope
-                    const player = players.find(p => p.id === call.args.characterId);
-                    if (player) {
-                        campaignActions.awardXp(call.args.characterId, call.args.amount);
-                        message = `${player.name} menerima ${call.args.amount} XP untuk: ${call.args.reason}`;
-                        
-                        // FASE 3: Cek Level Up (pasca-reducer)
-                        // Mirip dengan explorationSystem, kita ambil state terbaru dari 'campaign.players'
-                        // (yang merupakan prop hook yang diperbarui oleh reducer)
-                        const updatedPlayerState = campaign.players.find(p => p.id === call.args.characterId);
-                        if (updatedPlayerState) {
-                            // Panggil onCharacterUpdate untuk SSoT (jika belum ditangani oleh logic HP)
-							onCharacterUpdate(updatedPlayerState); 
+						campaignActions.spawnMonsters(call.args.monsters);
+						message = `Bahaya! Musuh baru muncul!`;
+						break;
+					// (Poin 7) Tangani tool XP
+					case 'award_xp': { // FASE 3: Tambah block scope
+						const player = players.find(p => p.id === call.args.characterId);
+						if (player) {
+							campaignActions.awardXp(call.args.characterId, call.args.amount);
+							message = `${player.name} menerima ${call.args.amount} XP untuk: ${call.args.reason}`;
 
-							// FASE 0: Logika Level Up (UI) dipindahkan ke GameScreen.tsx
-							// const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
-							// if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
-							//     useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
-							// }
+							// FASE 3: Cek Level Up (pasca-reducer)
+							// Mirip dengan explorationSystem, kita ambil state terbaru dari 'campaign.players'
+							// (yang merupakan prop hook yang diperbarui oleh reducer)
+							const updatedPlayerState = campaign.players.find(p => p.id === call.args.characterId);
+							if (updatedPlayerState) {
+								// Panggil onCharacterUpdate untuk SSoT (jika belum ditangani oleh logic HP)
+								onCharacterUpdate(updatedPlayerState);
+
+								// FASE 0: Logika Level Up (UI) dipindahkan ke GameScreen.tsx
+								// const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
+								// if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
+								//     useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
+								// }
+							}
 						}
+						break;
 					}
-					break;
+					// (Poin 4) Tangani tool Opini
+					case 'update_npc_opinion':
+						const npc = campaign.npcs.find(n => n.id === call.args.npcId);
+						const char = players.find(p => p.id === call.args.characterId);
+						if (npc && char) {
+							campaignActions.updateNpcOpinion(call.args.npcId, call.args.characterId, call.args.change);
+							message = `Opini ${npc.name} terhadap ${char.name} berubah (${call.args.change > 0 ? '+' : ''}${call.args.change} karena: ${call.args.reason})`;
+						}
+						break;
 				}
-                // (Poin 4) Tangani tool Opini
-                case 'update_npc_opinion':
-                    const npc = campaign.npcs.find(n => n.id === call.args.npcId);
-                    const char = players.find(p => p.id === call.args.characterId);
-                    if (npc && char) {
-                        campaignActions.updateNpcOpinion(call.args.npcId, call.args.characterId, call.args.change);
-                        message = `Opini ${npc.name} terhadap ${char.name} berubah (${call.args.change > 0 ? '+' : ''}${call.args.change} karena: ${call.args.reason})`;
-                    }
-                    break;
-			}
 				if (message) {
 					campaignActions.logEvent(
 						{ type: "system", text: `--- ${message} ---` },
@@ -551,17 +551,17 @@ export const useCombatSystem = ({
 		}
 
 		// --- 1B. CEK AKHIR KOMBAT (Kemenangan) ---
-			// Cek jika kombat *seharusnya* berakhir (Monster mati)
-			if (
-				campaign.gameState === "combat" &&
-				campaign.monsters.length > 0 &&
-				campaign.monsters.every((m) => m.currentHp === 0)
-			) {
-                // BARU: Panggil aksi pembersihan
-                campaignActions.clearBattleState(); 
+		// Cek jika kombat *seharusnya* berakhir (Monster mati)
+		if (
+			campaign.gameState === "combat" &&
+			campaign.monsters.length > 0 &&
+			campaign.monsters.every((m) => m.currentHp === 0)
+		) {
+			// BARU: Panggil aksi pembersihan
+			campaignActions.clearBattleState();
 
-				const turnId = campaignActions.startTurn(); // Mulai "turn" cleanup
-				campaignActions.logEvent(
+			const turnId = campaignActions.startTurn(); // Mulai "turn" cleanup
+			campaignActions.logEvent(
 				{
 					type: "system",
 					text: "Semua musuh telah dikalahkan! Pertarungan berakhir.",
@@ -589,8 +589,8 @@ export const useCombatSystem = ({
 						{ type: "dm_reaction", text: response.reaction },
 						turnId
 					);
-                // (Poin 3) Gunakan parser baru untuk dialog
-                parseAndLogNarration(response.narration, turnId, campaignActions);
+				// (Poin 3) Gunakan parser baru untuk dialog
+				parseAndLogNarration(response.narration, turnId, campaignActions);
 
 				// 2. Proses Mekanik
 				// PANGGILAN AMAN: advanceTurn -> processMechanics (tidak ada circular)
@@ -662,8 +662,8 @@ export const useCombatSystem = ({
 								{ type: "dm_reaction", text: response.reaction },
 								turnId
 							);
-                        // (Poin 3) Gunakan parser baru untuk dialog
-                        parseAndLogNarration(response.narration, turnId, campaignActions);
+						// (Poin 3) Gunakan parser baru untuk dialog
+						parseAndLogNarration(response.narration, turnId, campaignActions);
 
 						// 2. Proses Mekanik (yang akan di-auto-roll)
 						// PANGGILAN AMAN: advanceTurn -> processMechanics
@@ -715,33 +715,33 @@ export const useCombatSystem = ({
 	}, [campaign, players, campaignActions, processMechanics]); // <-- 'processMechanics' adalah dependensi yang valid
 
 	// BARU: Helper untuk generate grid data (diadaptasi dari P2)
-    const generateProceduralGrid = (width: number, height: number): GridCell[][] => {
-        const gridMap = Array.from({ length: height }, () =>
-            Array.from({ length: width }, () => ({
-                terrain: TerrainType.Plains, // Default Terrain
-                elevation: 0,
-            }))
-        );
-        // Tambahkan rintangan acak
-        for (let i = 0; i < (width * height) * 0.1; i++) { // 10% rintangan
-            const x = Math.floor(Math.random() * width);
-            const y = Math.floor(Math.random() * height);
-            gridMap[y][x].terrain = TerrainType.Obstacle;
-        }
-        // Tambahkan medan sulit acak
-        for (let i = 0; i < (width * height) * 0.15; i++) { // 15% medan sulit
-            const x = Math.floor(Math.random() * width);
-            const y = Math.floor(Math.random() * height);
-            if (gridMap[y][x].terrain === TerrainType.Plains) {
-                gridMap[y][x].terrain = TerrainType.Difficult;
-            }
-        }
-        return gridMap;
-    };
+	const generateProceduralGrid = (width: number, height: number): GridCell[][] => {
+		const gridMap = Array.from({ length: height }, () =>
+			Array.from({ length: width }, () => ({
+				terrain: TerrainType.Plains, // Default Terrain
+				elevation: 0,
+			}))
+		);
+		// Tambahkan rintangan acak
+		for (let i = 0; i < (width * height) * 0.1; i++) { // 10% rintangan
+			const x = Math.floor(Math.random() * width);
+			const y = Math.floor(Math.random() * height);
+			gridMap[y][x].terrain = TerrainType.Obstacle;
+		}
+		// Tambahkan medan sulit acak
+		for (let i = 0; i < (width * height) * 0.15; i++) { // 15% medan sulit
+			const x = Math.floor(Math.random() * width);
+			const y = Math.floor(Math.random() * height);
+			if (gridMap[y][x].terrain === TerrainType.Plains) {
+				gridMap[y][x].terrain = TerrainType.Difficult;
+			}
+		}
+		return gridMap;
+	};
 
 	// Effect untuk memulai kombat (DI-UPGRADE)
 	useEffect(() => {
-        // Jangan jalankan jika (A) bukan kombat, (B) kombat sudah berjalan, (C) tidak ada monster
+		// Jangan jalankan jika (A) bukan kombat, (B) kombat sudah berjalan, (C) tidak ada monster
 		if (
 			campaign.gameState !== "combat" ||
 			campaign.initiativeOrder.length > 0 ||
@@ -750,88 +750,88 @@ export const useCombatSystem = ({
 			return;
 		}
 
-        // --- BARU: Alur Persiapan Peta Tempur ---
-        const setupBattlefield = async () => {
-            const turnId = campaignActions.startTurn(); // Mulai "setup turn"
-            
-            // 1. Buat Data Grid (Logika P2)
-            const gridData = generateProceduralGrid(30, 20); // 30x20
-            
-            // 2. Buat Data Unit (Logika P1 + P2)
-            const playerUnits: Unit[] = players
-                .filter(p => campaign.playerIds.includes(p.id))
-                .map((p, i) => ({
-                    id: p.id,
-                    name: p.name,
-                    isPlayer: true,
-                    hp: p.currentHp,
-                    maxHp: p.maxHp,
-                    movementSpeed: Math.floor(p.speed / 5), // Konversi ft ke sel
-                    remainingMovement: Math.floor(p.speed / 5),
-                    gridPosition: { x: 2, y: 5 + i*2 } 
-                }));
+		// --- BARU: Alur Persiapan Peta Tempur ---
+		const setupBattlefield = async () => {
+			const turnId = campaignActions.startTurn(); // Mulai "setup turn"
 
-            const monsterUnits: Unit[] = campaign.monsters.map((m, i) => ({
-                id: m.instanceId,
-                name: m.name,
-                isPlayer: false,
-                hp: m.currentHp,
-                maxHp: m.definition.maxHp,
-                movementSpeed: 6, 
-                remainingMovement: 6,
-                gridPosition: { x: 25, y: 5 + i*2 } 
-            }));
-            
-            const allUnits = [...playerUnits, ...monsterUnits];
+			// 1. Buat Data Grid (Logika P2)
+			const gridData = generateProceduralGrid(30, 20); // 30x20
 
-            // 3. Hitung Inisiatif (Logika P1)
-            const initiatives = allUnits.map(u => {
-                let dexScore = 10;
-                if(u.isPlayer) {
-                    dexScore = players.find(p => p.id === u.id)?.abilityScores.dexterity || 10;
-                } else {
-                    dexScore = campaign.monsters.find(m => m.instanceId === u.id)?.definition.abilityScores.dexterity || 10;
-                }
-                return {
-                    id: u.id,
-                    initiative: rollInitiative(dexScore)
-                };
-            });
-            initiatives.sort((a, b) => b.initiative - a.initiative);
-            const order = initiatives.map(i => i.id);
+			// 2. Buat Data Unit (Logika P1 + P2)
+			const playerUnits: Unit[] = players
+				.filter(p => campaign.playerIds.includes(p.id))
+				.map((p, i) => ({
+					id: p.id,
+					name: p.name,
+					isPlayer: true,
+					hp: p.currentHp,
+					maxHp: p.maxHp,
+					movementSpeed: Math.floor(p.speed / 5), // Konversi ft ke sel
+					remainingMovement: Math.floor(p.speed / 5),
+					gridPosition: { x: 2, y: 5 + i * 2 }
+				}));
 
-            // 4. Kirim State Awal (Grid, Unit, Urutan) ke Reducer
-            campaignActions.setBattleState({
-                status: BattleStatus.Active,
-                gridMap: gridData,
-                units: allUnits,
-                turnOrder: order,
-                activeUnitId: order[0],
-                mapImageUrl: undefined, // Belum di-render
-            });
-            
-            campaignActions.setInitiativeOrder(order); // (Sinkronkan state lama & baru)
-            campaignActions.setCurrentPlayerId(order[0]); // (Sinkronkan state lama & baru)
-            
-            campaignActions.logEvent(
-                {
-                    type: "system",
-                    text: `Pertarungan dimulai! Urutan inisiatif telah ditentukan.`,
-                },
-                turnId
-            );
+			const monsterUnits: Unit[] = campaign.monsters.map((m, i) => ({
+				id: m.instanceId,
+				name: m.name,
+				isPlayer: false,
+				hp: m.currentHp,
+				maxHp: m.definition.maxHp,
+				movementSpeed: 6,
+				remainingMovement: 6,
+				gridPosition: { x: 25, y: 5 + i * 2 }
+			}));
 
-            // 5. Render Peta (Async)
-            try {
-                // Panggil Pixel Renderer (Fase 1)
-                const layoutB64 = renderMapLayout(gridData, true);
-                
-                const mapTheme = "Reruntuhan Hutan (Forest Ruins)"; 
-                
-                // Panggil AI Service (Fase 1)
-                const imageUrl = await generationService.generateBattleMapVisual(layoutB64, mapTheme);
-                
-                // Kirim URL Gambar ke Reducer
+			const allUnits = [...playerUnits, ...monsterUnits];
+
+			// 3. Hitung Inisiatif (Logika P1)
+			const initiatives = allUnits.map(u => {
+				let dexScore = 10;
+				if (u.isPlayer) {
+					dexScore = players.find(p => p.id === u.id)?.abilityScores.dexterity || 10;
+				} else {
+					dexScore = campaign.monsters.find(m => m.instanceId === u.id)?.definition.abilityScores.dexterity || 10;
+				}
+				return {
+					id: u.id,
+					initiative: rollInitiative(dexScore)
+				};
+			});
+			initiatives.sort((a, b) => b.initiative - a.initiative);
+			const order = initiatives.map(i => i.id);
+
+			// 4. Kirim State Awal (Grid, Unit, Urutan) ke Reducer
+			campaignActions.setBattleState({
+				status: BattleStatus.Active,
+				gridMap: gridData,
+				units: allUnits,
+				turnOrder: order,
+				activeUnitId: order[0],
+				mapImageUrl: undefined, // Belum di-render
+			});
+
+			campaignActions.setInitiativeOrder(order); // (Sinkronkan state lama & baru)
+			campaignActions.setCurrentPlayerId(order[0]); // (Sinkronkan state lama & baru)
+
+			campaignActions.logEvent(
+				{
+					type: "system",
+					text: `Pertarungan dimulai! Urutan inisiatif telah ditentukan.`,
+				},
+				turnId
+			);
+
+			// 5. Render Peta (Async)
+			try {
+				// Panggil Pixel Renderer (Fase 1)
+				const layoutB64 = renderMapLayout(gridData, true);
+
+				const mapTheme = "Reruntuhan Hutan (Forest Ruins)";
+
+				// Panggil AI Service (Fase 1)
+				const imageUrl = await generationService.generateBattleMapVisual(layoutB64, mapTheme);
+
+				// Kirim URL Gambar ke Reducer
 				campaignActions.setBattleMapImage(imageUrl);
 
 			} catch (e) {
@@ -843,14 +843,14 @@ export const useCombatSystem = ({
 			// untuk mencegah race condition.
 			campaignActions.endTurn(); // Selesaikan "setup turn"
 		};
-        
-        setupBattlefield();
+
+		setupBattlefield();
 
 	}, [
 		campaign.gameState,
 		campaign.initiativeOrder.length,
 		campaign.monsters,
-        campaign.playerIds,
+		campaign.playerIds,
 		players,
 		campaignActions,
 	]);
@@ -886,7 +886,7 @@ export const useCombatSystem = ({
 			// F2.3: Tentukan Advantage/Disadvantage dasar
 			const isAdvantage = character.conditions.includes("Hidden");
 			const isDisadvantage = character.conditions.includes("Prone");
-			
+
 			const attackRollRequest: RollRequest = {
 				type: "attack",
 				characterId: character.id,

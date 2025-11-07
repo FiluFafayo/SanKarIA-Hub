@@ -5,9 +5,9 @@
 
 import { create } from 'zustand';
 // (Impor RawCharacterData)
-import { 
-   Character, MapMarker, Campaign, CampaignState, Location,
-   RawCharacterData
+import {
+    Character, MapMarker, Campaign, CampaignState, Location,
+    RawCharacterData
 } from '../types';
 // (Impor yang tidak perlu dihapus)
 // import { dataService } from '../services/dataService'; // Tidak diperlukan di sini
@@ -21,21 +21,21 @@ type View = Location | 'nexus' | 'character-selection';
 
 // --- Slice 1: Navigation ---
 interface NavigationState {
-   currentView: View;
-   campaignToJoinOrStart: Campaign | null; // Untuk alur join
-   templateToPreFill: RawCharacterData | null; // FASE 2: Untuk alur template
+    currentView: View;
+    campaignToJoinOrStart: Campaign | null; // Untuk alur join
+    templateToPreFill: RawCharacterData | null; // FASE 2: Untuk alur template
 }
 const initialNavigationState: NavigationState = {
-   currentView: 'nexus',
-   campaignToJoinOrStart: null,
-   templateToPreFill: null, // FASE 2
+    currentView: 'nexus',
+    campaignToJoinOrStart: null,
+    templateToPreFill: null, // FASE 2
 };
 interface NavigationActions {
-   navigateTo: (view: Location) => void;
-   returnToNexus: () => void;
-   startJoinFlow: (campaign: Campaign) => void;
-   startTemplateFlow: (template: RawCharacterData) => void; // FASE 2
-   clearTemplateToPreFill: () => void; // FASE 2
+    navigateTo: (view: Location) => void;
+    returnToNexus: () => void;
+    startJoinFlow: (campaign: Campaign) => void;
+    startTemplateFlow: (template: RawCharacterData) => void; // FASE 2
+    clearTemplateToPreFill: () => void; // FASE 2
 }
 
 // --- Slice 2: Game Runtime (DIHAPUS) ---
@@ -82,38 +82,38 @@ export const useAppStore = create<AppStore>((set, get) => ({
             // Aksi reset form (seperti resetCampaignCreation) sekarang
             // ditangani oleh komponen (CreateCampaignView) saat unmount
             // atau saat `onClose` dipanggil.
-            
+
             // if (view !== Location.StorytellersSpire) get().actions.resetCampaignCreation(); // DIHAPUS
             // if (view === Location.StorytellersSpire) { // DIHAPUS
             //     set(state => ({ campaignCreation: { ...state.campaignCreation, step: 1 } }));
             // }
-            
+
             set(state => ({ navigation: { ...state.navigation, currentView: view } }));
         },
         returnToNexus: () => {
-           set({ navigation: initialNavigationState });
-       },
-       startJoinFlow: (campaign) => set(state => ({
-           navigation: { ...state.navigation, currentView: 'character-selection', campaignToJoinOrStart: campaign }
-       })),
-       
-       // FASE 2: Aksi alur template
-       startTemplateFlow: (template) => set(state => ({
-           navigation: {
-               ...state.navigation,
-               currentView: Location.MirrorOfSouls, // Arahkan ke Cermin Jiwa
-               templateToPreFill: template,
-               // campaignToJoinOrStart tetap ada jika alur ini dimulai dari CharacterSelectionView
-           }
-       })),
-       clearTemplateToPreFill: () => set(state => ({
-           navigation: {
-               ...state.navigation,
-               templateToPreFill: null
-           }
-       })),
+            set({ navigation: initialNavigationState });
+        },
+        startJoinFlow: (campaign) => set(state => ({
+            navigation: { ...state.navigation, currentView: 'character-selection', campaignToJoinOrStart: campaign }
+        })),
 
-       // --- Runtime Actions (DIHAPUS) ---
+        // FASE 2: Aksi alur template
+        startTemplateFlow: (template) => set(state => ({
+            navigation: {
+                ...state.navigation,
+                currentView: Location.MirrorOfSouls, // Arahkan ke Cermin Jiwa
+                templateToPreFill: template,
+                // campaignToJoinOrStart tetap ada jika alur ini dimulai dari CharacterSelectionView
+            }
+        })),
+        clearTemplateToPreFill: () => set(state => ({
+            navigation: {
+                ...state.navigation,
+                templateToPreFill: null
+            }
+        })),
+
+        // --- Runtime Actions (DIHAPUS) ---
 
         // --- Level Up Actions (Poin 7) ---
         triggerLevelUp: (character) => {

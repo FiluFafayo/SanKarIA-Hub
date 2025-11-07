@@ -108,10 +108,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 			// (ownerId akan di-set oleh dataService.createCampaign)
 		};
 
-        // (Poin 5) Pemeriksaan string tidak lagi diperlukan
-        // if (typeof (newCampaign as any).currentTime === 'string') {
-        //     (newCampaign as any).currentTime = 43200; // Fallback ke 12:00 PM
-        // }
+		// (Poin 5) Pemeriksaan string tidak lagi diperlukan
+		// if (typeof (newCampaign as any).currentTime === 'string') {
+		//     (newCampaign as any).currentTime = 43200; // Fallback ke 12:00 PM
+		// }
 
 		try {
 			// REFAKTOR G-4: Panggil aksi dataStore untuk membuat campaign
@@ -156,41 +156,37 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 				<div className="flex justify-center mb-6 gap-4">
 					<button
 						onClick={() => setFilter("Semua")}
-						className={`px-4 py-2 font-cinzel rounded transition-colors ${
-							filter === "Semua"
+						className={`px-4 py-2 font-cinzel rounded transition-colors ${filter === "Semua"
 								? "bg-amber-600 text-white"
 								: "bg-gray-700 text-gray-300 hover:bg-gray-600"
-						}`}
+							}`}
 					>
 						Semua
 					</button>
 					<button
 						onClick={() => setFilter("Fantasi")}
-						className={`px-4 py-2 font-cinzel rounded transition-colors ${
-							filter === "Fantasi"
+						className={`px-4 py-2 font-cinzel rounded transition-colors ${filter === "Fantasi"
 								? "bg-amber-600 text-white"
 								: "bg-gray-700 text-gray-300 hover:bg-gray-600"
-						}`}
+							}`}
 					>
 						Fantasi
 					</button>
 					<button
 						onClick={() => setFilter("Sci-Fi")}
-						className={`px-4 py-2 font-cinzel rounded transition-colors ${
-							filter === "Sci-Fi"
+						className={`px-4 py-2 font-cinzel rounded transition-colors ${filter === "Sci-Fi"
 								? "bg-amber-600 text-white"
 								: "bg-gray-700 text-gray-300 hover:bg-gray-600"
-						}`}
+							}`}
 					>
 						Sci-Fi
 					</button>
 					<button
 						onClick={() => setFilter("Horor")}
-						className={`px-4 py-2 font-cinzel rounded transition-colors ${
-							filter === "Horor"
+						className={`px-4 py-2 font-cinzel rounded transition-colors ${filter === "Horor"
 								? "bg-amber-600 text-white"
 								: "bg-gray-700 text-gray-300 hover:bg-gray-600"
-						}`}
+							}`}
 					>
 						Horor
 					</button>
@@ -198,11 +194,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 
 				{/* FASE 2: Tampilkan Status Message */}
 				{statusMessage && (
-					<div className={`p-3 rounded-lg mb-4 text-center ${
-						statusMessage.startsWith("Gagal") 
-						? "bg-red-800/50 text-red-200" 
-						: "bg-green-800/50 text-green-200"
-					}`}>
+					<div className={`p-3 rounded-lg mb-4 text-center ${statusMessage.startsWith("Gagal")
+							? "bg-red-800/50 text-red-200"
+							: "bg-green-800/50 text-green-200"
+						}`}>
 						{statusMessage}
 					</div>
 				)}

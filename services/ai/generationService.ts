@@ -11,7 +11,7 @@ import { formatDndTime } from "../../utils"; // Import helper waktu
 const CAMPAIGN_FRAMEWORK_SCHEMA = {
     type: Type.OBJECT,
     properties: {
-        proposedTitle: { 
+        proposedTitle: {
             type: Type.STRING,
             description: "Judul yang menarik dan ringkas untuk kampanye."
         },
@@ -139,7 +139,7 @@ class GenerationService {
         Misi Utama: ${framework.proposedMainQuest.title} - ${framework.proposedMainQuest.description}
         NPC: ${framework.proposedMainNPCs.map((npc: any) => `${npc.name} - ${npc.description}`).join('; ')}
         `;
-        
+
         const call = async (client: any) => {
             const response = await client.models.generateContent({
                 model: 'gemini-2.5-flash',
@@ -172,7 +172,7 @@ class GenerationService {
         1.  **Transisi:** Mulai adegan *sebelum* pemain tiba di lokasi utama (misal: "Kalian telah berjalan selama tiga hari...", "Kereta kuda berderit berhenti di gerbang..."). JANGAN mulai di dalam ruangan/kota secara tiba-tiba.
         2.  **Hook:** Sertakan SATU alasan yang jelas mengapa para pemain ada di sana (misal: "Kalian semua menjawab panggilan pekerjaan dari...", "Rumor tentang artefak itu terlalu menggiurkan...", "Surat mendesak dari kerabatmu...").
         3.  Tulis adegan imersif yang mengatur panggung. Jangan ajukan pertanyaan.`;
-        
+
         const call = async (client: any) => {
             const response = await client.models.generateContent({
                 model: 'gemini-2.5-flash',
@@ -182,12 +182,12 @@ class GenerationService {
         };
         return geminiService.makeApiCall(call);
     }
-    
+
     // (Poin 5) Modifikasi untuk mengembalikan detik, bukan string
     async generateWorldEvent(campaign: Campaign): Promise<{ event: string, secondsToAdd: number, nextWeather: WorldWeather }> {
         const { currentTime, currentWeather } = campaign;
         const formattedTime = formatDndTime(currentTime); // Gunakan helper
-        
+
         const prompt = `Ini adalah TTRPG fantasi. Waktu saat ini adalah ${formattedTime} dan cuacanya ${currentWeather}.
         
         Tuliskan peristiwa dunia singkat (1 kalimat) yang terjadi di latar belakang.
@@ -226,7 +226,7 @@ class GenerationService {
         `;
 
         const call = async (client: any) => {
-             const response = await client.models.generateContent({
+            const response = await client.models.generateContent({
                 model: 'gemini-2.5-flash-image', // (P0 FIX) Ganti ke model yang sesuai
                 contents: { parts: [{ text: prompt }] },
                 config: { responseModalities: [Modality.IMAGE] },
@@ -278,7 +278,7 @@ class GenerationService {
 
     // BARU: FASE 1 - Ditransplantasi dari P2 (rpg-asset...)
     async stylizePixelLayout(base64Image: string, prompt: string, category: 'Map' | 'Sprite' | 'Item'): Promise<string> {
-        
+
         const base64Data = base64Image.split(',')[1] || base64Image;
         const imagePart = {
             inlineData: {
@@ -286,9 +286,9 @@ class GenerationService {
                 mimeType: 'image/png',
             },
         };
-        
+
         let categoryGuidance = '';
-        switch(category) {
+        switch (category) {
             case 'Map':
                 categoryGuidance = 'This is a top-down 2D RPG map layout. Walls should be impassable, floors should be walkable. Maintain the original structure.';
                 break;
@@ -299,7 +299,7 @@ class GenerationService {
                 categoryGuidance = 'This is a 2D RPG item icon. The final image should be a detailed item that fits this shape.';
                 break;
         }
-        
+
         const fullPrompt = `A high-fidelity, HD, 2D, digital painting of an RPG game asset.
         The desired style is: "${prompt}".
         Use the provided pixel art image as a *strict* structural, compositional, and color-block guide.
@@ -318,7 +318,7 @@ class GenerationService {
                     responseModalities: [Modality.IMAGE],
                 },
             });
-            
+
             for (const part of response.candidates[0].content.parts) {
                 if (part.inlineData) {
                     const base64ImageBytes: string = part.inlineData.data;

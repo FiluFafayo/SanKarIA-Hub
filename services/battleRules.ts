@@ -59,7 +59,7 @@ export const calculateMovementOptions = (
       if (x < 0 || x >= gridMap[0].length || y < 0 || y >= gridMap.length) {
         continue;
       }
-      
+
       // Check for other units (can't move through)
       if (otherUnitPositions.has(key)) {
         continue;
@@ -78,7 +78,7 @@ export const calculateMovementOptions = (
           moveCost = MOVEMENT_COST.Obstacle;
           break;
       }
-      
+
       if (moveCost === Infinity) continue;
 
       const newCost = cost + moveCost;

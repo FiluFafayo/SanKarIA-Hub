@@ -28,21 +28,21 @@ import { SelectionCard } from "../SelectionCard"; // Import SelectionCard
 // import { useDataStore } from "../../store/dataStore"; // Impor baru
 
 // FASE 2: Impor SSoT Data Statis dari Registry
-import { 
-    getAllRaces,
-    getAllClasses,
-    getAllBackgrounds,
-    getItemDef,
-    findRace,
-    findClass,
-    findBackground,
-    findSpell, // FASE 0: Impor findSpell
-    RaceData, 
-    ClassData, 
-    BackgroundData, 
+import {
+	getAllRaces,
+	getAllClasses,
+	getAllBackgrounds,
+	getItemDef,
+	findRace,
+	findClass,
+	findBackground,
+	findSpell, // FASE 0: Impor findSpell
+	RaceData,
+	ClassData,
+	BackgroundData,
 	getRawCharacterTemplates, // Impor baru
-    RawCharacterData, // Impor baru
-    EquipmentChoice // FASE 0: EquipmentChoice sekarang Tipe string, bukan Definition
+	RawCharacterData, // Impor baru
+	EquipmentChoice // FASE 0: EquipmentChoice sekarang Tipe string, bukan Definition
 } from "../../data/registry";
 // FASE 2: Impor utilitas AI
 import { renderCharacterLayout } from "../../services/pixelRenderer";
@@ -61,17 +61,17 @@ const createInvItem = (
 
 // FASE 1: Ganti nama interface
 interface ProfileWizardProps {
-   onClose: () => void;
-   characters: Character[]; // SSoT Karakter milikku
-   userId: string;
-   onSaveNewCharacter: (
-   	charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
-   	inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
-   	spellData: SpellDefinition[]
-   ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
-   // FASE 2: Tambah props pre-fill
-   templateToPreFill: RawCharacterData | null;
-   clearTemplateToPreFill: () => void;
+	onClose: () => void;
+	characters: Character[]; // SSoT Karakter milikku
+	userId: string;
+	onSaveNewCharacter: (
+		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+		spellData: SpellDefinition[]
+	) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
+	// FASE 2: Tambah props pre-fill
+	templateToPreFill: RawCharacterData | null;
+	clearTemplateToPreFill: () => void;
 }
 
 // =================================================================
@@ -205,497 +205,497 @@ const AbilityRoller: React.FC<{
 // Helper untuk mengambil equipment default (dipindah dari appStore)
 // FASE 0: Direfaktor untuk menangani 'itemNames' (string[])
 const getDefaultEquipment = (charClass: ClassData): Record<number, EquipmentChoice['options'][0]> => {
-    const initialEquipment: Record<number, EquipmentChoice['options'][0]> = {};
-    charClass.startingEquipment.choices.forEach((choice, index) => {
-        initialEquipment[index] = choice.options[0];
-    });
-    return initialEquipment;
+	const initialEquipment: Record<number, EquipmentChoice['options'][0]> = {};
+	charClass.startingEquipment.choices.forEach((choice, index) => {
+		initialEquipment[index] = choice.options[0];
+	});
+	return initialEquipment;
 };
 
 const CreateCharacterWizard: React.FC<{
 	onCancel: () => void;
 	userId: string;
-    // FASE 2: Ambil prop onSaveNewCharacter (dari dataStore)
-    onSaveNewCharacter: (
-   	charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
-   	inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
-   	spellData: SpellDefinition[]
-   ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
-   // FASE 2: Tambah props pre-fill
-   templateToPreFill: RawCharacterData | null;
-   clearTemplateToPreFill: () => void;
+	// FASE 2: Ambil prop onSaveNewCharacter (dari dataStore)
+	onSaveNewCharacter: (
+		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+		spellData: SpellDefinition[]
+	) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
+	// FASE 2: Tambah props pre-fill
+	templateToPreFill: RawCharacterData | null;
+	clearTemplateToPreFill: () => void;
 }> = ({
-   onCancel,
-   userId,
-   onSaveNewCharacter,
-   templateToPreFill,
-   clearTemplateToPreFill,
+	onCancel,
+	userId,
+	onSaveNewCharacter,
+	templateToPreFill,
+	clearTemplateToPreFill,
 }) => {
-   // FASE 2: Ambil data SSoT statis dari registry, bukan (window)
-   const RACES: RaceData[] = useMemo(() => getAllRaces() || [], []);
-	const CLASS_DEFINITIONS: Record<string, ClassData> = useMemo(
-		() => getAllClasses() || {},
-		[]
-	);
-	const BACKGROUNDS: BackgroundData[] = useMemo(
-		() => getAllBackgrounds() || [],
-		[]
-	);
+		// FASE 2: Ambil data SSoT statis dari registry, bukan (window)
+		const RACES: RaceData[] = useMemo(() => getAllRaces() || [], []);
+		const CLASS_DEFINITIONS: Record<string, ClassData> = useMemo(
+			() => getAllClasses() || {},
+			[]
+		);
+		const BACKGROUNDS: BackgroundData[] = useMemo(
+			() => getAllBackgrounds() || [],
+			[]
+		);
 
-	// FASE 2: State sekarang lokal menggunakan useState, bukan zustand
-	const [step, setStep] = useState(1); // MULAI DARI LANGKAH 1 (PILIH METODE)
-	const [statusMessage, setStatusMessage] = useState('');
-    const [name, setName] = useState('');
-    const [gender, setGender] = useState<'Pria' | 'Wanita'>('Pria');
-    const [hair, setHair] = useState('h_short_blond');
-    const [facialHair, setFacialHair] = useState('ff_none');
-    const [headAccessory, setHeadAccessory] = useState('ha_none');
-    const [bodyType, setBodyType] = useState('bt_normal');
-    const [scars, setScars] = useState<string[]>([]);
+		// FASE 2: State sekarang lokal menggunakan useState, bukan zustand
+		const [step, setStep] = useState(1); // MULAI DARI LANGKAH 1 (PILIH METODE)
+		const [statusMessage, setStatusMessage] = useState('');
+		const [name, setName] = useState('');
+		const [gender, setGender] = useState<'Pria' | 'Wanita'>('Pria');
+		const [hair, setHair] = useState('h_short_blond');
+		const [facialHair, setFacialHair] = useState('ff_none');
+		const [headAccessory, setHeadAccessory] = useState('ha_none');
+		const [bodyType, setBodyType] = useState('bt_normal');
+		const [scars, setScars] = useState<string[]>([]);
 
-    // Pastikan RACES, dll. dimuat sebelum inisialisasi state
-    const [selectedRace, setSelectedRace] = useState<RaceData>(() => findRace('Human') || RACES[0]);
-    const [selectedClass, setSelectedClass] = useState<ClassData>(() => findClass('Fighter') || Object.values(CLASS_DEFINITIONS)[0]);
-    const [abilityScores, setAbilityScores] = useState<Partial<AbilityScores>>({});
-    const [selectedBackground, setSelectedBackground] = useState<BackgroundData>(() => findBackground('Acolyte') || BACKGROUNDS[0]);
-    const [selectedSkills, setSelectedSkills] = useState<Skill[]>([]);
-    const [selectedEquipment, setSelectedEquipment] = useState<Record<number, EquipmentChoice['options'][0]>>(() => getDefaultEquipment(findClass('Fighter') || Object.values(CLASS_DEFINITIONS)[0]));
-    const [isSaving, setIsSaving] = useState(false);
+		// Pastikan RACES, dll. dimuat sebelum inisialisasi state
+		const [selectedRace, setSelectedRace] = useState<RaceData>(() => findRace('Human') || RACES[0]);
+		const [selectedClass, setSelectedClass] = useState<ClassData>(() => findClass('Fighter') || Object.values(CLASS_DEFINITIONS)[0]);
+		const [abilityScores, setAbilityScores] = useState<Partial<AbilityScores>>({});
+		const [selectedBackground, setSelectedBackground] = useState<BackgroundData>(() => findBackground('Acolyte') || BACKGROUNDS[0]);
+		const [selectedSkills, setSelectedSkills] = useState<Skill[]>([]);
+		const [selectedEquipment, setSelectedEquipment] = useState<Record<number, EquipmentChoice['options'][0]>>(() => getDefaultEquipment(findClass('Fighter') || Object.values(CLASS_DEFINITIONS)[0]));
+		const [isSaving, setIsSaving] = useState(false);
 
-   // FASE 2: Aksi Store sekarang menjadi handler lokal
-   // const { copyCharacterFromTemplate } = useDataStore(s => s.actions); // FASE 2: Dihapus
-   const [isCopying, setIsCopying] = useState(false); // State loading template (tetap dipakai untuk UI Step 1)
-   const templates = getRawCharacterTemplates();
+		// FASE 2: Aksi Store sekarang menjadi handler lokal
+		// const { copyCharacterFromTemplate } = useDataStore(s => s.actions); // FASE 2: Dihapus
+		const [isCopying, setIsCopying] = useState(false); // State loading template (tetap dipakai untuk UI Step 1)
+		const templates = getRawCharacterTemplates();
 
-   const setCharacterStep = setStep;
-    const setAbilityScore = (ability: Ability, score: number) => {
-        setAbilityScores(prev => ({ ...prev, [ability]: score }));
-    };
-    const toggleScar = (partId: string) => {
-        setScars(currentScars => {
-            const newScars = currentScars.includes(partId)
-                ? currentScars.filter(s => s !== partId)
-                : [...currentScars, partId];
-            return newScars;
-        });
-    };
-    const handleClassChange = (className: string) => {
-        const newClass = CLASS_DEFINITIONS[className] || CLASS_DEFINITIONS["Fighter"];
-        setSelectedClass(newClass);
-        setSelectedSkills([]); // Reset skill pilihan
-        setSelectedEquipment(getDefaultEquipment(newClass)); // Reset equipment pilihan
-    };
+		const setCharacterStep = setStep;
+		const setAbilityScore = (ability: Ability, score: number) => {
+			setAbilityScores(prev => ({ ...prev, [ability]: score }));
+		};
+		const toggleScar = (partId: string) => {
+			setScars(currentScars => {
+				const newScars = currentScars.includes(partId)
+					? currentScars.filter(s => s !== partId)
+					: [...currentScars, partId];
+				return newScars;
+			});
+		};
+		const handleClassChange = (className: string) => {
+			const newClass = CLASS_DEFINITIONS[className] || CLASS_DEFINITIONS["Fighter"];
+			setSelectedClass(newClass);
+			setSelectedSkills([]); // Reset skill pilihan
+			setSelectedEquipment(getDefaultEquipment(newClass)); // Reset equipment pilihan
+		};
 
-	const abilitiesToRoll = useMemo(() => ALL_ABILITIES, []);
-	const currentAbilityIndex = Object.keys(abilityScores).length;
+		const abilitiesToRoll = useMemo(() => ALL_ABILITIES, []);
+		const currentAbilityIndex = Object.keys(abilityScores).length;
 
-	// FASE 2: Event handler sekarang memanggil state lokal
-	const handleAbilityRollComplete = (ability: Ability, score: number) => {
-		setAbilityScore(ability, score);
-		if (currentAbilityIndex === abilitiesToRoll.length - 1) {
-			setCharacterStep(4); // Lanjut ke Background
-		}
-	};
+		// FASE 2: Event handler sekarang memanggil state lokal
+		const handleAbilityRollComplete = (ability: Ability, score: number) => {
+			setAbilityScore(ability, score);
+			if (currentAbilityIndex === abilitiesToRoll.length - 1) {
+				setCharacterStep(4); // Lanjut ke Background
+			}
+		};
 
-	// FASE 2: Fungsi ini (preFillData) adalah inti dari refaktor DRY.
-   // Ia mengambil template mentah dan mengisi semua state React.
-   const preFillData = (template: RawCharacterData) => {
-   	setStatusMessage(`Memuat ${template.name}...`);
-   	setName(template.name);
-   	setGender(template.gender);
-   	setHair(template.hair);
-   	setFacialHair(template.facialHair);
-   	setHeadAccessory(template.headAccessory);
-   	setBodyType(template.bodyType);
-   	setScars(template.scars);
+		// FASE 2: Fungsi ini (preFillData) adalah inti dari refaktor DRY.
+		// Ia mengambil template mentah dan mengisi semua state React.
+		const preFillData = (template: RawCharacterData) => {
+			setStatusMessage(`Memuat ${template.name}...`);
+			setName(template.name);
+			setGender(template.gender);
+			setHair(template.hair);
+			setFacialHair(template.facialHair);
+			setHeadAccessory(template.headAccessory);
+			setBodyType(template.bodyType);
+			setScars(template.scars);
 
-   	const race = findRace(template.race);
-   	if (race) setSelectedRace(race);
+			const race = findRace(template.race);
+			if (race) setSelectedRace(race);
 
-   	const classData = findClass(template.class);
-   	if (classData) {
-   		setSelectedClass(classData);
-   		// Set equipment default DARI template, bukan default kelas
-   		const templateEquipment: Record<number, EquipmentChoice['options'][0]> = {};
-   		classData.startingEquipment.choices.forEach((choice, index) => {
-   			// Cari opsi di template
-   			const chosenOptionName = template.startingEquipment[index];
-   			const foundOption = choice.options.find(opt => opt.name === chosenOptionName);
-   			templateEquipment[index] = foundOption || choice.options[0]; // Fallback ke opsi pertama jika nama tidak cocok
-   		});
-   		setSelectedEquipment(templateEquipment);
-   	} else {
-   		// Fallback jika kelas tidak ditemukan (seharusnya tidak terjadi)
-   		setSelectedEquipment(getDefaultEquipment(findClass('Fighter')!));
-   	}
-   	
-   	const background = findBackground(template.background);
-   	if (background) setSelectedBackground(background);
-   	
-   	setAbilityScores(template.abilityScores);
-   	setSelectedSkills(template.proficientSkills);
-   	
-   	setStatusMessage("");
-   };
+			const classData = findClass(template.class);
+			if (classData) {
+				setSelectedClass(classData);
+				// Set equipment default DARI template, bukan default kelas
+				const templateEquipment: Record<number, EquipmentChoice['options'][0]> = {};
+				classData.startingEquipment.choices.forEach((choice, index) => {
+					// Cari opsi di template
+					const chosenOptionName = template.startingEquipment[index];
+					const foundOption = choice.options.find(opt => opt.name === chosenOptionName);
+					templateEquipment[index] = foundOption || choice.options[0]; // Fallback ke opsi pertama jika nama tidak cocok
+				});
+				setSelectedEquipment(templateEquipment);
+			} else {
+				// Fallback jika kelas tidak ditemukan (seharusnya tidak terjadi)
+				setSelectedEquipment(getDefaultEquipment(findClass('Fighter')!));
+			}
 
-   // FASE 2: useEffect untuk menangani pre-fill dari alur CharacterSelectionView
-   useEffect(() => {
-   	if (templateToPreFill) {
-   		preFillData(templateToPreFill);
-   		setStep(7); // Langsung lompat ke Review
-   		clearTemplateToPreFill(); // Hapus state global
-   	}
-   }, [templateToPreFill, clearTemplateToPreFill]);
+			const background = findBackground(template.background);
+			if (background) setSelectedBackground(background);
 
-   // FASE 2: handleTemplateCopy (yang dipicu DARI Step 1) sekarang
-   // hanya me-pre-fill state dan lompat ke Step 7 (Review).
-   // Ini TIDAK LAGI menyimpan ke DB.
-   const handleTemplateCopy = (template: RawCharacterData) => {
-   	setIsCopying(true); // Tetap gunakan ini untuk UI loading
-   	preFillData(template);
-   	setStep(7); // Lompat ke Review
-   	setIsCopying(false); // Selesai
-   };
+			setAbilityScores(template.abilityScores);
+			setSelectedSkills(template.proficientSkills);
 
-   const handleSave = async () => {
-		if (Object.keys(abilityScores).length !== 6) {
-            // FASE 3: Ganti alert() dengan status message
-            setStatusMessage("ERROR: Selesaikan pelemparan semua dadu kemampuan.");
-            // Hapus alert
-            return;
-        }
+			setStatusMessage("");
+		};
 
-        setIsSaving(true);
-        setStatusMessage("Merakit jiwa...");
+		// FASE 2: useEffect untuk menangani pre-fill dari alur CharacterSelectionView
+		useEffect(() => {
+			if (templateToPreFill) {
+				preFillData(templateToPreFill);
+				setStep(7); // Langsung lompat ke Review
+				clearTemplateToPreFill(); // Hapus state global
+			}
+		}, [templateToPreFill, clearTemplateToPreFill]);
 
-        try {
-            const baseScores = abilityScores as AbilityScores;
-            const finalScores = { ...baseScores };
-            for (const [ability, bonus] of Object.entries(selectedRace.abilityScoreBonuses)) {
-                if (typeof bonus === 'number') finalScores[ability as Ability] += bonus;
-            }
-            const profSkills = new Set<Skill>([
-                ...selectedBackground.skillProficiencies,
-                ...(selectedRace.proficiencies?.skills || []),
-                ...selectedSkills,
-            ]);
-            const conModifier = getAbilityModifier(finalScores.constitution);
-            const dexModifier = getAbilityModifier(finalScores.dexterity);
-            const maxHp = selectedClass.hpAtLevel1(conModifier);
-            let inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[] = [];
+		// FASE 2: handleTemplateCopy (yang dipicu DARI Step 1) sekarang
+		// hanya me-pre-fill state dan lompat ke Step 7 (Review).
+		// Ini TIDAK LAGI menyimpan ke DB.
+		const handleTemplateCopy = (template: RawCharacterData) => {
+			setIsCopying(true); // Tetap gunakan ini untuk UI loading
+			preFillData(template);
+			setStep(7); // Lompat ke Review
+			setIsCopying(false); // Selesai
+		};
 
-            // FASE 0: Refaktor untuk me-resolve string 'itemName' dan 'itemNames'
-            selectedClass.startingEquipment.fixed.forEach(item => {
-                try { inventoryData.push(createInvItem(getItemDef(item.itemName), item.quantity)); } catch (e) { console.warn(e); }
-            });
-            Object.values(selectedEquipment).forEach(chosenOption => {
-                chosenOption.itemNames.forEach(itemName => {
-                    try { inventoryData.push(createInvItem(getItemDef(itemName), chosenOption.quantity || 1)); } catch (e) { console.warn(e); }
-                });
-            });
-            selectedBackground.equipment.forEach(itemName => {
-                 // FASE 2: Gunakan getItemDef dari registry
-                 try { inventoryData.push(createInvItem(getItemDef(itemName))); } catch (e) { console.warn(e); }
-            });
+		const handleSave = async () => {
+			if (Object.keys(abilityScores).length !== 6) {
+				// FASE 3: Ganti alert() dengan status message
+				setStatusMessage("ERROR: Selesaikan pelemparan semua dadu kemampuan.");
+				// Hapus alert
+				return;
+			}
 
-            let armorClass = 10 + dexModifier;
-            let equippedArmorDef: ItemDefinition | null = null;
-            const armorIndex = inventoryData.findIndex(i => i.item.type === 'armor' && i.item.armorType !== 'shield');
-            const shieldIndex = inventoryData.findIndex(i => i.item.name === 'Shield');
-            if (armorIndex > -1) { inventoryData[armorIndex].isEquipped = true; equippedArmorDef = inventoryData[armorIndex].item; }
-            if (shieldIndex > -1) { inventoryData[shieldIndex].isEquipped = true; }
-            if (equippedArmorDef) {
-                const baseAc = equippedArmorDef.baseAc || 10;
-                if (equippedArmorDef.armorType === 'light') armorClass = baseAc + dexModifier;
-                else if (equippedArmorDef.armorType === 'medium') armorClass = baseAc + Math.min(2, dexModifier);
-                else if (equippedArmorDef.armorType === 'heavy') armorClass = baseAc;
-            }
-            if (shieldIndex > -1) armorClass += 2;
+			setIsSaving(true);
+			setStatusMessage("Merakit jiwa...");
 
-            const spellSlots = selectedClass.spellcasting?.spellSlots || [];
-            
-            // FASE 0: Refaktor untuk me-resolve string 'spellName'
-         const spellData: SpellDefinition[] = [];
-         (selectedClass.spellcasting?.knownCantrips || []).forEach(spellName => {
-             const def = findSpell(spellName);
-             if (def) { // FASE FINAL FIX: Memastikan 'def' adalah truthy
-                 spellData.push(def); 
-             } else {
-                 console.warn(`[ProfileWizard] Gagal menemukan definisi spell: ${spellName}`);
-             }
-         });
-         (selectedClass.spellcasting?.knownSpells || []).forEach(spellName => {
-             const def = findSpell(spellName);
-             if (def) { // FASE FINAL FIX: Memastikan 'def' adalah truthy
-                 spellData.push(def); 
-             } else {
-                 console.warn(`[ProfileWizard] Gagal menemukan definisi spell: ${spellName}`);
-             }
-         });
+			try {
+				const baseScores = abilityScores as AbilityScores;
+				const finalScores = { ...baseScores };
+				for (const [ability, bonus] of Object.entries(selectedRace.abilityScoreBonuses)) {
+					if (typeof bonus === 'number') finalScores[ability as Ability] += bonus;
+				}
+				const profSkills = new Set<Skill>([
+					...selectedBackground.skillProficiencies,
+					...(selectedRace.proficiencies?.skills || []),
+					...selectedSkills,
+				]);
+				const conModifier = getAbilityModifier(finalScores.constitution);
+				const dexModifier = getAbilityModifier(finalScores.dexterity);
+				const maxHp = selectedClass.hpAtLevel1(conModifier);
+				let inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[] = [];
+
+				// FASE 0: Refaktor untuk me-resolve string 'itemName' dan 'itemNames'
+				selectedClass.startingEquipment.fixed.forEach(item => {
+					try { inventoryData.push(createInvItem(getItemDef(item.itemName), item.quantity)); } catch (e) { console.warn(e); }
+				});
+				Object.values(selectedEquipment).forEach(chosenOption => {
+					chosenOption.itemNames.forEach(itemName => {
+						try { inventoryData.push(createInvItem(getItemDef(itemName), chosenOption.quantity || 1)); } catch (e) { console.warn(e); }
+					});
+				});
+				selectedBackground.equipment.forEach(itemName => {
+					// FASE 2: Gunakan getItemDef dari registry
+					try { inventoryData.push(createInvItem(getItemDef(itemName))); } catch (e) { console.warn(e); }
+				});
+
+				let armorClass = 10 + dexModifier;
+				let equippedArmorDef: ItemDefinition | null = null;
+				const armorIndex = inventoryData.findIndex(i => i.item.type === 'armor' && i.item.armorType !== 'shield');
+				const shieldIndex = inventoryData.findIndex(i => i.item.name === 'Shield');
+				if (armorIndex > -1) { inventoryData[armorIndex].isEquipped = true; equippedArmorDef = inventoryData[armorIndex].item; }
+				if (shieldIndex > -1) { inventoryData[shieldIndex].isEquipped = true; }
+				if (equippedArmorDef) {
+					const baseAc = equippedArmorDef.baseAc || 10;
+					if (equippedArmorDef.armorType === 'light') armorClass = baseAc + dexModifier;
+					else if (equippedArmorDef.armorType === 'medium') armorClass = baseAc + Math.min(2, dexModifier);
+					else if (equippedArmorDef.armorType === 'heavy') armorClass = baseAc;
+				}
+				if (shieldIndex > -1) armorClass += 2;
+
+				const spellSlots = selectedClass.spellcasting?.spellSlots || [];
+
+				// FASE 0: Refaktor untuk me-resolve string 'spellName'
+				const spellData: SpellDefinition[] = [];
+				(selectedClass.spellcasting?.knownCantrips || []).forEach(spellName => {
+					const def = findSpell(spellName);
+					if (def) { // FASE FINAL FIX: Memastikan 'def' adalah truthy
+						spellData.push(def);
+					} else {
+						console.warn(`[ProfileWizard] Gagal menemukan definisi spell: ${spellName}`);
+					}
+				});
+				(selectedClass.spellcasting?.knownSpells || []).forEach(spellName => {
+					const def = findSpell(spellName);
+					if (def) { // FASE FINAL FIX: Memastikan 'def' adalah truthy
+						spellData.push(def);
+					} else {
+						console.warn(`[ProfileWizard] Gagal menemukan definisi spell: ${spellName}`);
+					}
+				});
 
 
-            const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
-                name, class: selectedClass.name, race: selectedRace.name, level: 1, xp: 0,
-                image: selectedRace.img, // INI AKAN DI-OVERWRITE
-                background: selectedBackground.name,
-                gender: gender,
-                bodyType: bodyType,
-                scars: scars,
-                hair: hair,
-                facialHair: facialHair,
-                headAccessory: headAccessory,
-                personalityTrait: '', ideal: '', bond: '', flaw: '',
-                abilityScores: finalScores, maxHp: Math.max(1, maxHp), currentHp: Math.max(1, maxHp),
-                tempHp: 0, armorClass: armorClass, speed: selectedRace.speed,
-                hitDice: { [selectedClass.hitDice]: { max: 1, spent: 0 } },
-                deathSaves: { successes: 0, failures: 0}, conditions: [],
-                racialTraits: selectedRace.traits, classFeatures: selectedClass.features,
-                proficientSkills: Array.from(profSkills),
-                proficientSavingThrows: selectedClass.proficiencies.savingThrows,
-                spellSlots: spellSlots,
-            };
+				const newCharData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
+					name, class: selectedClass.name, race: selectedRace.name, level: 1, xp: 0,
+					image: selectedRace.img, // INI AKAN DI-OVERWRITE
+					background: selectedBackground.name,
+					gender: gender,
+					bodyType: bodyType,
+					scars: scars,
+					hair: hair,
+					facialHair: facialHair,
+					headAccessory: headAccessory,
+					personalityTrait: '', ideal: '', bond: '', flaw: '',
+					abilityScores: finalScores, maxHp: Math.max(1, maxHp), currentHp: Math.max(1, maxHp),
+					tempHp: 0, armorClass: armorClass, speed: selectedRace.speed,
+					hitDice: { [selectedClass.hitDice]: { max: 1, spent: 0 } },
+					deathSaves: { successes: 0, failures: 0 }, conditions: [],
+					racialTraits: selectedRace.traits, classFeatures: selectedClass.features,
+					proficientSkills: Array.from(profSkills),
+					proficientSavingThrows: selectedClass.proficiencies.savingThrows,
+					spellSlots: spellSlots,
+				};
 
-            // --- PANGGILAN AI BARU ---
-            // 1. Render layout pixel
-            setStatusMessage("Merender layout piksel...");
-            const layout = renderCharacterLayout(newCharData as Character);
+				// --- PANGGILAN AI BARU ---
+				// 1. Render layout pixel
+				setStatusMessage("Merender layout piksel...");
+				const layout = renderCharacterLayout(newCharData as Character);
 
-            // 2. Buat prompt
-            setStatusMessage("Menghubungi AI untuk visual...");
-            const VISUAL_STYLE_PROMPT = "digital painting, fantasy art, detailed, high quality, vibrant colors, style of D&D 5e sourcebooks, character portrait, full body";
-            // FASE 2: Ambil nama part dari SPRITE_PARTS
-            const getPartName = (arr: any[], id: string) => arr.find(p => p.id === id)?.name || '';
-            const prompt = `Potret HD, ${newCharData.gender} ${newCharData.race} ${newCharData.class}, ${getPartName(SPRITE_PARTS.hair, newCharData.hair)}, ${getPartName(SPRITE_PARTS.facial_feature, newCharData.facialHair)}, ${newCharData.scars.map(id => getPartName(SPRITE_PARTS.facial_feature, id)).join(', ')}, ${VISUAL_STYLE_PROMPT}`;
+				// 2. Buat prompt
+				setStatusMessage("Menghubungi AI untuk visual...");
+				const VISUAL_STYLE_PROMPT = "digital painting, fantasy art, detailed, high quality, vibrant colors, style of D&D 5e sourcebooks, character portrait, full body";
+				// FASE 2: Ambil nama part dari SPRITE_PARTS
+				const getPartName = (arr: any[], id: string) => arr.find(p => p.id === id)?.name || '';
+				const prompt = `Potret HD, ${newCharData.gender} ${newCharData.race} ${newCharData.class}, ${getPartName(SPRITE_PARTS.hair, newCharData.hair)}, ${getPartName(SPRITE_PARTS.facial_feature, newCharData.facialHair)}, ${newCharData.scars.map(id => getPartName(SPRITE_PARTS.facial_feature, id)).join(', ')}, ${VISUAL_STYLE_PROMPT}`;
 
-            // 3. Panggil AI
-            const imageUrl = await generationService.stylizePixelLayout(layout, prompt, 'Sprite');
+				// 3. Panggil AI
+				const imageUrl = await generationService.stylizePixelLayout(layout, prompt, 'Sprite');
 
-            // 4. Update gambar di data karakter
-            newCharData.image = imageUrl;
-            // --- AKHIR PANGGILAN AI ---
+				// 4. Update gambar di data karakter
+				newCharData.image = imageUrl;
+				// --- AKHIR PANGGILAN AI ---
 
-            setStatusMessage("Menyimpan ke database...");
-         // FASE 1 FIX: Panggil handler 'onSaveNewCharacter' (dari ProfileView)
-   		// Handler ini akan menyimpan ke DB DAN menangani alur "Join Campaign".
-   		// Kita tidak perlu menangkap 'newChar' di sini karena handler
-   		// akan mengelola navigasi (menutup modal atau masuk ke game).
-   		await onSaveNewCharacter(newCharData, inventoryData, spellData);
+				setStatusMessage("Menyimpan ke database...");
+				// FASE 1 FIX: Panggil handler 'onSaveNewCharacter' (dari ProfileView)
+				// Handler ini akan menyimpan ke DB DAN menangani alur "Join Campaign".
+				// Kita tidak perlu menangkap 'newChar' di sini karena handler
+				// akan mengelola navigasi (menutup modal atau masuk ke game).
+				await onSaveNewCharacter(newCharData, inventoryData, spellData);
 
-   		// onCancel(); // DIHAPUS (sudah ditangani oleh onSaveNewCharacter)
+				// onCancel(); // DIHAPUS (sudah ditangani oleh onSaveNewCharacter)
 
-    } catch (e: any) { // FASE 3: Tambah tipe error
-            console.error("Gagal finalisasi karakter:", e);
-            // FASE 3: Ganti alert() dengan status message
-            setStatusMessage(`ERROR: Gagal menyimpan karakter. ${e.message || 'Coba lagi.'}`);
-            // Hapus alert
-        } finally {
-            setIsSaving(false);
-            // FASE 3: Jangan hapus status message jika itu adalah error
-            // setStatusMessage(""); 
-        }
-	};
+			} catch (e: any) { // FASE 3: Tambah tipe error
+				console.error("Gagal finalisasi karakter:", e);
+				// FASE 3: Ganti alert() dengan status message
+				setStatusMessage(`ERROR: Gagal menyimpan karakter. ${e.message || 'Coba lagi.'}`);
+				// Hapus alert
+			} finally {
+				setIsSaving(false);
+				// FASE 3: Jangan hapus status message jika itu adalah error
+				// setStatusMessage(""); 
+			}
+		};
 
-	const handleBack = () => {
-		if (step > 2) { // Jika di step 3 (Ability) atau lebih
-			setCharacterStep(step - 1);
-		} else if (step === 2) { // Jika di step 2 (Ras/Kelas)
-			setCharacterStep(1); // Kembali ke step 1 (Pilih Metode)
-		} else { // Jika di step 1 (Pilih Metode)
-			onCancel();
-		}
-	};
+		const handleBack = () => {
+			if (step > 2) { // Jika di step 3 (Ability) atau lebih
+				setCharacterStep(step - 1);
+			} else if (step === 2) { // Jika di step 2 (Ras/Kelas)
+				setCharacterStep(1); // Kembali ke step 1 (Pilih Metode)
+			} else { // Jika di step 1 (Pilih Metode)
+				onCancel();
+			}
+		};
 
-	// FASE 2: Helper untuk Pilihan Skill (Step 4)
-	const handleSkillToggle = (skill: Skill) => {
-        const limit = selectedClass.proficiencies.skills.choices;
-        setSelectedSkills(currentSkills => {
-            const newSkills = currentSkills.includes(skill)
-                ? currentSkills.filter(s => s !== skill)
-                : (currentSkills.length < limit ? [...currentSkills, skill] : currentSkills);
+		// FASE 2: Helper untuk Pilihan Skill (Step 4)
+		const handleSkillToggle = (skill: Skill) => {
+			const limit = selectedClass.proficiencies.skills.choices;
+			setSelectedSkills(currentSkills => {
+				const newSkills = currentSkills.includes(skill)
+					? currentSkills.filter(s => s !== skill)
+					: (currentSkills.length < limit ? [...currentSkills, skill] : currentSkills);
 
-            if (newSkills.length > limit) {
-                // FASE 4: Ganti alert()
-                console.warn(`Anda hanya bisa memilih ${limit} skill.`);
-                return currentSkills;
-            }
-            return newSkills;
-        });
-	};
+				if (newSkills.length > limit) {
+					// FASE 4: Ganti alert()
+					console.warn(`Anda hanya bisa memilih ${limit} skill.`);
+					return currentSkills;
+				}
+				return newSkills;
+			});
+		};
 
-	// REFAKTOR G-3: Helper untuk Pilihan Equipment (Step 5)
-	const handleEquipmentSelect = (choiceIndex: number, optionIndex: number) => {
-        // FASE 1 FIX: Logika ini salah, harusnya me-set state
-        setSelectedEquipment(prev => ({
-            ...prev,
-            [choiceIndex]: selectedClass.startingEquipment.choices[choiceIndex].options[optionIndex]
-        }));
-	};
+		// REFAKTOR G-3: Helper untuk Pilihan Equipment (Step 5)
+		const handleEquipmentSelect = (choiceIndex: number, optionIndex: number) => {
+			// FASE 1 FIX: Logika ini salah, harusnya me-set state
+			setSelectedEquipment(prev => ({
+				...prev,
+				[choiceIndex]: selectedClass.startingEquipment.choices[choiceIndex].options[optionIndex]
+			}));
+		};
 
-	// ================== RENDER WIZARD ==================
-	return (
-        // FASE 0: Hapus padding, biarkan parent (panel kiri) yang mengelola
-		<div className="w-full h-full flex flex-col"> 
-			<h3 className="font-cinzel text-2xl text-blue-200 mb-4 text-center pt-4">
-				Menciptakan Jiwa Baru (Langkah {step}/6)
-			</h3>
+		// ================== RENDER WIZARD ==================
+		return (
+			// FASE 0: Hapus padding, biarkan parent (panel kiri) yang mengelola
+			<div className="w-full h-full flex flex-col">
+				<h3 className="font-cinzel text-2xl text-blue-200 mb-4 text-center pt-4">
+					Menciptakan Jiwa Baru (Langkah {step}/6)
+				</h3>
 
-			{step > 1 && (
-				<button
-					onClick={handleBack}
-					className="absolute top-4 left-4 font-cinzel text-gray-300 hover:text-white z-10"
-				>
-					&larr; Kembali
-				</button>
-			)}
-
-			{/* === STEP 1: Pilih Metode === */}
-			{step === 1 && (
-				<div className="p-4 flex flex-col items-center flex-grow animate-fade-in-fast">
-					<h3 className="font-cinzel text-xl text-blue-200 mb-4">Bagaimana Anda ingin memulai?</h3>
-					<button 
-						onClick={() => setStep(2)} 
-						disabled={isCopying}
-						className="w-full max-w-sm font-cinzel text-lg bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-lg shadow-lg disabled:bg-gray-600"
+				{step > 1 && (
+					<button
+						onClick={handleBack}
+						className="absolute top-4 left-4 font-cinzel text-gray-300 hover:text-white z-10"
 					>
-						Mulai dari Awal
+						&larr; Kembali
 					</button>
+				)}
 
-					<div className="flex items-center gap-4 my-4 w-full max-w-sm">
-						<div className="flex-grow border-t border-blue-400/30"></div>
-						<span className="text-blue-200/70 text-sm">ATAU</span>
-						<div className="flex-grow border-t border-blue-400/30"></div>
-					</div>
+				{/* === STEP 1: Pilih Metode === */}
+				{step === 1 && (
+					<div className="p-4 flex flex-col items-center flex-grow animate-fade-in-fast">
+						<h3 className="font-cinzel text-xl text-blue-200 mb-4">Bagaimana Anda ingin memulai?</h3>
+						<button
+							onClick={() => setStep(2)}
+							disabled={isCopying}
+							className="w-full max-w-sm font-cinzel text-lg bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-lg shadow-lg disabled:bg-gray-600"
+						>
+							Mulai dari Awal
+						</button>
 
-					<h4 className="font-cinzel text-lg mb-2">Pilih dari Template</h4>
-					{statusMessage && <p className={`text-center text-sm mb-2 ${statusMessage.startsWith('ERROR:') ? 'text-red-400' : 'text-amber-300'}`}>{statusMessage}</p>}
-
-					<div className="grid grid-cols-3 gap-4 w-full max-w-sm">
-					{templates.map(template => (
-						<div key={template.name} className="relative">
-							<SelectionCard 
-								key={template.name}
-								title={template.name}
-								description={`${template.race} ${template.class}`}
-								imageUrl={template.image}
-								isSelected={isCopying && statusMessage.includes(template.name)}
-								onClick={() => !isCopying && handleTemplateCopy(template)}
-							/>
-							{isCopying && statusMessage.includes(template.name) && (
-								<div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded-lg animate-fade-in-fast">
-									<div className="w-8 h-8 border-2 border-t-amber-400 border-gray-600 rounded-full animate-spin"></div>
-								</div>
-							)}
+						<div className="flex items-center gap-4 my-4 w-full max-w-sm">
+							<div className="flex-grow border-t border-blue-400/30"></div>
+							<span className="text-blue-200/70 text-sm">ATAU</span>
+							<div className="flex-grow border-t border-blue-400/30"></div>
 						</div>
-					))}
+
+						<h4 className="font-cinzel text-lg mb-2">Pilih dari Template</h4>
+						{statusMessage && <p className={`text-center text-sm mb-2 ${statusMessage.startsWith('ERROR:') ? 'text-red-400' : 'text-amber-300'}`}>{statusMessage}</p>}
+
+						<div className="grid grid-cols-3 gap-4 w-full max-w-sm">
+							{templates.map(template => (
+								<div key={template.name} className="relative">
+									<SelectionCard
+										key={template.name}
+										title={template.name}
+										description={`${template.race} ${template.class}`}
+										imageUrl={template.image}
+										isSelected={isCopying && statusMessage.includes(template.name)}
+										onClick={() => !isCopying && handleTemplateCopy(template)}
+									/>
+									{isCopying && statusMessage.includes(template.name) && (
+										<div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded-lg animate-fade-in-fast">
+											<div className="w-8 h-8 border-2 border-t-amber-400 border-gray-600 rounded-full animate-spin"></div>
+										</div>
+									)}
+								</div>
+							))}
+						</div>
+						<div className="flex-grow"></div>
 					</div>
-					<div className="flex-grow"></div>
-				</div>
-			)}
+				)}
 
-			{/* === STEP 2: Ras, Kelas, Nama & Visual (Dulu Step 1) === */}
-			{step === 2 && (
-				// FASE 0: Tambah padding internal untuk step
-				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
-                    {/* Grid 2 Kolom untuk Info Dasar */}
-                    <div className="grid grid-cols-2 gap-x-4">
-                        <div>
-                            <label className="block mb-1 font-cinzel text-sm">Nama</label>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
-                            />
-                        </div>
-                        <div>
-                            <label className="block mb-1 font-cinzel text-sm">Jenis Kelamin</label>
-                            <select
-                                value={gender}
-                                onChange={(e) => setGender(e.target.value as 'Pria' | 'Wanita')}
-                                className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
-                            >
-                                <option value="Pria">Pria</option>
-                                <option value="Wanita">Wanita</option>
-                            </select>
-                        </div>
-                    </div>
+				{/* === STEP 2: Ras, Kelas, Nama & Visual (Dulu Step 1) === */}
+				{step === 2 && (
+					// FASE 0: Tambah padding internal untuk step
+					<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
+						{/* Grid 2 Kolom untuk Info Dasar */}
+						<div className="grid grid-cols-2 gap-x-4">
+							<div>
+								<label className="block mb-1 font-cinzel text-sm">Nama</label>
+								<input
+									type="text"
+									value={name}
+									onChange={(e) => setName(e.target.value)}
+									className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
+								/>
+							</div>
+							<div>
+								<label className="block mb-1 font-cinzel text-sm">Jenis Kelamin</label>
+								<select
+									value={gender}
+									onChange={(e) => setGender(e.target.value as 'Pria' | 'Wanita')}
+									className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
+								>
+									<option value="Pria">Pria</option>
+									<option value="Wanita">Wanita</option>
+								</select>
+							</div>
+						</div>
 
-					<label className="block mb-1 font-cinzel text-sm">Ras</label>
-					<div className="grid grid-cols-5 gap-2 mb-4">
-						{RACES.map((r) => (
-							<SelectionCard
-								key={r.name}
-								title={r.name}
-								imageUrl={r.img}
-								isSelected={selectedRace.name === r.name}
-								onClick={() => setSelectedRace(r)}
-							/>
-						))}
-					</div>
+						<label className="block mb-1 font-cinzel text-sm">Ras</label>
+						<div className="grid grid-cols-5 gap-2 mb-4">
+							{RACES.map((r) => (
+								<SelectionCard
+									key={r.name}
+									title={r.name}
+									imageUrl={r.img}
+									isSelected={selectedRace.name === r.name}
+									onClick={() => setSelectedRace(r)}
+								/>
+							))}
+						</div>
 
-					{/* Grid 2 Kolom untuk Info RPG */}
-                    <div className="grid grid-cols-2 gap-x-4">
-                        <div>
-                            <label className="block mb-1 font-cinzel text-sm">Kelas</label>
-                            {/* REFAKTOR G-3: Gunakan setSelectedClass */}
-                            <select
-                                value={selectedClass.name}
-                                onChange={(e) => handleClassChange(e.target.value)}
-                                className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
-                            >
-                                {Object.keys(CLASS_DEFINITIONS).map((c) => (
-                                    <option key={c} value={c}>
-                                        {c}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block mb-1 font-cinzel text-sm">Tipe Tubuh</label>
-                            <select
-                                value={bodyType}
-                                onChange={(e) => setBodyType(e.target.value)}
-                                className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
-                            >
-                                {SPRITE_PARTS.body_type.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                        </div>
-                    </div>
+						{/* Grid 2 Kolom untuk Info RPG */}
+						<div className="grid grid-cols-2 gap-x-4">
+							<div>
+								<label className="block mb-1 font-cinzel text-sm">Kelas</label>
+								{/* REFAKTOR G-3: Gunakan setSelectedClass */}
+								<select
+									value={selectedClass.name}
+									onChange={(e) => handleClassChange(e.target.value)}
+									className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
+								>
+									{Object.keys(CLASS_DEFINITIONS).map((c) => (
+										<option key={c} value={c}>
+											{c}
+										</option>
+									))}
+								</select>
+							</div>
+							<div>
+								<label className="block mb-1 font-cinzel text-sm">Tipe Tubuh</label>
+								<select
+									value={bodyType}
+									onChange={(e) => setBodyType(e.target.value)}
+									className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4"
+								>
+									{SPRITE_PARTS.body_type.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+								</select>
+							</div>
+						</div>
 
-                    {/* Grid 3 Kolom untuk Visual Kustom */}
-                    <div className="grid grid-cols-3 gap-x-4">
-                        <div>
-                            <label className="block mb-1 font-cinzel text-sm">Rambut</label>
-                            <select value={hair} onChange={e => setHair(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
-                                {SPRITE_PARTS.hair.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block mb-1 font-cinzel text-sm">Fitur Wajah</label>
-                            <select value={facialHair} onChange={e => setFacialHair(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
-                                {SPRITE_PARTS.facial_feature.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block mb-1 font-cinzel text-sm">Aksesori Kepala</label>
-                            <select value={headAccessory} onChange={e => setHeadAccessory(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
-                                {SPRITE_PARTS.head_accessory.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <label className="block mb-1 font-cinzel text-sm">Luka & Tanda</label>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                        {SPRITE_PARTS.facial_feature.filter(p => p.name.includes('Luka') || p.name.includes('Buta')).map(p => (
-                             <label key={p.id} className={`p-2 rounded-lg cursor-pointer text-xs ${scars.includes(p.id) ? "bg-blue-600" : "bg-black/30 hover:bg-black/50"}`}>
-                                <input type="checkbox" className="mr-2" checked={scars.includes(p.id)} onChange={() => toggleScar(p.id)} />
-                                {p.name}
-                            </label>
-                        ))}
-                    </div>
+						{/* Grid 3 Kolom untuk Visual Kustom */}
+						<div className="grid grid-cols-3 gap-x-4">
+							<div>
+								<label className="block mb-1 font-cinzel text-sm">Rambut</label>
+								<select value={hair} onChange={e => setHair(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
+									{SPRITE_PARTS.hair.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+								</select>
+							</div>
+							<div>
+								<label className="block mb-1 font-cinzel text-sm">Fitur Wajah</label>
+								<select value={facialHair} onChange={e => setFacialHair(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
+									{SPRITE_PARTS.facial_feature.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+								</select>
+							</div>
+							<div>
+								<label className="block mb-1 font-cinzel text-sm">Aksesori Kepala</label>
+								<select value={headAccessory} onChange={e => setHeadAccessory(e.target.value)} className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1 mb-4">
+									{SPRITE_PARTS.head_accessory.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+								</select>
+							</div>
+						</div>
 
-                    {/* FASE 1: Hapus select kelas duplikat */}
-					{/* <select
+						<label className="block mb-1 font-cinzel text-sm">Luka & Tanda</label>
+						<div className="flex flex-wrap gap-2 mb-4">
+							{SPRITE_PARTS.facial_feature.filter(p => p.name.includes('Luka') || p.name.includes('Buta')).map(p => (
+								<label key={p.id} className={`p-2 rounded-lg cursor-pointer text-xs ${scars.includes(p.id) ? "bg-blue-600" : "bg-black/30 hover:bg-black/50"}`}>
+									<input type="checkbox" className="mr-2" checked={scars.includes(p.id)} onChange={() => toggleScar(p.id)} />
+									{p.name}
+								</label>
+							))}
+						</div>
+
+						{/* FASE 1: Hapus select kelas duplikat */}
+						{/* <select
 						value={selectedClass.name}
 						onChange={(e) =>
 							setSelectedClass(
@@ -712,287 +712,286 @@ const CreateCharacterWizard: React.FC<{
 						))}
 					</select> */}
 
-					<div className="text-xs bg-black/20 p-3 rounded">
-						<p>{selectedClass.description}</p>
-						<p className="mt-2">
-							<strong>Proficiency:</strong>{" "}
-							{selectedClass.proficiencies.armor.join(", ") || "None"},{" "}
-							{selectedClass.proficiencies.weapons.join(", ")}.
-						</p>
-						<p>
-							<strong>Saving Throw:</strong>{" "}
-							{selectedClass.proficiencies.savingThrows.join(", ")}.
-						</p>
-					</div>
+						<div className="text-xs bg-black/20 p-3 rounded">
+							<p>{selectedClass.description}</p>
+							<p className="mt-2">
+								<strong>Proficiency:</strong>{" "}
+								{selectedClass.proficiencies.armor.join(", ") || "None"},{" "}
+								{selectedClass.proficiencies.weapons.join(", ")}.
+							</p>
+							<p>
+								<strong>Saving Throw:</strong>{" "}
+								{selectedClass.proficiencies.savingThrows.join(", ")}.
+							</p>
+						</div>
 
-					<div className="flex-grow"></div>
-					<div className="flex justify-between">
-						<button
-							onClick={handleBack}
-							className="font-cinzel text-gray-300 hover:text-white"
-						>
-							&larr; Kembali
-						</button>
-						<button
-							onClick={() => name.trim() && setCharacterStep(3)}
-							disabled={!name.trim()}
-							className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"
-						>
-							Lanjutkan
-						</button>
-					</div>
-				</div>
-			)}
-
-			{/* === STEP 3: Ability Scores (Dulu Step 2) === */}
-			{step === 3 && currentAbilityIndex < abilitiesToRoll.length && (
-				<AbilityRoller
-					key={abilitiesToRoll[currentAbilityIndex]}
-					ability={abilitiesToRoll[currentAbilityIndex]}
-					onRoll={handleAbilityRollComplete}
-					currentScore={
-						abilityScores[abilitiesToRoll[currentAbilityIndex]] || null
-					}
-				/>
-			)}
-
-			{/* === STEP 4: Background (Dulu Step 3) === */}
-			{step === 4 && (
-                // FASE 0: Tambah padding internal untuk step
-				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
-					<label className="block mb-1 font-cinzel text-sm">Background</label>
-					<div className="grid grid-cols-3 gap-2 mb-4 max-h-80 overflow-y-auto">
-						{BACKGROUNDS.map((b) => (
-							<SelectionCard
-								key={b.name}
-								title={b.name}
-								imageUrl={`https://picsum.photos/seed/${b.name.toLowerCase()}/200`}
-								isSelected={selectedBackground.name === b.name}
-								// REFAKTOR G-3: Gunakan setSelectedBackground
-   							onClick={() => setSelectedBackground(b)}
-   						/>
-   					))}
-   				</div>
-
-					<div className="bg-black/20 p-3 rounded text-sm space-y-2">
-						<p>{selectedBackground.description}</p>
-						<p>
-							<strong>Fitur: {selectedBackground.feature.name}</strong>
-						</p>
-						<p className="text-xs italic">
-							{selectedBackground.feature.description}
-						</p>
-						<p className="text-xs">
-							<strong>Proficiency Skill:</strong>{" "}
-							{selectedBackground.skillProficiencies.join(", ")}
-						</p>
-					</div>
-
-					<div className="flex-grow"></div>
-					<div className="flex justify-between">
-						<button
-							onClick={() => setCharacterStep(3)}
-							className="font-cinzel text-gray-300 hover:text-white"
-						>
-							&larr; Lempar Ulang
-						</button>
-						<button
-							onClick={() => setCharacterStep(5)}
-							className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded"
-						>
-							Lanjutkan
-						</button>
-					</div>
-				</div>
-			)}
-
-			{/* === STEP 5: Pilihan Skill (Dulu Step 4) === */}
-			{step === 5 && (
-                // FASE 0: Tambah padding internal untuk step
-				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
-					<h4 className="font-cinzel text-xl text-blue-200 mb-2">
-						Pilihan Skill Kelas
-					</h4>
-					<p className="text-sm mb-4">
-						Sebagai {selectedClass.name}, pilih{" "}
-						<strong>{selectedClass.proficiencies.skills.choices}</strong> skill
-						berikut:
-					</p>
-					<div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-						{selectedClass.proficiencies.skills.options.map((skill) => (
-							<label
-								key={skill}
-								className={`p-3 rounded-lg cursor-pointer ${
-									selectedSkills.includes(skill)
-										? "bg-blue-600"
-										: "bg-black/30 hover:bg-black/50"
-								}`}
+						<div className="flex-grow"></div>
+						<div className="flex justify-between">
+							<button
+								onClick={handleBack}
+								className="font-cinzel text-gray-300 hover:text-white"
 							>
-								<input
-									type="checkbox"
-									className="mr-2"
-									checked={selectedSkills.includes(skill)}
-									onChange={() => handleSkillToggle(skill)}
+								&larr; Kembali
+							</button>
+							<button
+								onClick={() => name.trim() && setCharacterStep(3)}
+								disabled={!name.trim()}
+								className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"
+							>
+								Lanjutkan
+							</button>
+						</div>
+					</div>
+				)}
+
+				{/* === STEP 3: Ability Scores (Dulu Step 2) === */}
+				{step === 3 && currentAbilityIndex < abilitiesToRoll.length && (
+					<AbilityRoller
+						key={abilitiesToRoll[currentAbilityIndex]}
+						ability={abilitiesToRoll[currentAbilityIndex]}
+						onRoll={handleAbilityRollComplete}
+						currentScore={
+							abilityScores[abilitiesToRoll[currentAbilityIndex]] || null
+						}
+					/>
+				)}
+
+				{/* === STEP 4: Background (Dulu Step 3) === */}
+				{step === 4 && (
+					// FASE 0: Tambah padding internal untuk step
+					<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
+						<label className="block mb-1 font-cinzel text-sm">Background</label>
+						<div className="grid grid-cols-3 gap-2 mb-4 max-h-80 overflow-y-auto">
+							{BACKGROUNDS.map((b) => (
+								<SelectionCard
+									key={b.name}
+									title={b.name}
+									imageUrl={`https://picsum.photos/seed/${b.name.toLowerCase()}/200`}
+									isSelected={selectedBackground.name === b.name}
+									// REFAKTOR G-3: Gunakan setSelectedBackground
+									onClick={() => setSelectedBackground(b)}
 								/>
-								{skill}
-							</label>
-						))}
-					</div>
-					<div className="flex-grow"></div>
-					<div className="flex justify-between">
-						<button
-							onClick={() => setCharacterStep(4)}
-							className="font-cinzel text-gray-300 hover:text-white"
-						>
-							&larr; Ganti Background
-						</button>
-						<button
-							onClick={() => setStep(6)}
-							disabled={
-								selectedSkills.length !==
-								selectedClass.proficiencies.skills.choices
-							}
-							className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"
-						>
-							Lanjutkan
-						</button>
-					</div>
-				</div>
-			)}
+							))}
+						</div>
 
-			{/* === STEP 6: Pilihan Equipment (Dulu Step 5) === */}
-			{step === 6 && (
-                // FASE 0: Tambah padding internal untuk step
-				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
-					<h4 className="font-cinzel text-xl text-blue-200 mb-2">
-						Pilihan Equipment
-					</h4>
-					<p className="text-sm mb-4">Pilih equipment awal Anda:</p>
-					<div className="space-y-4 max-h-72 overflow-y-auto pr-2">
-						{selectedClass.startingEquipment.choices.map(
-							(choice, choiceIndex) => (
-								<div key={choiceIndex}>
-									<label className="block mb-1 text-sm text-gray-300">
-										{choice.description}
-									</label>
-									<select
-										value={choice.options.findIndex(
-											(opt) => opt.name === selectedEquipment[choiceIndex]?.name
-										)}
-										onChange={(e) =>
-											handleEquipmentSelect(
-												choiceIndex,
-												parseInt(e.target.value, 10)
-											)
-										}
-										className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1"
-									>
-										{choice.options.map((option, optionIndex) => (
-											<option key={option.name} value={optionIndex}>
-												{option.name}
-											</option>
-										))}
-									</select>
-								</div>
-							)
-						)}
-					</div>
-					<div className="flex-grow"></div>
-					<div className="flex justify-between">
-						<button
-							onClick={() => setCharacterStep(5)}
-							className="font-cinzel text-gray-300 hover:text-white"
-						>
-							&larr; Ganti Skill
-						</button>
-						<button
-							onClick={() => setCharacterStep(7)}
-							className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded"
-						>
-							Lanjutkan
-						</button>
-					</div>
-				</div>
-			)}
+						<div className="bg-black/20 p-3 rounded text-sm space-y-2">
+							<p>{selectedBackground.description}</p>
+							<p>
+								<strong>Fitur: {selectedBackground.feature.name}</strong>
+							</p>
+							<p className="text-xs italic">
+								{selectedBackground.feature.description}
+							</p>
+							<p className="text-xs">
+								<strong>Proficiency Skill:</strong>{" "}
+								{selectedBackground.skillProficiencies.join(", ")}
+							</p>
+						</div>
 
-			{/* === STEP 7: Review & Finalisasi (Dulu Step 6) === */}
-			{step === 7 && (
-                // FASE 0: Tambah padding internal untuk step
-				<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
-					<p className="text-center text-lg text-gray-300 mb-4">
-						Inilah takdirmu. Tinjau nilaimu sebelum melangkah ke dunia.
-					</p>
-					<div className="grid grid-cols-3 gap-x-4 gap-y-4 p-4 bg-black/20 rounded-lg">
-						{ALL_ABILITIES.map((ability) => {
-							const baseScore = abilityScores[ability] || 0;
-							const raceBonus = selectedRace.abilityScoreBonuses[ability] || 0;
-							const finalScore = baseScore + raceBonus;
-							const modifier = getAbilityModifier(finalScore);
-							return (
-								<div key={ability} className="text-center">
-									<p className="font-cinzel text-lg capitalize text-blue-200">
-										{ability}
-									</p>
-									<p className="font-bold text-4xl">{finalScore}</p>
-									<p className="text-xs text-gray-400">
-										({baseScore} + {raceBonus} Ras)
-									</p>
-									<p className="font-bold text-md text-amber-300">
-										Mod: {modifier >= 0 ? "+" : ""}
-										{modifier}
-									</p>
-								</div>
-							);
-						})}
+						<div className="flex-grow"></div>
+						<div className="flex justify-between">
+							<button
+								onClick={() => setCharacterStep(3)}
+								className="font-cinzel text-gray-300 hover:text-white"
+							>
+								&larr; Lempar Ulang
+							</button>
+							<button
+								onClick={() => setCharacterStep(5)}
+								className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded"
+							>
+								Lanjutkan
+							</button>
+						</div>
 					</div>
-					<div className="flex-grow"></div>
-					<div className="flex justify-between">
-						<button
-							onClick={() => setCharacterStep(6)}
-							className="font-cinzel text-gray-300 hover:text-white"
-							disabled={isSaving}
-						>
-							&larr; Ganti Equipment
-						</button>
-						{/* Tampilkan Status Loading/Error BARU */}
-                        {(isSaving || statusMessage) && (
-                            <p className={`text-center animate-pulse ${statusMessage.startsWith('ERROR:') ? 'text-red-400' : 'text-amber-300'}`}>
-                                {isSaving ? (statusMessage || "Menyimpan...") : statusMessage}
-                            </p>
-                        )}
-						<button
-							onClick={handleSave}
-							className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"
-							disabled={isSaving}
-						>
-							{isSaving ? "Memproses..." : "Selesaikan"}
-						</button>
+				)}
+
+				{/* === STEP 5: Pilihan Skill (Dulu Step 4) === */}
+				{step === 5 && (
+					// FASE 0: Tambah padding internal untuk step
+					<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
+						<h4 className="font-cinzel text-xl text-blue-200 mb-2">
+							Pilihan Skill Kelas
+						</h4>
+						<p className="text-sm mb-4">
+							Sebagai {selectedClass.name}, pilih{" "}
+							<strong>{selectedClass.proficiencies.skills.choices}</strong> skill
+							berikut:
+						</p>
+						<div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+							{selectedClass.proficiencies.skills.options.map((skill) => (
+								<label
+									key={skill}
+									className={`p-3 rounded-lg cursor-pointer ${selectedSkills.includes(skill)
+											? "bg-blue-600"
+											: "bg-black/30 hover:bg-black/50"
+										}`}
+								>
+									<input
+										type="checkbox"
+										className="mr-2"
+										checked={selectedSkills.includes(skill)}
+										onChange={() => handleSkillToggle(skill)}
+									/>
+									{skill}
+								</label>
+							))}
+						</div>
+						<div className="flex-grow"></div>
+						<div className="flex justify-between">
+							<button
+								onClick={() => setCharacterStep(4)}
+								className="font-cinzel text-gray-300 hover:text-white"
+							>
+								&larr; Ganti Background
+							</button>
+							<button
+								onClick={() => setStep(6)}
+								disabled={
+									selectedSkills.length !==
+									selectedClass.proficiencies.skills.choices
+								}
+								className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"
+							>
+								Lanjutkan
+							</button>
+						</div>
 					</div>
-				</div>
-			)}
-		</div>
-	);
-};
+				)}
+
+				{/* === STEP 6: Pilihan Equipment (Dulu Step 5) === */}
+				{step === 6 && (
+					// FASE 0: Tambah padding internal untuk step
+					<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
+						<h4 className="font-cinzel text-xl text-blue-200 mb-2">
+							Pilihan Equipment
+						</h4>
+						<p className="text-sm mb-4">Pilih equipment awal Anda:</p>
+						<div className="space-y-4 max-h-72 overflow-y-auto pr-2">
+							{selectedClass.startingEquipment.choices.map(
+								(choice, choiceIndex) => (
+									<div key={choiceIndex}>
+										<label className="block mb-1 text-sm text-gray-300">
+											{choice.description}
+										</label>
+										<select
+											value={choice.options.findIndex(
+												(opt) => opt.name === selectedEquipment[choiceIndex]?.name
+											)}
+											onChange={(e) =>
+												handleEquipmentSelect(
+													choiceIndex,
+													parseInt(e.target.value, 10)
+												)
+											}
+											className="w-full bg-black/50 border border-blue-400 rounded px-2 py-1"
+										>
+											{choice.options.map((option, optionIndex) => (
+												<option key={option.name} value={optionIndex}>
+													{option.name}
+												</option>
+											))}
+										</select>
+									</div>
+								)
+							)}
+						</div>
+						<div className="flex-grow"></div>
+						<div className="flex justify-between">
+							<button
+								onClick={() => setCharacterStep(5)}
+								className="font-cinzel text-gray-300 hover:text-white"
+							>
+								&larr; Ganti Skill
+							</button>
+							<button
+								onClick={() => setCharacterStep(7)}
+								className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded"
+							>
+								Lanjutkan
+							</button>
+						</div>
+					</div>
+				)}
+
+				{/* === STEP 7: Review & Finalisasi (Dulu Step 6) === */}
+				{step === 7 && (
+					// FASE 0: Tambah padding internal untuk step
+					<div className="flex flex-col flex-grow animate-fade-in-fast p-4">
+						<p className="text-center text-lg text-gray-300 mb-4">
+							Inilah takdirmu. Tinjau nilaimu sebelum melangkah ke dunia.
+						</p>
+						<div className="grid grid-cols-3 gap-x-4 gap-y-4 p-4 bg-black/20 rounded-lg">
+							{ALL_ABILITIES.map((ability) => {
+								const baseScore = abilityScores[ability] || 0;
+								const raceBonus = selectedRace.abilityScoreBonuses[ability] || 0;
+								const finalScore = baseScore + raceBonus;
+								const modifier = getAbilityModifier(finalScore);
+								return (
+									<div key={ability} className="text-center">
+										<p className="font-cinzel text-lg capitalize text-blue-200">
+											{ability}
+										</p>
+										<p className="font-bold text-4xl">{finalScore}</p>
+										<p className="text-xs text-gray-400">
+											({baseScore} + {raceBonus} Ras)
+										</p>
+										<p className="font-bold text-md text-amber-300">
+											Mod: {modifier >= 0 ? "+" : ""}
+											{modifier}
+										</p>
+									</div>
+								);
+							})}
+						</div>
+						<div className="flex-grow"></div>
+						<div className="flex justify-between">
+							<button
+								onClick={() => setCharacterStep(6)}
+								className="font-cinzel text-gray-300 hover:text-white"
+								disabled={isSaving}
+							>
+								&larr; Ganti Equipment
+							</button>
+							{/* Tampilkan Status Loading/Error BARU */}
+							{(isSaving || statusMessage) && (
+								<p className={`text-center animate-pulse ${statusMessage.startsWith('ERROR:') ? 'text-red-400' : 'text-amber-300'}`}>
+									{isSaving ? (statusMessage || "Menyimpan...") : statusMessage}
+								</p>
+							)}
+							<button
+								onClick={handleSave}
+								className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"
+								disabled={isSaving}
+							>
+								{isSaving ? "Memproses..." : "Selesaikan"}
+							</button>
+						</div>
+					</div>
+				)}
+			</div>
+		);
+	};
 
 // =================================================================
 // Komponen Utama: ProfileWizard (Dulu ProfileModal)
 // =================================================================
 // FASE 1: Ganti nama komponen
 export const ProfileWizard: React.FC<ProfileWizardProps> = ({
-   onClose,
-   characters,
-   // setCharacters DIHAPUS
-   userId,
-   onSaveNewCharacter,
-   // FASE 2: Tambah props pre-fill
-   templateToPreFill,
-   clearTemplateToPreFill,
+	onClose,
+	characters,
+	// setCharacters DIHAPUS
+	userId,
+	onSaveNewCharacter,
+	// FASE 2: Tambah props pre-fill
+	templateToPreFill,
+	clearTemplateToPreFill,
 }) => {
 	// REFAKTOR G-4: myCharacters sekarang adalah prop 'characters'
 	const myCharacters = characters;
 	const [selectedChar, setSelectedChar] = useState<Character | null>(null);
 	// FASE 2: isCreating sekarang adalah state lokal
-    const [isCreating, setIsCreating] = useState(false);
+	const [isCreating, setIsCreating] = useState(false);
 
 	useEffect(() => {
 		if (!isCreating && !selectedChar && myCharacters.length > 0) {
@@ -1007,220 +1006,219 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 	// FASE 4: Hapus fungsi handleCreateCharacter (kode mati)
 
 	// FASE 2: handleClose sekarang hanya mereset state LOKAL.
-    // Prop onClose (dari ProfileView) akan menangani navigasi.
+	// Prop onClose (dari ProfileView) akan menangani navigasi.
 	const handleWizardCancel = () => {
-        // Jika tidak ada karakter, 'Batal' tidak melakukan apa-apa (tetap di mode create)
-        if (myCharacters.length > 0) {
-		    setIsCreating(false);
-        }
+		// Jika tidak ada karakter, 'Batal' tidak melakukan apa-apa (tetap di mode create)
+		if (myCharacters.length > 0) {
+			setIsCreating(false);
+		}
 	};
-    
-    // FASE 2: Handler untuk Selesai/Sukses membuat karakter
-    const handleWizardSave = async (
-        charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+
+	// FASE 2: Handler untuk Selesai/Sukses membuat karakter
+	const handleWizardSave = async (
+		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
 		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
 		spellData: SpellDefinition[]
-    ) => {
-        // FASE 1: Ganti nama prop
-        // FASE 2 FIX (dari Fase 0 Roadmap): Kirim userId
-        await onSaveNewCharacter(charData, inventoryData, spellData);
-        setIsCreating(false); // Kembali ke daftar karakter
-    };
+	) => {
+		// FASE 1: Ganti nama prop
+		// FASE 2 FIX (dari Fase 0 Roadmap): Kirim userId
+		await onSaveNewCharacter(charData, inventoryData, spellData);
+		setIsCreating(false); // Kembali ke daftar karakter
+	};
 
 	return (
-        // FASE 2: Hapus ModalWrapper. Ganti dengan div layout halaman standar.
-        // Styling modal (backdrop-blur, w-[90vw], h-[80vh]) dihapus total.
-        // FASE 2 FIX: Hapus 'min-h-[700px]' agar halaman bisa di-scroll alami di mobile.
-        // FASE 0: Tambah w-full, overflow-hidden
+		// FASE 2: Hapus ModalWrapper. Ganti dengan div layout halaman standar.
+		// Styling modal (backdrop-blur, w-[90vw], h-[80vh]) dihapus total.
+		// FASE 2 FIX: Hapus 'min-h-[700px]' agar halaman bisa di-scroll alami di mobile.
+		// FASE 0: Tambah w-full, overflow-hidden
 		<div className="bg-bg-secondary border border-blue-400/30 rounded-xl shadow-2xl text-white flex flex-col md:flex-row overflow-hidden w-full">
 			{/* Left Panel: Mirror and Character Sheet */}
-            {/* FASE 2 FIX: Hapus 'items-center' agar konten wizard tidak terpusat secara horizontal */}
-            {/* FASE 0: Ganti md:w-2/3 -> md:flex-1, tambah overflow, hapus p-4 internal */}
+			{/* FASE 2 FIX: Hapus 'items-center' agar konten wizard tidak terpusat secara horizontal */}
+			{/* FASE 0: Ganti md:w-2/3 -> md:flex-1, tambah overflow, hapus p-4 internal */}
 			<div className="w-full md:flex-1 p-4 md:p-6 flex flex-col overflow-y-auto min-w-0">
-					<h2 className="font-cinzel text-3xl mb-4">Cermin Jiwa</h2>
-                    {/* FASE 0: Hapus p-4 dari wrapper sheet */}
-					<div className="w-full h-full bg-black/30 border-2 border-blue-300/50 rounded-lg flex flex-col">
-						{isCreating ? (
-							// FASE 2: onCancel mereset state lokal, onSaveNewCharacter diganti handleWizardSave
-							<CreateCharacterWizard
-								onCancel={handleWizardCancel}
-								userId={userId}
-                                onSaveNewCharacter={handleWizardSave} // Kirim handler save
-							/>
-						) : selectedChar ? (
-							<>
-								<div className="flex shrink-0">
-									<div className="w-1/3 flex flex-col items-center pt-4">
-										<img
-											src={selectedChar.image.replace("/100", "/400")}
-											alt={selectedChar.name}
-											className="w-40 h-40 rounded-full border-4 border-blue-400 shadow-lg shadow-blue-500/50"
-										/>
-										<h3 className="font-cinzel text-2xl text-blue-200 mt-4">
-											{selectedChar.name}
-										</h3>
-										<p className="text-lg text-gray-300">
-											{selectedChar.race} {selectedChar.class} - Level{" "}
-											{selectedChar.level}
-										</p>
-										<div className="flex gap-4 mt-4 text-center">
-											<div>
-												<div className="font-bold text-xl">
-													{selectedChar.armorClass}
-												</div>
-												<div className="text-xs">AC</div>
+				<h2 className="font-cinzel text-3xl mb-4">Cermin Jiwa</h2>
+				{/* FASE 0: Hapus p-4 dari wrapper sheet */}
+				<div className="w-full h-full bg-black/30 border-2 border-blue-300/50 rounded-lg flex flex-col">
+					{isCreating ? (
+						// FASE 2: onCancel mereset state lokal, onSaveNewCharacter diganti handleWizardSave
+						<CreateCharacterWizard
+							onCancel={handleWizardCancel}
+							userId={userId}
+							onSaveNewCharacter={handleWizardSave} // Kirim handler save
+						/>
+					) : selectedChar ? (
+						<>
+							<div className="flex shrink-0">
+								<div className="w-1/3 flex flex-col items-center pt-4">
+									<img
+										src={selectedChar.image.replace("/100", "/400")}
+										alt={selectedChar.name}
+										className="w-40 h-40 rounded-full border-4 border-blue-400 shadow-lg shadow-blue-500/50"
+									/>
+									<h3 className="font-cinzel text-2xl text-blue-200 mt-4">
+										{selectedChar.name}
+									</h3>
+									<p className="text-lg text-gray-300">
+										{selectedChar.race} {selectedChar.class} - Level{" "}
+										{selectedChar.level}
+									</p>
+									<div className="flex gap-4 mt-4 text-center">
+										<div>
+											<div className="font-bold text-xl">
+												{selectedChar.armorClass}
 											</div>
-											<div>
-												<div className="font-bold text-xl">
-													{selectedChar.maxHp}
-												</div>
-												<div className="text-xs">HP</div>
-											</div>
-											<div>
-												<div className="font-bold text-xl">
-													{selectedChar.speed}
-												</div>
-												<div className="text-xs">Speed</div>
-											</div>
+											<div className="text-xs">AC</div>
 										</div>
-									</div>
-									<div className="w-2/3 pl-6">
-										<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">
-											Ability Scores
-										</h4>
-										<div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-											{ALL_ABILITIES.map((ability) => {
-												const score = selectedChar.abilityScores[ability];
-												const modifier = getAbilityModifier(score);
-												return (
-													<p key={ability}>
-														<strong className="capitalize">
-															{ability.slice(0, 3)}:
-														</strong>{" "}
-														{score} ({modifier >= 0 ? "+" : ""}
-														{modifier})
-													</p>
-												);
-											})}
+										<div>
+											<div className="font-bold text-xl">
+												{selectedChar.maxHp}
+											</div>
+											<div className="text-xs">HP</div>
 										</div>
-										<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2 mt-4">
-											Skills
-										</h4>
-										<ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs h-28 overflow-y-auto">
-											{Object.values(Skill).map((skill) => {
-												const isProficient =
-													selectedChar.proficientSkills.includes(skill);
-												return (
-													<li
-														key={skill}
-														className={
-															isProficient
-																? "text-blue-300 font-bold"
-																: "text-gray-400"
-														}
-													>
-														{skill}
-													</li>
-												);
-											})}
-										</ul>
+										<div>
+											<div className="font-bold text-xl">
+												{selectedChar.speed}
+											</div>
+											<div className="text-xs">Speed</div>
+										</div>
 									</div>
 								</div>
-								<div className="flex-grow mt-4 overflow-y-auto pr-2 grid grid-cols-2 gap-4">
-									<div>
-										<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">
-											Spells
-										</h4>
-										{selectedChar.knownSpells.length > 0 ? (
-											<>
-												{selectedChar.spellSlots.map((slot) => (
-													<p key={slot.level} className="text-sm">
-														Lvl {slot.level} Slots: {slot.max - slot.spent}/
-														{slot.max}
-													</p>
-												))}
-												<ul className="text-xs list-disc list-inside mt-2">
-													{selectedChar.knownSpells.map((spell) => (
-														<li key={spell.name}>
-															{spell.name} (Lvl {spell.level})
-														</li>
-													))}
-												</ul>
-											</>
-										) : (
-											<p className="text-xs text-gray-400">
-												Tidak memiliki kemampuan sihir.
-											</p>
-										)}
+								<div className="w-2/3 pl-6">
+									<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">
+										Ability Scores
+									</h4>
+									<div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+										{ALL_ABILITIES.map((ability) => {
+											const score = selectedChar.abilityScores[ability];
+											const modifier = getAbilityModifier(score);
+											return (
+												<p key={ability}>
+													<strong className="capitalize">
+														{ability.slice(0, 3)}:
+													</strong>{" "}
+													{score} ({modifier >= 0 ? "+" : ""}
+													{modifier})
+												</p>
+											);
+										})}
 									</div>
-									<div>
-										<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">
-											Inventory
-										</h4>
-										{selectedChar.inventory.length > 0 ? (
-											<ul className="text-xs">
-												{selectedChar.inventory.map((item) => (
-													<li key={item.instanceId}>
-														{item.item.name} (x{item.quantity}){" "}
-														{item.isEquipped ? "[E]" : ""}
+									<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2 mt-4">
+										Skills
+									</h4>
+									<ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs h-28 overflow-y-auto">
+										{Object.values(Skill).map((skill) => {
+											const isProficient =
+												selectedChar.proficientSkills.includes(skill);
+											return (
+												<li
+													key={skill}
+													className={
+														isProficient
+															? "text-blue-300 font-bold"
+															: "text-gray-400"
+													}
+												>
+													{skill}
+												</li>
+											);
+										})}
+									</ul>
+								</div>
+							</div>
+							<div className="flex-grow mt-4 overflow-y-auto pr-2 grid grid-cols-2 gap-4">
+								<div>
+									<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">
+										Spells
+									</h4>
+									{selectedChar.knownSpells.length > 0 ? (
+										<>
+											{selectedChar.spellSlots.map((slot) => (
+												<p key={slot.level} className="text-sm">
+													Lvl {slot.level} Slots: {slot.max - slot.spent}/
+													{slot.max}
+												</p>
+											))}
+											<ul className="text-xs list-disc list-inside mt-2">
+												{selectedChar.knownSpells.map((spell) => (
+													<li key={spell.name}>
+														{spell.name} (Lvl {spell.level})
 													</li>
 												))}
 											</ul>
-										) : (
-											<p className="text-xs text-gray-400">
-												Inventaris kosong.
-											</p>
-										)}
-									</div>
+										</>
+									) : (
+										<p className="text-xs text-gray-400">
+											Tidak memiliki kemampuan sihir.
+										</p>
+									)}
 								</div>
-							</>
-						) : (
-							<div className="w-full h-full flex flex-col justify-center items-center">
-								<p className="text-gray-400">Paksa ke mode 'create'...</p>
+								<div>
+									<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">
+										Inventory
+									</h4>
+									{selectedChar.inventory.length > 0 ? (
+										<ul className="text-xs">
+											{selectedChar.inventory.map((item) => (
+												<li key={item.instanceId}>
+													{item.item.name} (x{item.quantity}){" "}
+													{item.isEquipped ? "[E]" : ""}
+												</li>
+											))}
+										</ul>
+									) : (
+										<p className="text-xs text-gray-400">
+											Inventaris kosong.
+										</p>
+									)}
+								</div>
 							</div>
-						)}
-					</div>
-				</div>
-				{/* Right Panel: Soul Rack */}
-                {/* FASE 0: Ganti md:w-1/3 -> md:w-72, tambah overflow */}
-				<div className="w-full md:w-72 flex-shrink-0 bg-black/20 border-t md:border-t-0 md:border-l border-blue-400/30 p-4 md:p-6 flex flex-col overflow-y-auto">
-					<h3 className="font-cinzel text-xl text-center mb-4">Rak Jiwa</h3>
-					<div className="flex flex-row md:flex-col flex-wrap justify-center gap-4 mb-6">
-						{myCharacters.map((char) => (
-							// FASE 2: onClick sekarang mereset state lokal
-							<div
-								key={char.id}
-								onClick={() => {
-									setSelectedChar(char);
-									setIsCreating(false);
-								}}
-								className={`flex flex-col items-center cursor-pointer transition-all duration-300 transform ${
-									selectedChar?.id === char.id && !isCreating
-										? "scale-110"
-										: "opacity-60 hover:opacity-100 hover:scale-105"
-								}`}
-							>
-								<img
-									src={char.image}
-									alt={char.name}
-									className="w-16 h-16 rounded-full border-2 border-blue-400/50"
-								/>
-								<p className="text-xs text-center mt-1 w-20 truncate">
-									{char.name}
-								</p>
-							</div>
-						))}
-					</div>
-					{/* FASE 2: onClick sekarang memicu state lokal */}
-					<button
-						onClick={() => setIsCreating(true)}
-                        disabled={isCreating}
-						className="mt-auto w-full font-cinzel bg-blue-800/50 hover:bg-blue-700/50 py-2 rounded border border-blue-500/50
-                                   disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-					>
-						+ Ciptakan Baru
-					</button>
+						</>
+					) : (
+						<div className="w-full h-full flex flex-col justify-center items-center">
+							<p className="text-gray-400">Paksa ke mode 'create'...</p>
+						</div>
+					)}
 				</div>
 			</div>
+			{/* Right Panel: Soul Rack */}
+			{/* FASE 0: Ganti md:w-1/3 -> md:w-72, tambah overflow */}
+			<div className="w-full md:w-72 flex-shrink-0 bg-black/20 border-t md:border-t-0 md:border-l border-blue-400/30 p-4 md:p-6 flex flex-col overflow-y-auto">
+				<h3 className="font-cinzel text-xl text-center mb-4">Rak Jiwa</h3>
+				<div className="flex flex-row md:flex-col flex-wrap justify-center gap-4 mb-6">
+					{myCharacters.map((char) => (
+						// FASE 2: onClick sekarang mereset state lokal
+						<div
+							key={char.id}
+							onClick={() => {
+								setSelectedChar(char);
+								setIsCreating(false);
+							}}
+							className={`flex flex-col items-center cursor-pointer transition-all duration-300 transform ${selectedChar?.id === char.id && !isCreating
+									? "scale-110"
+									: "opacity-60 hover:opacity-100 hover:scale-105"
+								}`}
+						>
+							<img
+								src={char.image}
+								alt={char.name}
+								className="w-16 h-16 rounded-full border-2 border-blue-400/50"
+							/>
+							<p className="text-xs text-center mt-1 w-20 truncate">
+								{char.name}
+							</p>
+						</div>
+					))}
+				</div>
+				{/* FASE 2: onClick sekarang memicu state lokal */}
+				<button
+					onClick={() => setIsCreating(true)}
+					disabled={isCreating}
+					className="mt-auto w-full font-cinzel bg-blue-800/50 hover:bg-blue-700/50 py-2 rounded border border-blue-500/50
+                                   disabled:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+				>
+					+ Ciptakan Baru
+				</button>
+			</div>
+		</div>
 	);
 };
