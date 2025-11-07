@@ -668,24 +668,32 @@ class DataService {
         const newCharacterId = newDbCharacter.id;
 
         const inventoryToInsert: Omit<DbCharacterInventory, 'id'>[] = inventoryData.map(inv => {
-            // BUGFIX: Kita sudah punya ItemDefinition (inv.item). Gunakan ID-nya langsung.
-            // Jangan lakukan lookup berdasarkan nama (inv.item.name).
-            if (!inv.item || !inv.item.id) throw new Error(`Invalid ItemDefinition provided for: ${inv.item.name}`);
+            // FIX: Lakukan lookup item ID dari cache 'allItems' menggunakan nama item
+            const definition = allItems.find(item => item.name.toLowerCase() === inv.item.name.toLowerCase());
+
+            if (!definition || !definition.id) {
+                throw new Error(`[saveNewCharacter] Gagal menemukan ID database yang valid untuk item: ${inv.item.name}`);
+            }
+
             return {
                 character_id: newCharacterId,
-                item_id: inv.item.id, // Gunakan ID yang sudah di-resolve
+                item_id: definition.id, // <-- Gunakan ID yang sudah di-lookup
                 quantity: inv.quantity,
                 is_equipped: inv.isEquipped,
             };
         });
 
         const spellsToInsert: Omit<DbCharacterSpell, 'id'>[] = spellData.map(sp => {
-            // BUGFIX: Kita sudah punya SpellDefinition (sp). Gunakan ID-nya langsung.
-            // Jangan lakukan lookup berdasarkan nama (sp.name).
-            if (!sp || !sp.id) throw new Error(`Invalid SpellDefinition provided for: ${sp.name}`);
+            // FIX: Lakukan lookup spell ID dari cache 'allSpells' menggunakan nama spell
+            const definition = allSpells.find(spell => spell.name.toLowerCase() === sp.name.toLowerCase());
+
+            if (!definition || !definition.id) {
+                throw new Error(`[saveNewCharacter] Gagal menemukan ID database yang valid untuk spell: ${sp.name}`);
+            }
+
             return {
                 character_id: newCharacterId,
-                spell_id: sp.id, // Gunakan ID yang sudah di-resolve
+                spell_id: definition.id, // <-- Gunakan ID yang sudah di-lookup
             };
         });
 
