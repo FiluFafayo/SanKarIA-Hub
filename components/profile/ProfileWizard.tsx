@@ -319,7 +319,13 @@ const CreateCharacterWizard: React.FC<{
 				const templateEquipment: Record<number, EquipmentChoice['options'][0]> = {};
 				classData.startingEquipment.choices.forEach((choice, index) => {
 					// Cari opsi di template
-					const chosenOptionName = template.startingEquipment[index];
+					// FASE 4 FIX: Gunakan optional chaining (?.), data ini hilang dari templateData.
+					const chosenOptionName = template.startingEquipment?.[index];
+
+					if (!chosenOptionName) {
+						console.warn(`[ProfileWizard Pre-fill] Template ${template.name} tidak memiliki startingEquipment index ${index}. Menggunakan default.`);
+					}
+
 					const foundOption = choice.options.find(opt => opt.name === chosenOptionName);
 					templateEquipment[index] = foundOption || choice.options[0]; // Fallback ke opsi pertama jika nama tidak cocok
 				});
@@ -823,8 +829,8 @@ const CreateCharacterWizard: React.FC<{
 								<label
 									key={skill}
 									className={`p-3 rounded-lg cursor-pointer ${selectedSkills.includes(skill)
-											? "bg-blue-600"
-											: "bg-black/30 hover:bg-black/50"
+										? "bg-blue-600"
+										: "bg-black/30 hover:bg-black/50"
 										}`}
 								>
 									<input
@@ -1194,8 +1200,8 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 								setIsCreating(false);
 							}}
 							className={`flex flex-col items-center cursor-pointer transition-all duration-300 transform ${selectedChar?.id === char.id && !isCreating
-									? "scale-110"
-									: "opacity-60 hover:opacity-100 hover:scale-105"
+								? "scale-110"
+								: "opacity-60 hover:opacity-100 hover:scale-105"
 								}`}
 						>
 							<img

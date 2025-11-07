@@ -23,6 +23,7 @@ const spell = (name: string): string => {
 export type RawCharacterData = Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> & {
     inventory: { itemName: string, quantity: number, isEquipped: boolean }[];
     knownSpells: string[];
+    startingEquipment: string[]; // FASE 4 FIX: Menambahkan data ini untuk pre-fill
 };
 
 const VALERIUS_DATA: RawCharacterData = {
@@ -59,6 +60,12 @@ const VALERIUS_DATA: RawCharacterData = {
         invItem('Shield', 1, true),
         invItem('Light Crossbow', 1),
         invItem('Bolts', 20),
+    ],
+    // FASE 4 FIX: Data ini hilang, menyebabkan crash di ProfileWizard
+    startingEquipment: [
+        "Chain Mail", // Pilihan 0: (a) Chain Mail
+        "Longsword & Shield", // Pilihan 1: (a) Longsword & Shield
+        "Explorer's Pack" // Pilihan 2: (a) Explorer's Pack
     ],
     spellSlots: [],
     knownSpells: [],
@@ -98,6 +105,11 @@ const ELARA_DATA: RawCharacterData = {
         invItem('Arrows', 20),
         invItem('Shortsword', 2, true), // (Equip satu)
     ],
+    // FASE 4 FIX: Data ini hilang, menyebabkan crash di ProfileWizard
+    startingEquipment: [
+        "Rapier", // Pilihan 0: (a) Rapier
+        "Shortbow & Arrows" // Pilihan 1: (a) Shortbow & Arrows
+    ],
     spellSlots: [],
     knownSpells: [],
 };
@@ -136,6 +148,12 @@ const BORIN_DATA: RawCharacterData = {
         invItem('Warhammer', 1, true),
         invItem('Shield', 1, true),
         invItem('Holy Symbol', 1),
+    ],
+    // FASE 4 FIX: Data ini hilang, menyebabkan crash di ProfileWizard
+    startingEquipment: [
+        "Mace", // Pilihan 0: (a) Mace
+        "Scale Mail", // Pilihan 1: (a) Scale Mail
+        "Priest's Pack" // Pilihan 2: (a) Priest's Pack
     ],
     spellSlots: [{ level: 1, max: 2, spent: 0 }], // (File lama salah, cleric Lvl 1 punya 2 slot)
     knownSpells: [
