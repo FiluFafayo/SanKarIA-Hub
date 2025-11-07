@@ -7,8 +7,9 @@ import {
     Character, DiceRoll, RollRequest, Skill, StructuredApiResponse, 
     ToolCall, GameEvent, NPC 
 } from '../types';
-import { useAppStore } from '../store/appStore'; // FASE 3: Impor untuk Level Up
-import { xpToNextLevel } from '../utils'; // FASE 3: Impor untuk Level Up
+// FASE 0: Hapus dependensi UI store dari hook logika
+// import { useAppStore } from '../store/appStore'; 
+// import { xpToNextLevel } from '../utils'; 
 // Import service BARU (G-2)
 import { gameService } from '../services/ai/gameService';
 // Import service GENERASI (G-2)
@@ -64,12 +65,11 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                         if (updatedPlayerState) {
                             onCharacterUpdate(updatedPlayerState);
 
-                            // FASE 3: Cek Level Up
-                            const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
-                            if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
-                                // FASE 5: Hapus console.log
-                                useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
-                            }
+                            // FASE 0: Logika Level Up (UI) dipindahkan ke GameScreen.tsx
+                            // const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
+                            // if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
+                            //     useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
+                            // }
                         }
                     }
                     break;

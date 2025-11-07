@@ -73,9 +73,34 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 	const ssotCharacters = useDataStore((s) => s.state.characters);
     const dataStore = useDataStore.getState();
 	const { campaign, campaignActions } = useCampaign(initialCampaign, players);
+
+    // FASE 0: Logika Cek Level Up (UI) dipindah ke sini dari hooks logika
+    useEffect(() => {
+        // Temukan state runtime terbaru dari karakter 'kita'
+        const myCurrentRuntimeState = campaign.players.find(p => p.id === character.id);
+        if (!myCurrentRuntimeState) return;
+
+        // Cek apakah modal *sudah* terbuka untuk karakter ini
+        if (characterToLevel && characterToLevel.id === myCurrentRuntimeState.id) {
+            return;
+        }
+
+        // Cek apakah kita memenuhi syarat level up
+        const xpForNextLevel = xpToNextLevel(myCurrentRuntimeState.level);
+        if (xpForNextLevel > 0 && myCurrentRuntimeState.xp >= xpForNextLevel) {
+            triggerLevelUp(myCurrentRuntimeState);
+        }
+
+    }, [
+        campaign.players, // Dipantau setiap kali state pemain di reducer berubah
+        character.id, 
+        characterToLevel, 
+        triggerLevelUp
+    ]);
+
     // FASE 1: Hapus useEffect sinkronisasi SSoT (Tugas 1)
 	// useEffect(() => { ... });
-    
+
     // FASE 1: Hapus useEffect Level Up (Tugas 5)
     // const xpForNextLevel = xpToNextLevel(character.level);
     // useEffect(() => { ... });

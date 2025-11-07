@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { CampaignState, CampaignActions } from "./useCampaign";
-import { useAppStore } from "../store/appStore"; // FASE 3: Impor untuk Level Up
+// FASE 0: Hapus dependensi UI store dari hook logika
+// import { useAppStore } from "../store/appStore"; 
 import {
 	Character,
 	DiceRoll,
@@ -23,7 +24,8 @@ import {
 	rollDice,
 	getAbilityModifier,
 	getProficiencyBonus,
-	xpToNextLevel, // FASE 3: Impor untuk Level Up
+	// FASE 0: Hapus logic Level Up
+	// xpToNextLevel, 
 } from "../utils";
 // REFAKTOR G-2: Ganti impor geminiService
 import { gameService } from "../services/ai/gameService";
@@ -86,17 +88,17 @@ export const useCombatSystem = ({
                         const updatedPlayerState = campaign.players.find(p => p.id === call.args.characterId);
                         if (updatedPlayerState) {
                             // Panggil onCharacterUpdate untuk SSoT (jika belum ditangani oleh logic HP)
-                            onCharacterUpdate(updatedPlayerState); 
-                            
-                            const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
-                            if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
-                                // FASE 5: Hapus console.log
-                                useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
-                            }
-                        }
-                    }
-                    break;
-                }
+							onCharacterUpdate(updatedPlayerState); 
+
+							// FASE 0: Logika Level Up (UI) dipindahkan ke GameScreen.tsx
+							// const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
+							// if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
+							//     useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
+							// }
+						}
+					}
+					break;
+				}
                 // (Poin 4) Tangani tool Opini
                 case 'update_npc_opinion':
                     const npc = campaign.npcs.find(n => n.id === call.args.npcId);
