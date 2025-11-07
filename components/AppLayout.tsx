@@ -5,160 +5,164 @@
 // 2. GameScreen (jika ada state game aktif)
 // 3. Tampilan Nexus/View (jika tidak sedang bermain)
 
-import React, { useCallback } from "react"; // Hapus useState
-import { GameScreen } from "./GameScreen";
-import { NexusSanctum } from "./NexusSanctum";
-import { ViewManager } from "./ViewManager";
-import { useDataStore } from "../store/dataStore";
-import { useAppStore } from "../store/appStore";
-import { useGameStore } from "../store/gameStore"; // FASE 0: Impor gameStore
-import { Character, Campaign, CampaignState } from "../types";
-import { dataService } from "../services/dataService";
+import React, { useCallback } from 'react'; // Hapus useState
+import { GameScreen } from './GameScreen';
+import { NexusSanctum } from './NexusSanctum';
+import { ViewManager } from './ViewManager';
+import { useDataStore } from '../store/dataStore';
+import { useAppStore } from '../store/appStore';
+import { useGameStore } from '../store/gameStore'; // FASE 0: Impor gameStore
+import { Character, Campaign, CampaignState } from '../types';
+import { dataService } from '../services/dataService';
 
 interface AppLayoutProps {
-	userId: string;
-	userEmail?: string;
-	theme: string;
-	setTheme: React.Dispatch<React.SetStateAction<string>>;
+    userId: string;
+    userEmail?: string;
+    theme: string;
+    setTheme: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export const AppLayout: React.FC<AppLayoutProps> = ({
-	userId,
-	userEmail,
-	theme,
-	setTheme,
-}) => {
-	// State SSoT (dari dataStore)
-	const { isLoading, hasLoaded, characters } = useDataStore((s) => s.state);
-	const { addPlayerToCampaign } = useDataStore((s) => s.actions); // Ambil aksi
+// FASE 2: Modifikasi LoadingScreen untuk menangani status error
+const LoadingScreen: React.FC<{ theme: string; message: string; isError?: boolean }> = ({ 
+    theme, message, isError = false 
+}) => (
+     <div className={`w-full h-full bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme}`}>
+        <h1 className={`font-cinzel text-5xl ${!isError ? 'animate-pulse' : 'text-red-400'}`}>
+            {isError ? "Koneksi Gagal" : "SanKarIA Hub"}
+        </h1>
+        <p className={`mt-2 ${isError ? 'text-red-300' : ''}`}>{message}</p>
+        {isError && (
+            <button 
+                onClick={() => window.location.reload()}
+                className="mt-4 font-cinzel bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded"
+            >
+                Coba Lagi
+            </button>
+        )}
+    </div>
+);
 
-	// State Navigasi (dari appStore)
-	const { currentView, campaignToJoinOrStart, returnToNexus, startJoinFlow } =
-		useAppStore((s) => ({
-			...s.navigation,
-			...s.actions,
-		}));
+export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, setTheme }) => {
 
-	// FASE 0: State Runtime sekarang diambil dari gameStore
-	const {
-		playingCampaign,
-		playingCharacter,
-		isGameLoading,
-		loadGameSession,
-		exitGameSession,
-	} = useGameStore((s) => ({
-		...s.runtime,
-		...s.actions,
-	}));
+    // State SSoT (dari dataStore)
+    const { isLoading, hasLoaded, characters } = useDataStore(s => s.state);
+    const { addPlayerToCampaign } = useDataStore(s => s.actions); // Ambil aksi
 
-	// =================================================================
-	// Handler Sesi Game (Logika yang dulu ada di App.tsx)
-	// =================================================================
+    // State Navigasi (dari appStore)
+    const { currentView, campaignToJoinOrStart, returnToNexus, startJoinFlow } = useAppStore(s => ({
+        ...s.navigation,
+        ...s.actions
+    }));
 
-	const handleSelectCampaign = async (campaign: Campaign) => {
-		// Cek SSoT karakter dari dataStore
-		const myCharacterInCampaign = characters.find((c) =>
-			campaign.playerIds.includes(c.id)
-		);
+    // FASE 0: State Runtime sekarang diambil dari gameStore
+    const { playingCampaign, playingCharacter, isGameLoading, loadGameSession, exitGameSession } = useGameStore(s => ({
+        ...s.runtime,
+        ...s.actions
+    }));
 
-		if (!myCharacterInCampaign) {
-			// Alur 'Join': Buka character selection
-			startJoinFlow(campaign);
-		} else {
-			// Alur 'Load': Panggil aksi store
-			await loadGameSession(campaign, myCharacterInCampaign);
-		}
-	};
+    // =================================================================
+    // Handler Sesi Game (Logika yang dulu ada di App.tsx)
+    // =================================================================
 
-	const handleCharacterSelection = async (character: Character) => {
-		if (!campaignToJoinOrStart) return;
-		const campaign = campaignToJoinOrStart;
+    const handleSelectCampaign = async (campaign: Campaign) => {
+        // Cek SSoT karakter dari dataStore
+        const myCharacterInCampaign = characters.find(c => campaign.playerIds.includes(c.id));
 
-		try {
-			// FASE 1 FIX (RACE CONDITION):
-			// 1. Panggil addPlayerToCampaign yang sekarang mengembalikan campaign konsisten
-			const updatedCampaign = await addPlayerToCampaign(
-				campaign.id,
-				character.id
-			);
+        if (!myCharacterInCampaign) {
+            // Alur 'Join': Buka character selection
+            startJoinFlow(campaign);
+        } else {
+            // Alur 'Load': Panggil aksi store
+            await loadGameSession(campaign, myCharacterInCampaign);
+        }
+    };
 
-			// 2. Ambil campaign yang sudah ter-update dari SSoT store
-			// (Langkah ini tidak lagi diperlukan, updatedCampaign sudah konsisten)
-			// const updatedCampaign = useDataStore.getState().state.campaigns.find(c => c.id === campaign.id);
+    const handleCharacterSelection = async (character: Character) => {
+        if (!campaignToJoinOrStart) return;
+        const campaign = campaignToJoinOrStart;
 
-			if (!updatedCampaign)
-				throw new Error("Gagal menyinkronkan campaign setelah join.");
+        try {
+            // FASE 1 FIX (RACE CONDITION): 
+            // 1. Panggil addPlayerToCampaign yang sekarang mengembalikan campaign konsisten
+            const updatedCampaign = await addPlayerToCampaign(campaign.id, character.id);
 
-			// 3. Tutup view 'character-selection'
-			// FASE 1 FIX (STATE BASI): Hapus returnToNexus(). Ini akan dipanggil oleh loadGameSession.
-			// returnToNexus();
+            // 2. Ambil campaign yang sudah ter-update dari SSoT store
+            // (Langkah ini tidak lagi diperlukan, updatedCampaign sudah konsisten)
+            // const updatedCampaign = useDataStore.getState().state.campaigns.find(c => c.id === campaign.id);
 
-			// 4. Langsung muat game
-			await loadGameSession(updatedCampaign, character);
-		} catch (e) {
-			console.error("Gagal join campaign:", e);
-			// FASE 4: Hapus alert()
-			console.error(
-				"Gagal bergabung ke campaign. Mungkin Anda sudah bergabung?"
-			);
-			returnToNexus();
-		}
-	};
+            if (!updatedCampaign) throw new Error("Gagal menyinkronkan campaign setelah join.");
 
-	// FASE 0: handleExitGame sekarang memanggil aksi dari gameStore
-	const handleExitGame = (finalCampaignState: CampaignState) => {
-		// Aksi exitGameSession di gameStore menangani
-		// penyimpanan SSoT (Campaign + Character) DAN reset state runtime,
-		// DAN reset navigasi (via appStore).
-		exitGameSession();
-	};
+            // 3. Tutup view 'character-selection'
+            // FASE 1 FIX (STATE BASI): Hapus returnToNexus(). Ini akan dipanggil oleh loadGameSession.
+            // returnToNexus(); 
 
-	// =================================================================
-	// Render Logic
-	// =================================================================
+            // 4. Langsung muat game
+            await loadGameSession(updatedCampaign, character);
 
-	const LoadingScreen = () => (
-		<div
-			className={`w-full h-full bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme}`}
-		>
-			<h1 className="font-cinzel text-5xl animate-pulse">SanKarIA Hub</h1>
-			<p className="mt-2">
-				{isGameLoading ? "Memuat petualangan..." : "Memuat semesta..."}
-			</p>
-		</div>
-	);
+        } catch (e) {
+             console.error("Gagal join campaign:", e);
+             // FASE 4: Hapus alert()
+             console.error("Gagal bergabung ke campaign. Mungkin Anda sudah bergabung?");
+             returnToNexus();
+        }
+    };
 
-	// 1. Tampilkan loading jika SSoT data belum dimuat ATAU sedang memuat game
-	if ((!hasLoaded && isLoading) || isGameLoading) {
-		return <LoadingScreen />;
-	}
+    // FASE 0: handleExitGame sekarang memanggil aksi dari gameStore
+    const handleExitGame = (finalCampaignState: CampaignState) => {
+        // Aksi exitGameSession di gameStore menangani
+        // penyimpanan SSoT (Campaign + Character) DAN reset state runtime,
+        // DAN reset navigasi (via appStore).
+        exitGameSession(); 
+    };
 
-	// 2. Tampilkan GameScreen jika sesi game aktif
-	if (playingCampaign && playingCharacter) {
-		return (
-			<GameScreen
-				key={playingCampaign.id}
-				initialCampaign={playingCampaign}
-				character={playingCharacter}
-				players={playingCampaign.players}
-				onExit={handleExitGame} // Handler baru
-				userId={userId}
-			/>
-		);
-	}
+    // =================================================================
+    // Render Logic
+    // =================================================================
 
-	// 3. Tampilkan ViewManager.
-	// FASE 0: Logika percabangan Nexus/ViewManager dihapus.
-	// ViewManager sekarang menangani SEMUA view, termasuk 'nexus'.
-	return (
-		<ViewManager
-			userId={userId}
-			userEmail={userEmail}
-			theme={theme}
-			setTheme={setTheme}
-			// Teruskan handler sesi game ke ViewManager
-			onSelectCampaign={handleSelectCampaign}
-			onCharacterSelection={handleCharacterSelection}
-		/>
-	);
+    // 1. Tampilkan loading jika SSoT data belum dimuat ATAU sedang memuat game
+    if (isGameLoading) {
+        return <LoadingScreen theme={theme} message="Memuat petualangan..." />;
+    }
+
+    if (isLoading && !hasLoaded) {
+         return <LoadingScreen theme={theme} message="Memuat semesta..." />;
+    }
+
+    // FASE 2: Tangani Gagal Load SSoT
+    if (!isLoading && !hasLoaded) {
+        return <LoadingScreen 
+                    theme={theme} 
+                    message="Gagal memuat data awal dari database. Periksa koneksi Anda." 
+                    isError={true} 
+                />;
+    }
+
+    // 2. Tampilkan GameScreen jika sesi game aktif
+    if (playingCampaign && playingCharacter) {
+        return (
+            <GameScreen
+              key={playingCampaign.id}
+              initialCampaign={playingCampaign} 
+              character={playingCharacter} 
+              players={playingCampaign.players}
+              onExit={handleExitGame} // Handler baru
+              userId={userId}
+            />
+        );
+    }
+
+    // 3. Tampilkan ViewManager.
+    // FASE 0: Logika percabangan Nexus/ViewManager dihapus.
+    // ViewManager sekarang menangani SEMUA view, termasuk 'nexus'.
+    return (
+        <ViewManager 
+            userId={userId}
+            userEmail={userEmail}
+            theme={theme}
+            setTheme={setTheme}
+            // Teruskan handler sesi game ke ViewManager
+            onSelectCampaign={handleSelectCampaign}
+            onCharacterSelection={handleCharacterSelection}
+        />
+    );
 };

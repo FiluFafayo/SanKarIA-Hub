@@ -11,9 +11,10 @@ interface MarketplaceViewProps {
 	userId: string;
 }
 
-const AdventurePoster: React.FC<{ campaign: Campaign; onCopy: () => void }> = ({
+const AdventurePoster: React.FC<{ campaign: Campaign; onCopy: () => void, isCopying: boolean }> = ({ // FASE 2
 	campaign,
 	onCopy,
+	isCopying, // FASE 2
 }) => (
 	<div className="group bg-bg-secondary rounded-lg shadow-lg overflow-hidden transform hover:-translate-y-2 transition-transform duration-300">
 		<img
@@ -32,9 +33,11 @@ const AdventurePoster: React.FC<{ campaign: Campaign; onCopy: () => void }> = ({
 				</span>
 				<button
 					onClick={onCopy}
-					className="px-4 py-1.5 bg-accent-secondary hover:bg-accent-primary rounded font-cinzel transition-colors"
+					className="px-4 py-1.5 bg-accent-secondary hover:bg-accent-primary rounded font-cinzel transition-colors
+								disabled:bg-gray-600 disabled:cursor-not-allowed" // FASE 2
+					disabled={isCopying} // FASE 2
 				>
-					Salin
+					{isCopying ? "Menyalin..." : "Salin"}
 				</button>
 			</div>
 		</div>
@@ -49,18 +52,22 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 	const [filter, setFilter] = useState("Semua");
 	const [publishedCampaigns, setPublishedCampaigns] = useState<Campaign[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [statusMessage, setStatusMessage] = useState(""); // FASE 2: Error Handling
+	const [copyingId, setCopyingId] = useState<string | null>(null); // FASE 2: Loading per item
 
 	// Load data mandiri
 	useEffect(() => {
 		const loadPublishedCampaigns = async () => {
 			setIsLoading(true);
+			setStatusMessage(""); // FASE 2
 			try {
 				const campaigns = await dataService.getPublishedCampaigns();
 				setPublishedCampaigns(campaigns);
 			} catch (error) {
 				console.error("Gagal memuat marketplace:", error);
 				// FASE 4: Hapus alert()
-				console.error("Gagal memuat Pasar Seribu Kisah. Coba lagi nanti.");
+				// FASE 2: Set status UI
+				setStatusMessage("Gagal memuat Pasar Seribu Kisah. Coba lagi nanti.");
 			} finally {
 				setIsLoading(false);
 			}
@@ -69,6 +76,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 	}, []);
 
 	const handleCopyCampaign = async (originalCampaign: Campaign) => {
+		setCopyingId(originalCampaign.id); // FASE 2
+		setStatusMessage(""); // FASE 2
+
 		// Sesuai Tipe baru, 'ownerId' harus di-set
 		const newCampaign: Omit<
 			Campaign,
@@ -113,13 +123,17 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 			// REFAKTOR G-4: Panggil aksi store untuk menambah ke SSoT
 			onCampaignCopied(createdCampaign);
 			// FASE 4: Ganti alert() dengan console.log untuk pesan sukses non-invasif
-			console.log(
+			// FASE 2: Ganti console.log dengan UI feedback
+			setStatusMessage(
 				`Kampanye "${originalCampaign.title}" telah disalin ke Aula Gema Anda!`
 			);
 		} catch (error) {
 			console.error("Gagal menyalin campaign:", error);
 			// FASE 4: Hapus alert()
-			console.error("Gagal menyalin campaign.");
+			// FASE 2: Ganti console.error dengan UI feedback
+			setStatusMessage(`Gagal menyalin campaign: ${error.message || 'Error tidak diketahui'}`);
+		} finally {
+			setCopyingId(null); // FASE 2
 		}
 	};
 
@@ -182,6 +196,17 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 					</button>
 				</div>
 
+				{/* FASE 2: Tampilkan Status Message */}
+				{statusMessage && (
+					<div className={`p-3 rounded-lg mb-4 text-center ${
+						statusMessage.startsWith("Gagal") 
+						? "bg-red-800/50 text-red-200" 
+						: "bg-green-800/50 text-green-200"
+					}`}>
+						{statusMessage}
+					</div>
+				)}
+
 				{isLoading ? (
 					<div className="text-amber-200/80">Memuat petualangan...</div>
 				) : filteredCampaigns.length > 0 ? (
@@ -191,6 +216,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 								key={campaign.id}
 								campaign={campaign}
 								onCopy={() => handleCopyCampaign(campaign)}
+								isCopying={copyingId === campaign.id} // FASE 2
 							/>
 						))}
 					</div>
