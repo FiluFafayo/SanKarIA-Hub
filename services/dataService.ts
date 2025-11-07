@@ -668,22 +668,24 @@ class DataService {
         const newCharacterId = newDbCharacter.id;
 
         const inventoryToInsert: Omit<DbCharacterInventory, 'id'>[] = inventoryData.map(inv => {
-            const definition = allItems.find(def => def.name.toLowerCase() === inv.item.name.toLowerCase());
-            if (!definition) throw new Error(`Item definition cache miss: ${inv.item.name}`);
+            // BUGFIX: Kita sudah punya ItemDefinition (inv.item). Gunakan ID-nya langsung.
+            // Jangan lakukan lookup berdasarkan nama (inv.item.name).
+            if (!inv.item || !inv.item.id) throw new Error(`Invalid ItemDefinition provided for: ${inv.item.name}`);
             return {
                 character_id: newCharacterId,
-                item_id: definition.id,
+                item_id: inv.item.id, // Gunakan ID yang sudah di-resolve
                 quantity: inv.quantity,
                 is_equipped: inv.isEquipped,
             };
         });
         
         const spellsToInsert: Omit<DbCharacterSpell, 'id'>[] = spellData.map(sp => {
-            const definition = allSpells.find(def => def.name.toLowerCase() === sp.name.toLowerCase());
-            if (!definition) throw new Error(`Spell definition cache miss: ${sp.name}`);
+            // BUGFIX: Kita sudah punya SpellDefinition (sp). Gunakan ID-nya langsung.
+            // Jangan lakukan lookup berdasarkan nama (sp.name).
+            if (!sp || !sp.id) throw new Error(`Invalid SpellDefinition provided for: ${sp.name}`);
             return {
                 character_id: newCharacterId,
-                spell_id: definition.id,
+                spell_id: sp.id, // Gunakan ID yang sudah di-resolve
             };
         });
 

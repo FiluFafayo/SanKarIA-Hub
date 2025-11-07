@@ -66,7 +66,7 @@ const VALERIUS_DATA: RawCharacterData = {
 
 const ELARA_DATA: RawCharacterData = {
     name: 'Elara',
-    class: 'Ranger', // (Kita asumsikan Ranger ada di data/classes.ts, jika tidak, ganti ke Fighter)
+    class: 'Rogue', // (Perbaikan: Ganti ke Rogue karena Ranger tidak terdefinisi)
     race: 'Elf',
     level: 1,
     xp: 0,
@@ -80,23 +80,23 @@ const ELARA_DATA: RawCharacterData = {
         [Ability.Strength]: 12, [Ability.Dexterity]: 17, [Ability.Constitution]: 13,
         [Ability.Intelligence]: 10, [Ability.Wisdom]: 15, [Ability.Charisma]: 8,
     },
-    maxHp: 11, // (10 + 1 CON)
-    currentHp: 11,
+    maxHp: 9, // (8 Rogue + 1 CON)
+    currentHp: 9,
     tempHp: 0,
     armorClass: 14, // (11 Leather + 3 DEX)
     speed: 30, // (Elf)
-    hitDice: { 'd10': { max: 1, spent: 0 } },
+    hitDice: { 'd8': { max: 1, spent: 0 } }, // (Perbaikan: Rogue d8)
     deathSaves: { successes: 0, failures: 0 },
     conditions: [],
-    proficientSkills: [Skill.Stealth, Skill.Survival, Skill.Perception],
-    proficientSavingThrows: [Ability.Strength, Ability.Dexterity],
+    proficientSkills: [Skill.Stealth, Skill.Survival, Skill.Perception, Skill.Acrobatics], // (Rogue dapat 4 skill)
+    proficientSavingThrows: [Ability.Dexterity, Ability.Intelligence], // (Perbaikan: Rogue DEX/INT)
     racialTraits: RACES.find(r => r.name === 'Elf')?.traits || [],
-    classFeatures: [{ name: 'Favored Enemy', description: 'Kamu ahli melawan satu tipe musuh.' }, { name: 'Natural Explorer', description: 'Kamu ahli di satu tipe medan.' }], // (Contoh fitur Ranger)
+    classFeatures: CLASS_DEFINITIONS['Rogue'].features, // (Perbaikan: Ambil fitur Rogue)
     inventory: [
         invItem('Leather Armor', 1, true),
-        invItem('Longbow', 1, true),
+        invItem('Shortbow', 1, true), // (Perbaikan: Rogue proficient Shortbow, bukan Longbow)
         invItem('Arrows', 20),
-        invItem('Shortsword', 2),
+        invItem('Shortsword', 2, true), // (Equip satu)
     ],
     spellSlots: [],
     knownSpells: [],
