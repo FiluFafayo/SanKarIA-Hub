@@ -229,7 +229,7 @@ class GenerationService {
             const response = await client.models.generateContent({
                 model: 'gemini-2.0-flash-preview-image-generation', // (P0 FIX) Ganti ke model yang sesuai
                 contents: { parts: [{ text: prompt }] },
-                config: { responseModalities: [Modality.IMAGE] },
+                config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
             });
             for (const part of response.candidates[0].content.parts) {
                 if (part.inlineData) {
@@ -264,7 +264,7 @@ class GenerationService {
             const response = await client.models.generateContent({
                 model: 'gemini-2.0-flash-preview-image-generation',
                 contents: { parts: [imagePart, textPart] },
-                config: { responseModalities: [Modality.IMAGE] },
+                config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
             });
             if (response.candidates && response.candidates[0].content.parts[0].inlineData) {
                 const base64ImageBytes: string = response.candidates[0].content.parts[0].inlineData.data;
@@ -315,7 +315,7 @@ class GenerationService {
                     ],
                 },
                 config: {
-                    responseModalities: [Modality.IMAGE],
+                    responseModalities: [Modality.IMAGE, Modality.TEXT],
                 },
             });
 
