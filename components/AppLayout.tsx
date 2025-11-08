@@ -48,8 +48,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
     const { addPlayerToCampaign } = useDataStore(s => s.actions); // Ambil aksi
 
     // State Navigasi (dari appStore)
-    const { currentView, campaignToJoinOrStart, returnToNexus, startJoinFlow } = useAppStore(s => ({
+    const { currentView, campaignToJoinOrStart, returnToNexus, startJoinFlow, notifications, pushNotification } = useAppStore(s => ({
         ...s.navigation,
+        notifications: s.notifications.notifications,
+        pushNotification: s.actions.pushNotification,
         ...s.actions
     }));
 
@@ -70,9 +72,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
         if (!myCharacterInCampaign) {
             // Alur 'Join': Buka character selection
             startJoinFlow(campaign);
+            pushNotification({ message: 'Pilih karakter untuk bergabung ke campaign.', type: 'info' });
         } else {
             // Alur 'Load': Panggil aksi store
             await loadGameSession(campaign, myCharacterInCampaign);
+            pushNotification({ message: 'Sesi permainan dimulai.', type: 'success' });
         }
     };
 
@@ -97,11 +101,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
 
             // 4. Langsung muat game
             await loadGameSession(updatedCampaign, character);
+            pushNotification({ message: 'Berhasil bergabung ke campaign.', type: 'success' });
 
         } catch (e) {
              console.error("Gagal join campaign:", e);
              // FASE 4: Hapus alert()
              console.error("Gagal bergabung ke campaign. Mungkin Anda sudah bergabung?");
+             pushNotification({ message: 'Gagal bergabung ke campaign.', type: 'error' });
              returnToNexus();
         }
     };
@@ -112,6 +118,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
         // penyimpanan SSoT (Campaign + Character) DAN reset state runtime,
         // DAN reset navigasi (via appStore).
         exitGameSession(); 
+        pushNotification({ message: 'Sesi berakhir. Kemajuan disimpan.', type: 'success' });
     };
 
     // =================================================================
@@ -154,14 +161,49 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
     // FASE 0: Logika percabangan Nexus/ViewManager dihapus.
     // ViewManager sekarang menangani SEMUA view, termasuk 'nexus'.
     return (
-        <ViewManager 
-            userId={userId}
-            userEmail={userEmail}
-            theme={theme}
-            setTheme={setTheme}
-            // Teruskan handler sesi game ke ViewManager
-            onSelectCampaign={handleSelectCampaign}
-            onCharacterSelection={handleCharacterSelection}
-        />
+        <div className="relative w-full h-full">
+            {/* Global toaster */}
+            <div className="pointer-events-none fixed top-4 right-4 z-50 space-y-2">
+                {notifications.map((n) => {
+                    const baseStyle =
+                        n.type === 'error'
+                            ? 'bg-red-800/70 border-red-600 text-red-100'
+                            : n.type === 'success'
+                            ? 'bg-emerald-800/70 border-emerald-600 text-emerald-100'
+                            : n.type === 'warning'
+                            ? 'bg-amber-800/70 border-amber-600 text-amber-100'
+                            : 'bg-slate-800/70 border-amber-800 text-amber-100';
+
+                    const icon =
+                        n.type === 'error' ? '✖' :
+                        n.type === 'success' ? '✓' :
+                        n.type === 'warning' ? '⚠' : 'ℹ';
+
+                    return (
+                        <div
+                            key={n.id}
+                            className={`pointer-events-auto px-4 py-2 rounded shadow-md font-cinzel border ${baseStyle}`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <span aria-hidden className="text-lg leading-none">{icon}</span>
+                                <span className="leading-tight">{n.message}</span>
+                                {n.count && n.count > 1 && (
+                                    <span className="ml-2 text-xs opacity-80">x{n.count}</span>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            <ViewManager 
+                userId={userId}
+                userEmail={userEmail}
+                theme={theme}
+                setTheme={setTheme}
+                // Teruskan handler sesi game ke ViewManager
+                onSelectCampaign={handleSelectCampaign}
+                onCharacterSelection={handleCharacterSelection}
+            />
+        </div>
     );
 };

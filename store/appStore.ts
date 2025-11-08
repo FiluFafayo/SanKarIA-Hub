@@ -59,12 +59,32 @@ interface LevelUpActions {
     closeLevelUp: () => void;
 }
 
+// --- Slice 6: Notifications (Toaster) ---
+export interface AppNotification {
+    id: string;
+    message: string;
+    type?: 'info' | 'success' | 'error' | 'warning';
+    durationMs?: number; // Durasi khusus untuk auto-dismiss
+    count?: number; // Penggabungan duplikat
+}
+interface NotificationState {
+    notifications: AppNotification[];
+}
+const initialNotificationState: NotificationState = {
+    notifications: [],
+};
+interface NotificationActions {
+    pushNotification: (n: Omit<AppNotification, 'id'>) => void;
+    clearNotification: (id: string) => void;
+}
+
 
 // --- Gabungan Store ---
 type AppStore = {
     navigation: NavigationState;
     levelUp: LevelUpState; // (Poin 7)
-    actions: NavigationActions & LevelUpActions;
+    notifications: NotificationState;
+    actions: NavigationActions & LevelUpActions & NotificationActions;
 }
 
 // =================================================================
@@ -74,6 +94,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     // === STATE ===
     navigation: initialNavigationState,
     levelUp: initialLevelUpState, // (Poin 7)
+    notifications: initialNotificationState,
 
     // === ACTIONS ===
     actions: {
@@ -124,6 +145,50 @@ export const useAppStore = create<AppStore>((set, get) => ({
         },
         closeLevelUp: () => {
             set({ levelUp: initialLevelUpState });
+        },
+
+        // --- Notification Actions ---
+        pushNotification: (n) => {
+            const defaultDuration = 3000;
+            const duration = n.durationMs ?? defaultDuration;
+            let usedId = '';
+
+            set((state) => {
+                const list = state.notifications.notifications;
+                const dupIndex = list.findIndex((x) => x.message === n.message && x.type === n.type);
+                let next = [...list];
+
+                if (dupIndex >= 0) {
+                    // Gabungkan duplikat: tingkatkan count dan reset timer
+                    const existing = next[dupIndex];
+                    const updated = { ...existing, count: (existing.count ?? 1) + 1 };
+                    next[dupIndex] = updated;
+                    usedId = existing.id;
+                } else {
+                    // Batasi maksimum 3 notifikasi, buang yang tertua
+                    if (next.length >= 3) {
+                        next = next.slice(1);
+                    }
+                    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                    usedId = id;
+                    next = [...next, { id, ...n, count: 1 }];
+                }
+
+                return { notifications: { notifications: next } };
+            });
+
+            // Auto clear berdasarkan durasi
+            setTimeout(() => {
+                const { actions } = get();
+                actions.clearNotification(usedId);
+            }, duration);
+        },
+        clearNotification: (id) => {
+            set((state) => ({
+                notifications: {
+                    notifications: state.notifications.notifications.filter((x) => x.id !== id),
+                },
+            }));
         },
 
         // --- Campaign Actions (DIHAPUS) ---

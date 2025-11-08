@@ -15,6 +15,7 @@ import {
 	ItemDefinition,
 } from "../types";
 import { getRepositories } from "../services/repository";
+import { useAppStore } from "./appStore";
 import { generationService } from "../services/ai/generationService";
 // Impor baru untuk aksi template
 import {
@@ -139,6 +140,10 @@ export const useDataStore = create<DataStore>((set, get) => ({
             try {
                 const { auth } = getRepositories();
                 await auth.signOut();
+
+                // Reset SSoT state to avoid stale data after re-login
+                // This ensures App.tsx's fetchInitialData runs again for the next session
+                set({ state: initialState });
             } catch (e) {
                 console.error("Gagal keluar:", e);
                 throw e;
@@ -218,26 +223,47 @@ export const useDataStore = create<DataStore>((set, get) => ({
 					choices: [],
 					turnId: null,
 				});
-			} catch (e) {
-				console.error("Gagal menyimpan kampanye:", e);
-				// FASE 4: Hapus alert()
-				console.error(
-					"Gagal menyimpan progres kampanye. Periksa koneksi Anda."
-				);
-			}
-		},
+
+                // Notifikasi sukses
+                useAppStore.getState().actions.pushNotification({
+                    type: "success",
+                    message: "Kampanye berhasil disimpan.",
+                });
+            } catch (e) {
+                console.error("Gagal menyimpan kampanye:", e);
+                // FASE 4: Hapus alert()
+                console.error(
+                    "Gagal menyimpan progres kampanye. Periksa koneksi Anda."
+                );
+                // Notifikasi gagal
+                useAppStore.getState().actions.pushNotification({
+                    type: "error",
+                    message: "Gagal menyimpan progres kampanye. Periksa koneksi Anda.",
+                });
+            }
+        },
 
 		updateCharacter: async (character) => {
             try {
                 const { character: characterRepo } = getRepositories();
                 const savedCharacter = await characterRepo.saveCharacter(character);
                 get().actions._updateCharacter(savedCharacter);
+                // Notifikasi sukses
+                useAppStore.getState().actions.pushNotification({
+                    type: "success",
+                    message: "Karakter berhasil disimpan.",
+                });
             } catch (e) {
                 console.error("Gagal menyimpan karakter (SSoT):", e);
                 // FASE 4: Hapus alert()
                 console.error(
                     "Gagal menyimpan progres karakter. Periksa koneksi Anda."
                 );
+                // Notifikasi gagal
+                useAppStore.getState().actions.pushNotification({
+                    type: "error",
+                    message: "Gagal menyimpan progres karakter. Periksa koneksi Anda.",
+                });
             }
         },
 
@@ -251,11 +277,21 @@ export const useDataStore = create<DataStore>((set, get) => ({
                     userId
                 );
                 get().actions._addCharacter(newCharacter);
+                // Notifikasi sukses
+                useAppStore.getState().actions.pushNotification({
+                    type: "success",
+                    message: "Karakter baru berhasil dibuat.",
+                });
                 return newCharacter; // FASE 1 FIX: Kembalikan karakter baru
             } catch (e) {
                 console.error("Gagal menyimpan karakter baru:", e);
                 // FASE 4: Hapus alert()
                 // UI (ProfileWizard) sekarang menangani ini dengan statusMessage
+                // Notifikasi gagal
+                useAppStore.getState().actions.pushNotification({
+                    type: "error",
+                    message: "Gagal menyimpan karakter baru.",
+                });
                 throw e; // Lemparkan error agar UI (store G-3) tahu
             }
         },
@@ -283,11 +319,21 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 await campaignRepo.logGameEvent(openingEvent);
 
                 get().actions._addCampaign(newCampaign);
+                // Notifikasi sukses
+                useAppStore.getState().actions.pushNotification({
+                    type: "success",
+                    message: "Kampanye berhasil dibuat.",
+                });
                 return newCampaign; // Kembalikan untuk alur join
             } catch (e) {
                 console.error("Gagal membuat kampanye atau adegan pembuka:", e);
                 // FASE 4: Hapus alert()
                 console.error("Gagal membuat kampanye. Coba lagi.");
+                // Notifikasi gagal
+                useAppStore.getState().actions.pushNotification({
+                    type: "error",
+                    message: "Gagal membuat kampanye. Coba lagi.",
+                });
                 throw e;
             }
         },
@@ -313,6 +359,11 @@ export const useDataStore = create<DataStore>((set, get) => ({
                         await campaignRepo.saveCampaign(updatedCampaign); // Simpan perubahan ini ke DB
                     }
                     get().actions._updateCampaign(updatedCampaign);
+                    // Notifikasi sukses
+                    useAppStore.getState().actions.pushNotification({
+                        type: "success",
+                        message: "Berhasil bergabung ke kampanye.",
+                    });
                     return updatedCampaign; // FASE 1 FIX: Kembalikan campaign yang konsisten
                 }
                 // FASE 1 FIX: Fallback jika campaign tidak ditemukan di state
@@ -321,6 +372,11 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 );
             } catch (e) {
                 console.error("Gagal menambahkan player ke campaign:", e);
+                // Notifikasi gagal
+                useAppStore.getState().actions.pushNotification({
+                    type: "error",
+                    message: "Gagal bergabung ke kampanye.",
+                });
                 throw e;
             }
         },

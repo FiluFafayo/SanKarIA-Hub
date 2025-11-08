@@ -11,15 +11,16 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
-	onClose,
-	currentTheme,
-	setTheme,
-	userEmail,
-	onSignOut,
+    onClose,
+    currentTheme,
+    setTheme,
+    userEmail,
+    onSignOut,
 }) => {
-	const [activeStation, setActiveStation] = useState("Audio");
-	const [masterVolume, setMasterVolume] = useState(100);
-	const [musicVolume, setMusicVolume] = useState(75);
+    const [activeStation, setActiveStation] = useState("Audio");
+    const [masterVolume, setMasterVolume] = useState(100);
+    const [musicVolume, setMusicVolume] = useState(75);
+    const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
 	return (
 		<ViewWrapper onClose={onClose} title="Bengkel Juru Cipta">
@@ -55,19 +56,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 								Anda masuk sebagai:{" "}
 								<strong className="text-amber-300">{userEmail}</strong>
 							</p>
-							<button
-								onClick={onSignOut}
-								className="mt-2 text-sm font-cinzel bg-red-800 hover:bg-red-700 text-white px-4 py-1 rounded transition-colors"
-							>
-								Keluar
-							</button>
-						</div>
-					)}
-				</div>
-				{/* Content */}
-				<div className="w-full md:w-2/3 p-6 md:p-8">
-					{activeStation === "Audio" && (
-						<div>
+                            <button
+                                onClick={() => {
+                                    setInfoMessage("Anda telah keluar.");
+                                    onSignOut();
+                                }}
+                                className="mt-2 text-sm font-cinzel bg-red-800 hover:bg-red-700 text-white px-4 py-1 rounded transition-colors"
+                            >
+                                Keluar
+                            </button>
+                        </div>
+                    )}
+                </div>
+                {/* Content */}
+                <div className="w-full md:w-2/3 p-6 md:p-8">
+                    {infoMessage && (
+                        <div className="mb-4 p-3 rounded bg-amber-800/40 border border-amber-600 text-amber-100 font-cinzel text-sm">
+                            {infoMessage}
+                        </div>
+                    )}
+                    {activeStation === "Audio" && (
+                        <div>
 							<h3 className="text-2xl font-cinzel mb-2">Gramofon Ajaib</h3>
 							<p className="text-sm text-amber-200/70 mb-6">
 								Sesuaikan suasana pendengaran dari pengalaman Anda.

@@ -35,10 +35,11 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
 }) => {
     
     // Ambil state navigasi
-    const { currentView, campaignToJoinOrStart, returnToNexus } = useAppStore(s => ({
+    const { currentView, campaignToJoinOrStart, returnToNexus, pushNotification } = useAppStore(s => ({
         currentView: s.navigation.currentView,
         campaignToJoinOrStart: s.navigation.campaignToJoinOrStart,
-        returnToNexus: s.actions.returnToNexus
+        returnToNexus: s.actions.returnToNexus,
+        pushNotification: s.actions.pushNotification
     }));
 
     // Ambil data SSoT
@@ -91,7 +92,14 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
                     currentTheme={theme} 
                     setTheme={setTheme}
                     userEmail={userEmail}
-                    onSignOut={() => signOut()}
+                    onSignOut={() => {
+                      // Reset runtime tanpa menyimpan jika user logout di tengah permainan
+                      useGameStore.getState().actions.resetRuntimeOnLogout();
+                      // Tampilkan toast global
+                      pushNotification({ message: 'Anda telah keluar.', type: 'success' });
+                      // Lanjutkan proses sign out untuk membersihkan SSoT dan sesi auth
+                      signOut();
+                    }}
                 />;
       case Location.MirrorOfSouls:
         return <ProfileView 

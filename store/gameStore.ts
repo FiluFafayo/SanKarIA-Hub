@@ -23,11 +23,13 @@ const initialRuntimeState: RuntimeState = {
 	isGameLoading: false,
 };
 interface RuntimeActions {
-	loadGameSession: (campaign: Campaign, character: Character) => Promise<void>;
-	exitGameSession: () => void;
-	// Aksi internal yang dipanggil oleh GameScreen/Hooks
-	_setRuntimeCampaignState: (campaignState: CampaignState) => void;
-	_setRuntimeCharacterState: (character: Character) => void;
+    loadGameSession: (campaign: Campaign, character: Character) => Promise<void>;
+    exitGameSession: () => void;
+    // Reset tanpa menyimpan, dipakai saat logout
+    resetRuntimeOnLogout: () => void;
+    // Aksi internal yang dipanggil oleh GameScreen/Hooks
+    _setRuntimeCampaignState: (campaignState: CampaignState) => void;
+    _setRuntimeCharacterState: (character: Character) => void;
 }
 
 // --- Gabungan Store ---
@@ -77,6 +79,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
 				// FASE 1 FIX (STATE BASI): Bersihkan state navigasi (termasuk campaignToJoinOrStart)
 				useAppStore.getState().actions.returnToNexus();
+
+				// Notifikasi sukses
+				useAppStore.getState().actions.pushNotification({
+					message: 'Sesi permainan dimulai.',
+					type: 'success',
+				});
 			} catch (e) {
 				console.error("Gagal memuat data runtime campaign:", e);
 				// FASE 4: Hapus alert()
@@ -84,6 +92,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 				set((state) => ({
 					runtime: { ...state.runtime, isGameLoading: false },
 				}));
+				// Notifikasi error
+				useAppStore.getState().actions.pushNotification({
+					message: 'Gagal memuat sesi permainan.',
+					type: 'error',
+				});
 			}
 		},
 		exitGameSession: () => {
@@ -107,12 +120,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
 			set({ runtime: initialRuntimeState });
 			// Reset navigasi global
 			useAppStore.getState().actions.returnToNexus();
+
+			// Notifikasi sukses
+			useAppStore.getState().actions.pushNotification({
+				message: 'Sesi berakhir. Kemajuan disimpan.',
+				type: 'success',
+			});
 		},
-		_setRuntimeCampaignState: (campaignState) => {
-			set((state) => ({
-				runtime: { ...state.runtime, playingCampaign: campaignState },
-			}));
-		},
+        resetRuntimeOnLogout: () => {
+            // Jangan menyimpan apapun, hanya reset runtime state
+            set({ runtime: initialRuntimeState });
+            // Pulihkan navigasi global ke Nexus
+            useAppStore.getState().actions.returnToNexus();
+        },
+        _setRuntimeCampaignState: (campaignState) => {
+            set((state) => ({
+                runtime: { ...state.runtime, playingCampaign: campaignState },
+            }));
+        },
 		_setRuntimeCharacterState: (character) => {
 			set((state) => ({
 				runtime: { ...state.runtime, playingCharacter: character },
