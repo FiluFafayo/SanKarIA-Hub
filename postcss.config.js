@@ -1,6 +1,7 @@
 export default {
   plugins: {
-    tailwindcss: {},
+    // Tailwind v4 memerlukan plugin PostCSS baru
+    '@tailwindcss/postcss': {},
     autoprefixer: {},
   },
 };
