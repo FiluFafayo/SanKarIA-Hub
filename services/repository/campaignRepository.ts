@@ -30,6 +30,9 @@ function mapDbCampaign(dbCampaign: any): Campaign {
 
   return {
     ...rest,
+    // Pastikan array tidak undefined agar pemanggilan .filter aman
+    quests: quests || [],
+    npcs: npcs || [],
     ownerId: owner_id,
     joinCode: join_code,
     isPublished: is_published,
@@ -44,7 +47,7 @@ function mapDbCampaign(dbCampaign: any): Campaign {
     currentWeather: current_weather,
     worldEventCounter: world_event_counter,
     mapImageUrl: map_image_url,
-    mapMarkers: map_markers,
+    mapMarkers: map_markers || [],
     currentPlayerLocation: current_player_location,
     explorationGrid: dbCampaign.exploration_grid || [],
     fogOfWar: dbCampaign.fog_of_war || [],
