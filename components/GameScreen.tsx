@@ -40,6 +40,7 @@ import { findClass } from "../data/registry";
 // Import store (tidak berubah)
 import { useDataStore } from "../store/dataStore";
 import { useAppStore } from "../store/appStore";
+import { useGameStore } from "../store/gameStore";
 
 interface GameScreenProps {
 	initialCampaign: CampaignState;
@@ -66,19 +67,14 @@ export const GameScreen: React.FC<GameScreenProps> = ({
 	userId,
 }) => {
 	// (Logika hook (useAppStore, useDataStore, useCampaign) tidak berubah)
-	const {
-		_setRuntimeCampaignState,
-		_setRuntimeCharacterState,
-		characterToLevel,
-		triggerLevelUp,
-		closeLevelUp,
-	} = useAppStore((s) => ({
-		_setRuntimeCampaignState: s.actions._setRuntimeCampaignState,
-		_setRuntimeCharacterState: s.actions._setRuntimeCharacterState,
-		characterToLevel: s.levelUp.characterToLevel,
-		triggerLevelUp: s.actions.triggerLevelUp,
-		closeLevelUp: s.actions.closeLevelUp,
-	}));
+const { characterToLevel, triggerLevelUp, closeLevelUp } = useAppStore((s) => ({
+    characterToLevel: s.levelUp.characterToLevel,
+    triggerLevelUp: s.actions.triggerLevelUp,
+    closeLevelUp: s.actions.closeLevelUp,
+}));
+
+// Ambil aksi runtime dari gameStore (bukan appStore)
+const { _setRuntimeCampaignState, _setRuntimeCharacterState } = useGameStore((s) => s.actions);
 	const { updateCharacter } = useDataStore((s) => s.actions);
 	const ssotCharacters = useDataStore((s) => s.state.characters);
 	const dataStore = useDataStore.getState();
