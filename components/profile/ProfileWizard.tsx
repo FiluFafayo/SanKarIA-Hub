@@ -47,6 +47,7 @@ import {
 // FASE 2: Impor utilitas AI
 import { renderCharacterLayout } from "../../services/pixelRenderer";
 import { generationService } from "../../services/ai/generationService";
+import { CreateCharacterWizard as CreateCharacterWizardComponent } from "./CreateCharacterWizard";
 
 // Helper untuk membuat item inventory
 const createInvItem = (
@@ -1053,11 +1054,13 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 				<div className="w-full h-full bg-black/30 border-2 border-blue-300/50 rounded-lg flex flex-col">
 					{isCreating ? (
 						// FASE 2: onCancel mereset state lokal, onSaveNewCharacter diganti handleWizardSave
-						<CreateCharacterWizard
-							onCancel={handleWizardCancel}
-							userId={userId}
-							onSaveNewCharacter={handleWizardSave} // Kirim handler save
-						/>
+            <CreateCharacterWizardComponent
+              onCancel={handleWizardCancel}
+              userId={userId}
+              onSaveNewCharacter={handleWizardSave}
+              templateToPreFill={templateToPreFill}
+              clearTemplateToPreFill={clearTemplateToPreFill}
+            />
 					) : selectedChar ? (
 						<>
 							<div className="flex shrink-0">

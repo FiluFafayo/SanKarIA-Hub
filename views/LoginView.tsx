@@ -1,9 +1,9 @@
 import React from 'react';
-import { dataService } from '../services/dataService';
+import { authRepository } from '../services/repository';
 
 export const LoginView: React.FC = () => {
     const handleLogin = async () => {
-        await dataService.signInWithGoogle();
+        await authRepository.signInWithGoogle();
     };
 
     return (

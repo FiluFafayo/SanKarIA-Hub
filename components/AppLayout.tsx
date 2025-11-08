@@ -13,7 +13,6 @@ import { useDataStore } from '../store/dataStore';
 import { useAppStore } from '../store/appStore';
 import { useGameStore } from '../store/gameStore'; // FASE 0: Impor gameStore
 import { Character, Campaign, CampaignState } from '../types';
-import { dataService } from '../services/dataService';
 
 interface AppLayoutProps {
     userId: string;

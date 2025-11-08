@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { ViewWrapper } from '../components/ViewWrapper';
 import { Campaign } from '../types';
-import { dataService } from '../services/dataService';
+import { campaignRepository } from '../services/repository';
 
 interface JoinCampaignViewProps {
   onClose: () => void;
@@ -24,7 +24,7 @@ export const JoinCampaignView: React.FC<JoinCampaignViewProps> = ({ onClose, onC
 
     setIsLoading(true);
     try {
-      const campaign = await dataService.getCampaignByJoinCode(code); // Gunakan dataService
+      const campaign = await campaignRepository.getCampaignByJoinCode(code);
 
       if (campaign) {
         setFeedback("Selamat datang, petualang! Pintu pun terbuka...");

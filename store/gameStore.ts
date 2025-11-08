@@ -4,7 +4,7 @@
 
 import { create } from "zustand";
 import { Character, Campaign, CampaignState } from "../types";
-import { dataService } from "../services/dataService";
+import { getRepositories } from "../services/repository";
 import { useDataStore } from "./dataStore";
 import { useAppStore } from "./appStore"; // Diperlukan untuk reset navigasi
 
@@ -48,12 +48,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 		// --- Runtime Actions (Dipindah dari appStore) ---
 		loadGameSession: async (campaign, character) => {
 			set((state) => ({ runtime: { ...state.runtime, isGameLoading: true } }));
-			try {
-				const { eventLog, monsters, players } =
-					await dataService.loadCampaignRuntimeData(
-						campaign.id,
-						campaign.playerIds
-					);
+            try {
+                const { runtime } = getRepositories();
+                const { eventLog, monsters, players } =
+                    await runtime.loadCampaignRuntimeData(
+                        campaign.id,
+                        campaign.playerIds
+                    );
 
 				const campaignState: CampaignState = {
 					...campaign,

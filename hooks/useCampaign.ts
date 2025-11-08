@@ -3,43 +3,41 @@ import { useReducer, useMemo } from "react";
 // import { dataService } from "../services/dataService";
 import { findItem, findMonster } from "../data/registry"; // REFAKTOR G-5 / FASE 3
 import {
-	Campaign,
-	GameEvent,
-	MonsterInstance,
-	RollRequest,
-	CharacterInventoryItem, // FASE 1 FIX: Ganti nama tipe
-	Character,
-	ThinkingState,
-	Quest,
-	NPC,
-	QuestStatus,
-	PlayerActionEvent,
-	DmNarrationEvent,
-	SystemMessageEvent,
-	RollResultEvent,
-	DmReactionEvent,
-	WorldTime,
-	WorldWeather,
-	MonsterDefinition,
-	CharacterInventoryItem,
-	ItemDefinition,
-	SpellDefinition,
-	// BARU: Impor tipe dari Fase 1
-	BattleState,
-	BattleStatus,
-	GridCell,
-	TerrainType,
-	Unit,
+    Campaign,
+    GameEvent,
+    MonsterInstance,
+    RollRequest,
+    CharacterInventoryItem, // FASE 1 FIX: Ganti nama tipe
+    Character,
+    ThinkingState,
+    Quest,
+    NPC,
+    QuestStatus,
+    PlayerActionEvent,
+    DmNarrationEvent,
+    SystemMessageEvent,
+    RollResultEvent,
+    DmReactionEvent,
+    WorldTime,
+    WorldWeather,
+    MonsterDefinition,
+    CharacterInventoryItem,
+    ItemDefinition,
+    SpellDefinition,
+    CampaignState,
+    CampaignActions,
+    // BARU: Impor tipe dari Fase 1
+    BattleState,
+    BattleStatus,
+    GridCell,
+    TerrainType,
+    Unit,
 } from "../types";
 import { generateId, xpToNextLevel } from "../utils"; // FASE 1 (Tugas 5)
 // import { useAppStore } from "../store/appStore"; // FASE 3: Dihapus (Side-effect dipindah)
 // import { MONSTER_DEFINITIONS } from "../data/monsters"; // <-- FASE 3: Dihapus, gunakan registry
 
-export interface CampaignState extends Campaign {
-	thinkingState: ThinkingState;
-	activeRollRequest: RollRequest | null;
-	players: Character[]; // Add players to the campaign state for easy access
-}
+// Tipe CampaignState kini diimpor dari types.ts sebagai SSoT
 
 // Definisikan tipe untuk payload monster yang lebih fleksibel
 interface MonsterSpawnPayload {
@@ -88,49 +86,7 @@ type LoggableGameEvent =
 	| Omit<SystemMessageEvent, "id" | "timestamp" | "turnId">
 	| Omit<RollResultEvent, "id" | "timestamp" | "turnId">;
 
-export interface CampaignActions {
-	logEvent: (event: LoggableGameEvent, turnId: string) => void;
-	startTurn: () => string;
-	endTurn: () => void;
-	updateMonster: (monster: MonsterInstance) => void;
-	removeMonster: (monsterInstanceId: string) => void;
-	setInitiativeOrder: (order: string[]) => void;
-	setCurrentPlayerId: (id: string | null) => void;
-	setGameState: (state: "exploration" | "combat") => void;
-	setThinkingState: (state: ThinkingState) => void;
-	setActiveRollRequest: (request: RollRequest | null) => void;
-	spawnMonsters: (monstersToSpawn: MonsterSpawnPayload[]) => void;
-	clearChoices: () => void;
-	setChoices: (choices: string[]) => void;
-	updateCharacterInCampaign: (character: Character) => void;
-	addItemsToInventory: (payload: AddItemsPayload) => void;
-	updateQuestLog: (payload: UpdateQuestPayload) => void;
-	logNpcInteraction: (payload: LogNpcInteractionPayload) => void;
-
-	// BARU: Aksi Battle State
-	setBattleState: (state: BattleState | null) => void;
-	setBattleGrid: (grid: GridCell[][]) => void;
-	setBattleMapImage: (url: string) => void;
-	setBattleUnits: (units: Unit[]) => void;
-	setActiveBattleUnit: (id: string | null) => void;
-	moveUnit: (payload: {
-		unitId: string;
-		newPosition: { x: number; y: number };
-		cost: number;
-	}) => void;
-	clearBattleState: () => void; // BARU
-	setFogOfWar: (fog: boolean[][]) => void; // BARU: Fase 5
-
-	// (Poin 5) Ganti updateWorldState
-	advanceTime: (seconds: number) => void;
-	setWeather: (weather: WorldWeather) => void;
-	awardXp: (characterId: string, amount: number) => void; // (Poin 7)
-	updateNpcOpinion: (
-		npcId: string,
-		characterId: string,
-		change: number
-	) => void; // (Poin 4)
-}
+// Tipe CampaignActions kini diimpor dari types.ts sebagai SSoT
 
 type Action =
 	| { type: "SET_STATE"; payload: Partial<CampaignState> }

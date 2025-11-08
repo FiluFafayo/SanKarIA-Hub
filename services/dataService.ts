@@ -251,6 +251,11 @@ class DataService {
         return this.supabase;
     }
 
+    // Membuka akses klien Supabase untuk repository yang mengambil alih implementasi
+    public getClient(): SupabaseClient {
+        return this.ensureSupabase();
+    }
+
     // =================================================================
     // METODE CACHING DATA GLOBAL (Sudah Benar)
     // =================================================================

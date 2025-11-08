@@ -14,7 +14,7 @@ import {
 	AbilityScores,
 	ItemDefinition,
 } from "../types";
-import { dataService } from "../services/dataService";
+import { getRepositories } from "../services/repository";
 import { generationService } from "../services/ai/generationService";
 // Impor baru untuk aksi template
 import {
@@ -66,8 +66,8 @@ interface DataActions {
 		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
 		spellData: SpellDefinition[],
 		userId: string
-	) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
-	createCampaign: (
+    ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
+    createCampaign: (
 		campaignData: Omit<
 			Campaign,
 			| "id"
@@ -80,12 +80,14 @@ interface DataActions {
 			| "turnId"
 			| "initiativeOrder"
 		>,
-		userId: string
-	) => Promise<Campaign>; // Kembalikan campaign untuk alur join
-	addPlayerToCampaign: (
-		campaignId: string,
-		characterId: string
-	) => Promise<Campaign>; // FASE 1 FIX: Kembalikan campaign
+        userId: string
+    ) => Promise<Campaign>; // Kembalikan campaign untuk alur join
+    getPublishedCampaigns: () => Promise<Campaign[]>;
+    signOut: () => Promise<void>;
+    addPlayerToCampaign: (
+        campaignId: string,
+        characterId: string
+    ) => Promise<Campaign>; // FASE 1 FIX: Kembalikan campaign
 	copyCharacterFromTemplate: (
 		templateData: RawCharacterData,
 		userId: string
@@ -118,7 +120,28 @@ export const useDataStore = create<DataStore>((set, get) => ({
 				state: {
 					...state.state,
 					campaigns: [...state.state.campaigns, campaign],
-				},
+        },
+
+        getPublishedCampaigns: async () => {
+            try {
+                const { campaign } = getRepositories();
+                const campaigns = await campaign.getPublishedCampaigns();
+                return campaigns;
+            } catch (e) {
+                console.error("Gagal memuat kampanye terbit:", e);
+                throw e;
+            }
+        },
+
+        signOut: async () => {
+            try {
+                const { auth } = getRepositories();
+                await auth.signOut();
+            } catch (e) {
+                console.error("Gagal keluar:", e);
+                throw e;
+            }
+        },
 			})),
 		_updateCampaign: (campaign) =>
 			set((state) => ({
@@ -152,16 +175,17 @@ export const useDataStore = create<DataStore>((set, get) => ({
 
 			get().actions._setLoading(true);
 
-			try {
-				await dataService.cacheGlobalData();
-				let fetchedCharacters = await dataService.getMyCharacters(userId); // Ganti jadi 'let'
-				get().actions._setCharacters(fetchedCharacters);
+            try {
+                const { globalData, character, campaign } = getRepositories();
+                await globalData.cacheGlobalData();
+                let fetchedCharacters = await character.getMyCharacters(userId); // Ganti jadi 'let'
+                get().actions._setCharacters(fetchedCharacters);
 
-				const myCharacterIds = fetchedCharacters.map((c) => c.id);
-				const fetchedCampaigns = await dataService.getMyCampaigns(
-					myCharacterIds
-				);
-				get().actions._setCampaigns(fetchedCampaigns);
+                const myCharacterIds = fetchedCharacters.map((c) => c.id);
+                const fetchedCampaigns = await campaign.getMyCampaigns(
+                    myCharacterIds
+                );
+                get().actions._setCampaigns(fetchedCampaigns);
 
 				set((state) => ({ state: { ...state.state, hasLoaded: true } }));
 			} catch (error) {
@@ -176,11 +200,12 @@ export const useDataStore = create<DataStore>((set, get) => ({
 		},
 
 		saveCampaign: async (campaign) => {
-			try {
-				const { activeRollRequest, thinkingState, players, ...campaignToSave } =
-					campaign as CampaignState;
+            try {
+                const { activeRollRequest, thinkingState, players, ...campaignToSave } =
+                    campaign as CampaignState;
 
-				const savedCampaign = await dataService.saveCampaign(campaignToSave);
+                const { campaign: campaignRepo } = getRepositories();
+                const savedCampaign = await campaignRepo.saveCampaign(campaignToSave);
 
 				// Update SSoT store
 				get().actions._updateCampaign({
@@ -202,45 +227,48 @@ export const useDataStore = create<DataStore>((set, get) => ({
 		},
 
 		updateCharacter: async (character) => {
-			try {
-				const savedCharacter = await dataService.saveCharacter(character);
-				get().actions._updateCharacter(savedCharacter);
-			} catch (e) {
-				console.error("Gagal menyimpan karakter (SSoT):", e);
-				// FASE 4: Hapus alert()
-				console.error(
-					"Gagal menyimpan progres karakter. Periksa koneksi Anda."
-				);
-			}
-		},
+            try {
+                const { character: characterRepo } = getRepositories();
+                const savedCharacter = await characterRepo.saveCharacter(character);
+                get().actions._updateCharacter(savedCharacter);
+            } catch (e) {
+                console.error("Gagal menyimpan karakter (SSoT):", e);
+                // FASE 4: Hapus alert()
+                console.error(
+                    "Gagal menyimpan progres karakter. Periksa koneksi Anda."
+                );
+            }
+        },
 
 		saveNewCharacter: async (charData, inventoryData, spellData, userId) => {
-			try {
-				const newCharacter = await dataService.saveNewCharacter(
-					charData,
-					inventoryData,
-					spellData,
-					userId
-				);
-				get().actions._addCharacter(newCharacter);
-				return newCharacter; // FASE 1 FIX: Kembalikan karakter baru
-			} catch (e) {
-				console.error("Gagal menyimpan karakter baru:", e);
-				// FASE 4: Hapus alert()
-				// UI (ProfileWizard) sekarang menangani ini dengan statusMessage
-				throw e; // Lemparkan error agar UI (store G-3) tahu
-			}
-		},
+            try {
+                const { character: characterRepo } = getRepositories();
+                const newCharacter = await characterRepo.saveNewCharacter(
+                    charData,
+                    inventoryData,
+                    spellData,
+                    userId
+                );
+                get().actions._addCharacter(newCharacter);
+                return newCharacter; // FASE 1 FIX: Kembalikan karakter baru
+            } catch (e) {
+                console.error("Gagal menyimpan karakter baru:", e);
+                // FASE 4: Hapus alert()
+                // UI (ProfileWizard) sekarang menangani ini dengan statusMessage
+                throw e; // Lemparkan error agar UI (store G-3) tahu
+            }
+        },
 
 		createCampaign: async (campaignData, userId) => {
-			try {
-				const newCampaign = await dataService.createCampaign(
-					campaignData,
-					userId
-				);
-				const openingScene = await generationService.generateOpeningScene(
-					newCampaign
-				);
+            try {
+                const { campaign: campaignRepo } = getRepositories();
+                const newCampaign = await campaignRepo.createCampaign(
+                    campaignData,
+                    userId
+                );
+                const openingScene = await generationService.generateOpeningScene(
+                    newCampaign
+                );
 
 				const openingEvent: Omit<GameEvent, "id" | "timestamp"> & {
 					campaignId: string;
@@ -251,21 +279,22 @@ export const useDataStore = create<DataStore>((set, get) => ({
 					turnId: "turn-0",
 					characterId: null,
 				};
-				await dataService.logGameEvent(openingEvent);
+                await campaignRepo.logGameEvent(openingEvent);
 
-				get().actions._addCampaign(newCampaign);
-				return newCampaign; // Kembalikan untuk alur join
-			} catch (e) {
-				console.error("Gagal membuat kampanye atau adegan pembuka:", e);
-				// FASE 4: Hapus alert()
-				console.error("Gagal membuat kampanye. Coba lagi.");
-				throw e;
-			}
-		},
+                get().actions._addCampaign(newCampaign);
+                return newCampaign; // Kembalikan untuk alur join
+            } catch (e) {
+                console.error("Gagal membuat kampanye atau adegan pembuka:", e);
+                // FASE 4: Hapus alert()
+                console.error("Gagal membuat kampanye. Coba lagi.");
+                throw e;
+            }
+        },
 
 		addPlayerToCampaign: async (campaignId, characterId) => {
-			try {
-				await dataService.addPlayerToCampaign(campaignId, characterId);
+            try {
+                const { campaign: campaignRepo } = getRepositories();
+                await campaignRepo.addPlayerToCampaign(campaignId, characterId);
 
 				// Update SSoT campaign lokal untuk merefleksikan player baru
 				const campaign = get().state.campaigns.find((c) => c.id === campaignId);
@@ -275,25 +304,25 @@ export const useDataStore = create<DataStore>((set, get) => ({
 						playerIds: [...campaign.playerIds, characterId],
 					};
 					// Set player pertama sebagai giliran pertama jika belum ada
-					if (
-						updatedCampaign.playerIds.length === 1 &&
-						!updatedCampaign.currentPlayerId
-					) {
-						updatedCampaign.currentPlayerId = characterId;
-						await dataService.saveCampaign(updatedCampaign); // Simpan perubahan ini ke DB
-					}
-					get().actions._updateCampaign(updatedCampaign);
-					return updatedCampaign; // FASE 1 FIX: Kembalikan campaign yang konsisten
-				}
-				// FASE 1 FIX: Fallback jika campaign tidak ditemukan di state
-				throw new Error(
-					"Campaign tidak ditemukan di SSoT setelah menambahkan player."
-				);
-			} catch (e) {
-				console.error("Gagal menambahkan player ke campaign:", e);
-				throw e;
-			}
-		},
+                    if (
+                        updatedCampaign.playerIds.length === 1 &&
+                        !updatedCampaign.currentPlayerId
+                    ) {
+                        updatedCampaign.currentPlayerId = characterId;
+                        await campaignRepo.saveCampaign(updatedCampaign); // Simpan perubahan ini ke DB
+                    }
+                    get().actions._updateCampaign(updatedCampaign);
+                    return updatedCampaign; // FASE 1 FIX: Kembalikan campaign yang konsisten
+                }
+                // FASE 1 FIX: Fallback jika campaign tidak ditemukan di state
+                throw new Error(
+                    "Campaign tidak ditemukan di SSoT setelah menambahkan player."
+                );
+            } catch (e) {
+                console.error("Gagal menambahkan player ke campaign:", e);
+                throw e;
+            }
+        },
 	},
 
 	// FASE 2 REFAKTOR: Fungsi ini (copyCharacterFromTemplate) dihapus

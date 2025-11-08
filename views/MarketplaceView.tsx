@@ -2,13 +2,12 @@ import React, { useState, useEffect } from "react"; // Import useEffect
 import { ViewWrapper } from "../components/ViewWrapper";
 import { Campaign } from "../types";
 import { generateId, generateJoinCode } from "../utils";
-import { dataService } from "../services/dataService"; // Import dataService
+import { useDataStore } from "../store/dataStore"; // Gunakan store sebagai boundary
 
 // REFAKTOR G-4: Disederhanakan
 interface MarketplaceViewProps {
-	onClose: () => void;
-	onCampaignCopied: (campaign: Campaign) => void; // Aksi dari dataStore
-	userId: string;
+    onClose: () => void;
+    userId: string;
 }
 
 const AdventurePoster: React.FC<{ campaign: Campaign; onCopy: () => void, isCopying: boolean }> = ({ // FASE 2
@@ -45,9 +44,8 @@ const AdventurePoster: React.FC<{ campaign: Campaign; onCopy: () => void, isCopy
 );
 
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
-	onClose,
-	onCampaignCopied,
-	userId,
+    onClose,
+    userId,
 }) => {
 	const [filter, setFilter] = useState("Semua");
 	const [publishedCampaigns, setPublishedCampaigns] = useState<Campaign[]>([]);
@@ -56,24 +54,23 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 	const [copyingId, setCopyingId] = useState<string | null>(null); // FASE 2: Loading per item
 
 	// Load data mandiri
-	useEffect(() => {
-		const loadPublishedCampaigns = async () => {
-			setIsLoading(true);
-			setStatusMessage(""); // FASE 2
-			try {
-				const campaigns = await dataService.getPublishedCampaigns();
-				setPublishedCampaigns(campaigns);
-			} catch (error) {
-				console.error("Gagal memuat marketplace:", error);
-				// FASE 4: Hapus alert()
-				// FASE 2: Set status UI
-				setStatusMessage("Gagal memuat Pasar Seribu Kisah. Coba lagi nanti.");
-			} finally {
-				setIsLoading(false);
-			}
-		};
-		loadPublishedCampaigns();
-	}, []);
+    const { getPublishedCampaigns, createCampaign } = useDataStore(s => s.actions);
+    useEffect(() => {
+        const loadPublishedCampaigns = async () => {
+            setIsLoading(true);
+            setStatusMessage("");
+            try {
+                const campaigns = await getPublishedCampaigns();
+                setPublishedCampaigns(campaigns);
+            } catch (error) {
+                console.error("Gagal memuat marketplace:", error);
+                setStatusMessage("Gagal memuat Pasar Seribu Kisah. Coba lagi nanti.");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadPublishedCampaigns();
+    }, [getPublishedCampaigns]);
 
 	const handleCopyCampaign = async (originalCampaign: Campaign) => {
 		setCopyingId(originalCampaign.id); // FASE 2
@@ -113,29 +110,23 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({
 		//     (newCampaign as any).currentTime = 43200; // Fallback ke 12:00 PM
 		// }
 
-		try {
-			// REFAKTOR G-4: Panggil aksi dataStore untuk membuat campaign
-			const createdCampaign = await dataService.createCampaign(
-				newCampaign,
-				userId
-			);
-
-			// REFAKTOR G-4: Panggil aksi store untuk menambah ke SSoT
-			onCampaignCopied(createdCampaign);
-			// FASE 4: Ganti alert() dengan console.log untuk pesan sukses non-invasif
-			// FASE 2: Ganti console.log dengan UI feedback
-			setStatusMessage(
-				`Kampanye "${originalCampaign.title}" telah disalin ke Aula Gema Anda!`
-			);
-		} catch (error) {
-			console.error("Gagal menyalin campaign:", error);
-			// FASE 4: Hapus alert()
-			// FASE 2: Ganti console.error dengan UI feedback
-			setStatusMessage(`Gagal menyalin campaign: ${error.message || 'Error tidak diketahui'}`);
-		} finally {
-			setCopyingId(null); // FASE 2
-		}
-	};
+        try {
+            // Gunakan aksi store untuk membuat campaign dan otomatis menambah ke SSoT
+            await createCampaign(newCampaign, userId);
+            // FASE 4: Ganti alert() dengan console.log untuk pesan sukses non-invasif
+            // FASE 2: Ganti console.log dengan UI feedback
+            setStatusMessage(
+                `Kampanye "${originalCampaign.title}" telah disalin ke Aula Gema Anda!`
+            );
+        } catch (error) {
+            console.error("Gagal menyalin campaign:", error);
+            // FASE 4: Hapus alert()
+            // FASE 2: Ganti console.error dengan UI feedback
+            setStatusMessage(`Gagal menyalin campaign: ${error.message || 'Error tidak diketahui'}`);
+        } finally {
+            setCopyingId(null); // FASE 2
+        }
+    };
 
 	const filteredCampaigns = publishedCampaigns.filter(
 		(c) => filter === "Semua" || c.mainGenre === filter

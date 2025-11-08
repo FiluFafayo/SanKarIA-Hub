@@ -8,7 +8,7 @@ import React from 'react';
 import { Location, Campaign, Character } from '../types';
 import { useAppStore } from '../store/appStore';
 import { useDataStore } from '../store/dataStore';
-import { dataService } from '../services/dataService'; // Import dataService
+import { useDataStore } from '../store/dataStore';
 
 // Import Views
 import { NexusSanctum } from './NexusSanctum'; // FASE 0: Import Nexus
@@ -45,8 +45,7 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
     const { campaigns, characters } = useDataStore(s => s.state);
     
     // Ambil Aksi SSoT
-    // REFAKTOR G-4: HallOfEchoesView memanggil dataStore.saveCampaign secara langsung
-    const { createCampaign, addCampaign } = useDataStore(s => s.actions);
+    const { createCampaign, signOut } = useDataStore(s => s.actions);
 
     // Ini adalah logika 'renderView' yang lama
     if (currentView === 'character-selection' && campaignToJoinOrStart) {
@@ -84,7 +83,6 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
       case Location.MarketOfAThousandTales:
         return <MarketplaceView 
                     onClose={returnToNexus} 
-                    onCampaignCopied={addCampaign} // Aksi SSoT
                     userId={userId} 
                 />;
       case Location.TinkerersWorkshop:
@@ -93,7 +91,7 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
                     currentTheme={theme} 
                     setTheme={setTheme}
                     userEmail={userEmail}
-                    onSignOut={() => dataService.signOut()}
+                    onSignOut={() => signOut()}
                 />;
       case Location.MirrorOfSouls:
         return <ProfileView 
