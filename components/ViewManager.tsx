@@ -8,7 +8,7 @@ import React from 'react';
 import { Location, Campaign, Character } from '../types';
 import { useAppStore } from '../store/appStore';
 import { useDataStore } from '../store/dataStore';
-import { useDataStore } from '../store/dataStore';
+import { useGameStore } from '../store/gameStore';
 
 // Import Views
 import { NexusSanctum } from './NexusSanctum'; // FASE 0: Import Nexus
