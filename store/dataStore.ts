@@ -120,8 +120,10 @@ export const useDataStore = create<DataStore>((set, get) => ({
 				state: {
 					...state.state,
 					campaigns: [...state.state.campaigns, campaign],
-        },
+				},
+			})),
 
+        // --- Aksi util publik (harus berada di level actions, bukan di dalam set() di atas) ---
         getPublishedCampaigns: async () => {
             try {
                 const { campaign } = getRepositories();
@@ -142,7 +144,6 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 throw e;
             }
         },
-			})),
 		_updateCampaign: (campaign) =>
 			set((state) => ({
 				state: {
