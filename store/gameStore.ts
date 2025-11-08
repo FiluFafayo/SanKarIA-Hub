@@ -13,14 +13,16 @@ import { useAppStore } from "./appStore"; // Diperlukan untuk reset navigasi
 // =================================================================
 
 interface RuntimeState {
-	playingCampaign: CampaignState | null;
-	playingCharacter: Character | null;
-	isGameLoading: boolean;
+    playingCampaign: CampaignState | null;
+    playingCharacter: Character | null;
+    isGameLoading: boolean;
+    sessionAbortController: AbortController | null;
 }
 const initialRuntimeState: RuntimeState = {
-	playingCampaign: null,
-	playingCharacter: null,
-	isGameLoading: false,
+    playingCampaign: null,
+    playingCharacter: null,
+    isGameLoading: false,
+    sessionAbortController: null,
 };
 interface RuntimeActions {
     loadGameSession: (campaign: Campaign, character: Character) => Promise<void>;
@@ -30,6 +32,8 @@ interface RuntimeActions {
     // Aksi internal yang dipanggil oleh GameScreen/Hooks
     _setRuntimeCampaignState: (campaignState: CampaignState) => void;
     _setRuntimeCharacterState: (character: Character) => void;
+    // Pembatalan level sesi
+    cancelAllInFlight: () => void;
 }
 
 // --- Gabungan Store ---
@@ -74,6 +78,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 						playingCampaign: campaignState,
 						playingCharacter: character,
 						isGameLoading: false,
+                        sessionAbortController: new AbortController(),
 					},
 				});
 
@@ -100,7 +105,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 			}
 		},
 		exitGameSession: () => {
-			const { playingCampaign, playingCharacter } = get().runtime;
+            // Batalkan semua panggilan AI yang masih berjalan (level sesi)
+            const controller = get().runtime.sessionAbortController;
+            controller?.abort();
+
+            const { playingCampaign, playingCharacter } = get().runtime;
 
 			if (playingCampaign) {
 				// Simpan SSoT Campaign
@@ -128,6 +137,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 			});
 		},
         resetRuntimeOnLogout: () => {
+            // Batalkan semua panggilan AI (jika ada)
+            const controller = get().runtime.sessionAbortController;
+            controller?.abort();
             // Jangan menyimpan apapun, hanya reset runtime state
             set({ runtime: initialRuntimeState });
             // Pulihkan navigasi global ke Nexus
@@ -143,5 +155,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
 				runtime: { ...state.runtime, playingCharacter: character },
 			}));
 		},
+        cancelAllInFlight: () => {
+            const controller = get().runtime.sessionAbortController;
+            controller?.abort();
+            // Setelah abort, buat controller baru agar sesi tetap bisa lanjut jika tidak exit
+            set((state) => ({
+                runtime: { ...state.runtime, sessionAbortController: new AbortController() }
+            }));
+        },
 	},
 }));

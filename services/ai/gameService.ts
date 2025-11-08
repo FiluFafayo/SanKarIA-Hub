@@ -188,6 +188,7 @@ class GameService {
 
     private buildPrompt(campaign: Campaign, players: Character[], playerAction: string, actingCharacterId: string | null): string { // (Poin 6)
         const worldState = `Saat ini adalah ${formatDndTime(campaign.currentTime)} hari, dengan cuaca ${campaign.currentWeather}.`;
+        const turnTrace = `TRACE: Turn ID = ${campaign.turnId || 'none'}`;
 
         // (Poin 4) Konteks Quest/NPC diperkaya
         const questContext = `Misi Aktif: ${JSON.stringify(campaign.quests.filter(q => q.status === 'active').map(q => ({ title: q.title, id: q.id }))) || 'Tidak ada'}`;
@@ -219,6 +220,7 @@ class GameService {
             : 'Inventaris pemain tidak diketahui.';
 
         return `KONTEKS KAMPANYE:
+        - ${turnTrace}
         - Cerita Jangka Panjang: ${campaign.longTermMemory}
         - State Dunia: ${worldState}. Lokasi Saat Ini: ${campaign.currentPlayerLocation || 'Tidak diketahui'}.
         - ${questContext}
@@ -241,7 +243,8 @@ class GameService {
         players: Character[],
         playerAction: string,
         actingCharacterId: string | null, // (Poin 6) ID pelaku aksi
-        onStateChange: (state: 'thinking' | 'retrying') => void
+        onStateChange: (state: 'thinking' | 'retrying') => void,
+        signal?: AbortSignal
     ): Promise<StructuredApiResponse> {
         onStateChange('thinking');
 
@@ -317,7 +320,7 @@ class GameService {
         };
 
         try {
-            return await geminiService.makeApiCall(call);
+            return await geminiService.makeApiCall(call, signal);
         } catch (error) {
             console.error("[G-2] Gagal total menghasilkan TurnResponse:", error);
             // Kembalikan respons fallback yang aman

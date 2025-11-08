@@ -32,20 +32,32 @@ const SKILL_TO_VERB_MAP: Record<Skill, string> = {
 export const ActionBar: React.FC<ActionBarProps> = ({ disabled, onActionSubmit, pendingSkill }) => {
     const [text, setText] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
+    const lastSkillRef = useRef<Skill | null>(null);
 
     useEffect(() => {
         if (pendingSkill) {
             const verb = SKILL_TO_VERB_MAP[pendingSkill] || `menggunakan ${pendingSkill}`;
-            setText(`Aku mencoba ${verb} untuk `);
-            inputRef.current?.focus();
+            const prefill = `Aku mencoba ${verb} untuk `;
+            const isTextEmpty = text.trim().length === 0;
+            const looksPrefilled = text.startsWith('Aku mencoba ');
+            const isNewSkill = lastSkillRef.current !== pendingSkill;
+
+            // Only prefill if user hasn't started custom typing or it matches old prefill
+            if (isTextEmpty || (looksPrefilled && isNewSkill)) {
+                setText(prefill);
+                if (!disabled) inputRef.current?.focus();
+                lastSkillRef.current = pendingSkill;
+            }
         }
-    }, [pendingSkill]);
+    // include text and disabled in deps to guard against overriding user input during typing
+    }, [pendingSkill, text, disabled]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (text.trim() && !disabled) {
             onActionSubmit(text.trim());
             setText('');
+            lastSkillRef.current = null;
         }
     };
 

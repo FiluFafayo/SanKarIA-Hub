@@ -50,7 +50,7 @@ class GeminiService {
         console.warn(`[G-2] Beralih ke Kunci API #${this.currentKeyIndex + 1}`);
     }
 
-    public async makeApiCall<T>(call: (client: GoogleGenAI) => Promise<T>): Promise<T> {
+    public async makeApiCall<T>(call: (client: GoogleGenAI) => Promise<T>, signal?: AbortSignal): Promise<T> {
         let attempts = 0;
         const maxAttempts = Math.max(1, this.apiKeys.length);
 
@@ -61,8 +61,20 @@ class GeminiService {
                     setTimeout(() => reject(new Error(`API call timed out after 30 seconds (Attempt ${attempts + 1}/${maxAttempts})`)), 30000)
                 );
 
+                const abortPromise = signal
+                    ? new Promise<never>((_, reject) => {
+                        if (signal.aborted) {
+                            reject(new Error('API call aborted'));
+                            return;
+                        }
+                        signal.addEventListener('abort', () => reject(new Error('API call aborted')), { once: true });
+                    })
+                    : null;
+
                 // @ts-ignore
-                const result = await Promise.race([call(client), timeoutPromise]);
+                const racers = [call(client), timeoutPromise];
+                if (abortPromise) racers.push(abortPromise);
+                const result = await Promise.race(racers);
                 return result;
 
             } catch (error: any) {

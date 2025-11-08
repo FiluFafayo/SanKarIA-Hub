@@ -122,6 +122,29 @@ export const addDndTime = (currentSeconds: number, unit: 'round' | 'minute' | 'h
     return currentSeconds + secondsToAdd;
 };
 
+// Menggabungkan beberapa AbortSignal menjadi satu. Jika salah satu abort, sinyal gabungan ikut abort.
+export const composeAbortSignals = (
+    ...signals: Array<AbortSignal | undefined>
+): AbortSignal | undefined => {
+    const validSignals = signals.filter(Boolean) as AbortSignal[];
+    if (validSignals.length === 0) return undefined;
+
+    const controller = new AbortController();
+    const abort = () => {
+        if (!controller.signal.aborted) controller.abort();
+    };
+
+    for (const sig of validSignals) {
+        if (sig.aborted) {
+            abort();
+        } else {
+            sig.addEventListener('abort', abort, { once: true });
+        }
+    }
+
+    return controller.signal;
+};
+
 // (Poin 3 / Cleanup DRY) Pindahkan parser dialog ke sini
 export const parseAndLogNarration = (
     narration: string, 

@@ -1,7 +1,7 @@
 // REFAKTOR G-2: Seluruh file ini di-refaktor untuk menggunakan SATU PANGGILAN AI (gameService.generateTurnResponse)
 // Ini memperbaiki bug 'AI DM STUCK' (G-2) dan menyederhanakan logika secara drastis.
 
-import { useCallback } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { CampaignState, CampaignActions } from './useCampaign';
 import {
     Character, DiceRoll, RollRequest, Skill, StructuredApiResponse,
@@ -15,7 +15,8 @@ import { gameService } from '../services/ai/gameService';
 // Import service GENERASI (G-2)
 import { generationService } from '../services/ai/generationService';
 // (Cleanup DRY) Impor dari utils
-import { parseAndLogNarration } from '../utils';
+import { parseAndLogNarration, composeAbortSignals } from '../utils';
+import { useGameStore } from '../store/gameStore';
 
 const WORLD_EVENT_THRESHOLD = 5; // Trigger event every 5 player turns
 
@@ -28,6 +29,15 @@ interface ExplorationSystemProps {
 }
 
 export function useExplorationSystem({ campaign, character, players, campaignActions, onCharacterUpdate }: ExplorationSystemProps) {
+    // Cancellation & stale guards
+    const aiAbortRef = useRef<AbortController | null>(null);
+    const seqRef = useRef(0);
+
+    useEffect(() => {
+        return () => {
+            aiAbortRef.current?.abort();
+        };
+    }, []);
 
     // processToolCalls tetap sama (sudah di-patch G-1)
     const processToolCalls = useCallback((turnId: string, toolCalls: ToolCall[]) => {
@@ -185,6 +195,11 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: actionText }, turnId);
         campaignActions.clearChoices();
 
+        // Cancel any in-flight AI call
+        aiAbortRef.current?.abort();
+        aiAbortRef.current = new AbortController();
+        const mySeq = ++seqRef.current;
+
         // --- BARU: FASE 5 (Fog of War Reveal) ---
         // Diadaptasi dari P2 (pixel-vtt-stylizer ExplorationView)
         const FOG_REVEAL_RADIUS = 3.5;
@@ -228,7 +243,11 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                     players,
                     encounterActionText, // Paksa prompt encounter
                     null, // (Poin 6) Aksi 'random encounter' tidak punya pelaku spesifik
-                    campaignActions.setThinkingState
+                    campaignActions.setThinkingState,
+                    composeAbortSignals(
+                        aiAbortRef.current?.signal,
+                        useGameStore.getState().runtime.sessionAbortController?.signal
+                    )
                 );
 
                 // Log narasi encounter
@@ -267,9 +286,18 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                 players,
                 actionText,
                 character.id, // (Poin 6) Kirim ID pelaku aksi
-                campaignActions.setThinkingState
+                campaignActions.setThinkingState,
+                composeAbortSignals(
+                    aiAbortRef.current?.signal,
+                    useGameStore.getState().runtime.sessionAbortController?.signal
+                )
             );
             // ==========================================================
+
+            // Drop stale responses if a newer action started or turn changed
+            if (seqRef.current !== mySeq || campaign.turnId !== turnId) {
+                return;
+            }
 
             // 1. Log Narasi (Sekarang aman)
             if (response.reaction) {
@@ -313,15 +341,28 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         const actionText = `Hasil dari lemparan dadu ${character.name} untuk "${request.reason}": ${roll.total} (${roll.success ? 'BERHASIL' : 'GAGAL'}). (Aksi asli: ${request.originalActionText})`;
 
         try {
+            // Cancel any in-flight AI call
+            aiAbortRef.current?.abort();
+            aiAbortRef.current = new AbortController();
+            const mySeq = ++seqRef.current;
             // ================== PANGGILAN ATOMIK G-2 (Setelah Roll) ==================
             const response = await gameService.generateTurnResponse(
                 campaign,
                 players,
                 actionText, // Inputnya sekarang adalah hasil roll
                 character.id, // (Poin 6) Kirim ID pelaku aksi
-                campaignActions.setThinkingState
+                campaignActions.setThinkingState,
+                composeAbortSignals(
+                    aiAbortRef.current?.signal,
+                    useGameStore.getState().runtime.sessionAbortController?.signal
+                )
             );
             // ========================================================================
+
+            // Drop stale responses if a newer action started or turn changed
+            if (seqRef.current !== mySeq || campaign.turnId !== turnId) {
+                return;
+            }
 
             // 1. Log Narasi
             if (response.reaction) { campaignActions.logEvent({ type: 'dm_reaction', text: response.reaction }, turnId); }

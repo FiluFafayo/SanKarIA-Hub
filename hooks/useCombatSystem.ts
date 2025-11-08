@@ -34,7 +34,8 @@ import { generationService } from "../services/ai/generationService";
 import { renderMapLayout } from "../services/pixelRenderer";
 import { BATTLE_TILESET } from "../data/tileset";
 // (Cleanup DRY) Impor dari utils
-import { parseAndLogNarration } from "../utils";
+import { parseAndLogNarration, composeAbortSignals } from "../utils";
+import { useGameStore } from "../store/gameStore";
 
 
 interface CombatSystemProps {
@@ -518,7 +519,12 @@ export const useCombatSystem = ({
 	// =================================================================
 	// FUNGSI INTI 3: advanceTurn (Menangani alur giliran)
 	// =================================================================
-	const advanceTurn = useCallback(async () => {
+    const advanceTurn = useCallback(async () => {
+        // Cancellation & stale guards for AI calls inside combat
+        const aiAbortRef = (advanceTurn as any)._abortRef || { current: null };
+        const seqRef = (advanceTurn as any)._seqRef || { current: 0 };
+        (advanceTurn as any)._abortRef = aiAbortRef;
+        (advanceTurn as any)._seqRef = seqRef;
 		// --- 1A. CEK TPK (Total Party Kill) (F1.2) ---
 		const playersInCombat = players.filter((p) =>
 			campaign.initiativeOrder.includes(p.id)
@@ -575,13 +581,17 @@ export const useCombatSystem = ({
 
 				// REFAKTOR G-2: Ganti Panggilan "Two-Step" menjadi "One-Step"
 				// PANGGILAN ATOMIK: Dapatkan Narasi Akhir Kombat + Mekanik (loot, quest, dll)
-				const response = await gameService.generateTurnResponse(
-					campaign,
-					players,
-					actionText,
-					null, // (Poin 6) Tidak ada pelaku aksi spesifik di akhir kombat
-					campaignActions.setThinkingState
-				);
+                const response = await gameService.generateTurnResponse(
+                    campaign,
+                    players,
+                    actionText,
+                    null, // (Poin 6) Tidak ada pelaku aksi spesifik di akhir kombat
+                    campaignActions.setThinkingState,
+                    composeAbortSignals(
+                        (advanceTurn as any)._abortRef?.current?.signal,
+                        useGameStore.getState().runtime.sessionAbortController?.signal
+                    )
+                );
 
 				// 1. Log Narasi
 				if (response.reaction)
@@ -648,20 +658,33 @@ export const useCombatSystem = ({
 
 						// REFAKTOR G-2: Ganti Panggilan "Two-Step" menjadi "One-Step"
 						// PANGGILAN ATOMIK: Dapatkan Narasi Aksi Monster + Mekanik
-						const response = await gameService.generateTurnResponse(
-							campaign,
-							players,
-							actionText,
-							nextCombatant.instanceId, // (Poin 6) Kirim ID pelaku aksi (monster)
-							campaignActions.setThinkingState
-						);
+                    // Cancel any in-flight AI call (monster or player)
+                    if (aiAbortRef.current) aiAbortRef.current.abort();
+                    aiAbortRef.current = new AbortController();
+                    const mySeq = ++seqRef.current;
+                    const response = await gameService.generateTurnResponse(
+                            campaign,
+                            players,
+                            actionText,
+                            nextCombatant.instanceId, // (Poin 6) Kirim ID pelaku aksi (monster)
+                            campaignActions.setThinkingState,
+                            composeAbortSignals(
+                                aiAbortRef.current?.signal,
+                                useGameStore.getState().runtime.sessionAbortController?.signal
+                            )
+                        );
 
-						// 1. Log Narasi
-						if (response.reaction)
-							campaignActions.logEvent(
-								{ type: "dm_reaction", text: response.reaction },
-								turnId
-							);
+                        // Drop stale responses if a newer combat step started
+                        if (seqRef.current !== mySeq || campaign.turnId !== turnId) {
+                            return;
+                        }
+
+                        // 1. Log Narasi
+                        if (response.reaction)
+                            campaignActions.logEvent(
+                                { type: "dm_reaction", text: response.reaction },
+                                turnId
+                            );
 						// (Poin 3) Gunakan parser baru untuk dialog
 						parseAndLogNarration(response.narration, turnId, campaignActions);
 
