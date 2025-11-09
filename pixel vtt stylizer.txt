@@ -1,0 +1,1009 @@
+Selected Files Directory Structure:
+
+└── ./
+    ├── components
+    │   ├── AssemblerView.tsx
+    │   ├── BattleView.tsx
+    │   ├── ExplorationView.tsx
+    │   ├── Header.tsx
+    │   ├── LoadingSpinner.tsx
+    │   ├── Modal.tsx
+    │   └── StylizerButton.tsx
+    ├── data
+    │   ├── assets.ts
+    │   └── maps.ts
+    ├── services
+    │   └── geminiService.ts
+    ├── App.tsx
+    ├── index.html
+    ├── index.tsx
+    ├── metadata.json
+    ├── package.json
+    ├── tsconfig.json
+    ├── types.ts
+    └── vite.config.ts
+
+
+
+--- metadata.json ---
+
+{
+  "name": "Pixel VTT Stylizer",
+  "description": "A 2D Virtual Tabletop (VTT) application that uses a pixel art foundation and leverages the Gemini API to stylize assets and maps into high-resolution versions.",
+  "requestFramePermissions": []
+}
+
+--- App.tsx ---
+
+
+import React, { useState, useRef, useCallback } from 'react';
+import { AppView, Tile, SpritePartCategory, AssembledCharacter, POI } from './types';
+import { TILES, SPRITE_PARTS } from './data/assets';
+import { EXPLORATION_MAP_DATA, BATTLE_MAP_DATA } from './data/maps';
+import { Header } from './components/Header';
+import { ExplorationView } from './components/ExplorationView';
+import { BattleView } from './components/BattleView';
+import { AssemblerView } from './components/AssemblerView';
+import { Modal } from './components/Modal';
+import { stylizeImage } from './services/geminiService';
+import { LoadingSpinner } from './components/LoadingSpinner';
+import { StylizerButton } from './components/StylizerButton';
+
+const App: React.FC = () => {
+  const [currentView, setCurrentView] = useState<AppView>(AppView.EXPLORATION);
+  const [assembledCharacter, setAssembledCharacter] = useState<AssembledCharacter>({
+    body: SPRITE_PARTS.bodies[0],
+    head: SPRITE_PARTS.heads[0],
+    weapon: SPRITE_PARTS.weapons[0],
+  });
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [stylizedImageResult, setStylizedImageResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const handleStylize = useCallback(async () => {
+    if (!canvasRef.current) {
+      setError("Canvas not available for stylization.");
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    setStylizedImageResult(null);
+
+    try {
+      const pixelArtDataUrl = canvasRef.current.toDataURL('image/png');
+      const base64Data = pixelArtDataUrl.split(',')[1];
+      
+      let prompt = "Stylize this pixel art into a high-resolution, detailed fantasy illustration. Keep the composition and elements identical.";
+      if (currentView === AppView.ASSEMBLER) {
+          prompt = "Render this pixel art character sprite as a high-resolution, detailed fantasy character portrait. Keep the pose, equipment, and colors consistent."
+      } else if (currentView === AppView.BATTLE) {
+          prompt = "Render this pixel art top-down battle map as a high-resolution, detailed fantasy tactical map. Keep the layout, terrain, and grid structure identical."
+      } else if (currentView === AppView.EXPLORATION) {
+          prompt = "Render this pixel art top-down exploration map as a high-resolution, detailed fantasy world map. Keep the layout and terrain features identical. Ignore the fog of war."
+      }
+
+      const result = await stylizeImage(base64Data, prompt);
+      setStylizedImageResult(result);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "An unknown error occurred during stylization.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentView]);
+
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case AppView.EXPLORATION:
+        return <ExplorationView mapData={EXPLORATION_MAP_DATA} tiles={TILES} canvasRef={canvasRef} />;
+      case AppView.BATTLE:
+        return <BattleView mapData={BATTLE_MAP_DATA} tiles={TILES} canvasRef={canvasRef} />;
+      case AppView.ASSEMBLER:
+        return <AssemblerView 
+                  spriteParts={SPRITE_PARTS} 
+                  character={assembledCharacter} 
+                  setCharacter={setAssembledCharacter} 
+                  canvasRef={canvasRef} 
+               />;
+      default:
+        return <ExplorationView mapData={EXPLORATION_MAP_DATA} tiles={TILES} canvasRef={canvasRef} />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col p-4 font-sans">
+      <Header currentView={currentView} setCurrentView={setCurrentView} />
+      <main className="flex-grow flex flex-col items-center justify-center mt-4">
+        <div className="w-full max-w-5xl bg-gray-800 rounded-lg shadow-2xl p-4 border border-indigo-500/30">
+          <div className="flex justify-between items-center mb-4">
+             <h2 className="text-2xl font-bold text-indigo-400 capitalize">{currentView} View</h2>
+             <StylizerButton onStylize={handleStylize} isLoading={isLoading} />
+          </div>
+          {error && <div className="bg-red-500/20 border border-red-500 text-red-300 p-3 rounded-md mb-4">{error}</div>}
+          <div className="relative w-full aspect-video bg-black rounded-md overflow-hidden flex items-center justify-center">
+             {renderCurrentView()}
+          </div>
+        </div>
+      </main>
+
+      {stylizedImageResult && (
+        <Modal title="Stylized HD Render" onClose={() => setStylizedImageResult(null)}>
+          <img src={stylizedImageResult} alt="Stylized result" className="max-w-full max-h-[80vh] rounded-lg" />
+        </Modal>
+      )}
+
+      {isLoading && !stylizedImageResult && (
+         <div className="fixed inset-0 bg-black/70 flex flex-col items-center justify-center z-50">
+            <LoadingSpinner />
+            <p className="text-xl text-indigo-300 mt-4 animate-pulse">Stylizing with Nano Banana...</p>
+         </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
+
+
+--- types.ts ---
+
+
+export enum AppView {
+  EXPLORATION = 'exploration',
+  BATTLE = 'battle',
+  ASSEMBLER = 'assembler',
+}
+
+export interface Tile {
+  id: number;
+  name: string;
+  color: string;
+  isImpassable?: boolean;
+  movementCost?: number;
+}
+
+export interface POI {
+  id: number;
+  name: string;
+  position: { x: number; y: number };
+  description: string;
+}
+
+export interface MapData {
+  grid: number[][];
+  pois?: POI[];
+  initialPartyPosition?: { x: number; y: number };
+}
+
+export interface SpritePart {
+  id: string;
+  name: string;
+  color: string; // Using color for simplicity, can be replaced with image URLs
+}
+
+export interface SpritePartCategory {
+  heads: SpritePart[];
+  bodies: SpritePart[];
+  weapons: SpritePart[];
+}
+
+export interface AssembledCharacter {
+  head: SpritePart;
+  body: SpritePart;
+  weapon: SpritePart;
+}
+
+
+--- services/geminiService.ts ---
+
+
+import { GoogleGenAI, Modality } from "@google/genai";
+
+const MODEL_NAME = 'gemini-2.5-flash-image';
+
+export async function stylizeImage(base64ImageData: string, prompt: string): Promise<string> {
+  // This is a placeholder for a real API key, which should be handled by the environment.
+  if (!process.env.API_KEY) {
+    // In a real app, this would be a fatal error.
+    // Here, we simulate a delay and return a placeholder image for development.
+    console.warn("API_KEY is not set. Using placeholder image and simulated delay.");
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve(`https://picsum.photos/seed/${Math.random()}/1024/576`);
+        }, 2000);
+    });
+  }
+    
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  const response = await ai.models.generateContent({
+    model: MODEL_NAME,
+    contents: {
+      parts: [
+        {
+          inlineData: {
+            data: base64ImageData,
+            mimeType: 'image/png',
+          },
+        },
+        {
+          text: prompt,
+        },
+      ],
+    },
+    config: {
+      responseModalities: [Modality.IMAGE],
+    },
+  });
+
+  for (const part of response.candidates?.[0]?.content?.parts || []) {
+    if (part.inlineData) {
+      const base64ImageBytes: string = part.inlineData.data;
+      return `data:image/png;base64,${base64ImageBytes}`;
+    }
+  }
+
+  throw new Error("No image was generated by the AI model.");
+}
+
+
+--- data/assets.ts ---
+
+
+import { Tile, SpritePartCategory } from '../types';
+
+export const TILES: Record<number, Tile> = {
+  0: { id: 0, name: 'Grass', color: '#34A853' },
+  1: { id: 1, name: 'Stone', color: '#757575', isImpassable: true },
+  2: { id: 2, name: 'Water', color: '#4285F4', isImpassable: true },
+  3: { id: 3, name: 'Dirt', color: '#A1887F' },
+  4: { id: 4, name: 'Sand', color: '#FBC02D' },
+  5: { id: 5, name: 'Wall', color: '#424242', isImpassable: true },
+  6: { id: 6, name: 'Mud', color: '#6D4C41', movementCost: 2 },
+  7: { id: 7, name: 'Bush', color: '#00796B', movementCost: 2 },
+};
+
+export const SPRITE_PARTS: SpritePartCategory = {
+  heads: [
+    { id: 'h1', name: 'Human Head', color: '#FBC02D' },
+    { id: 'h2', name: 'Elf Head', color: '#E0E0E0' },
+    { id: 'h3', name: 'Orc Head', color: '#388E3C' },
+  ],
+  bodies: [
+    { id: 'b1', name: 'Leather Armor', color: '#795548' },
+    { id: 'b2', name: 'Plate Armor', color: '#BDBDBD' },
+    { id: 'b3', name: 'Mage Robe', color: '#5E35B1' },
+  ],
+  weapons: [
+    { id: 'w1', name: 'Sword', color: '#9E9E9E' },
+    { id: 'w2', name: 'Axe', color: '#616161' },
+    { id: 'w3', name: 'Staff', color: '#8D6E63' },
+  ],
+};
+
+
+--- data/maps.ts ---
+
+
+import { MapData } from '../types';
+
+export const EXPLORATION_MAP_DATA: MapData = {
+  grid: [
+    [2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4, 4],
+    [2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 4, 4, 4, 4, 4, 4],
+    [2, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 4, 4, 0, 0, 0],
+    [0, 0, 3, 3, 1, 1, 3, 3, 3, 3, 0, 0, 0, 0, 7, 0],
+    [0, 3, 3, 1, 1, 1, 1, 3, 3, 3, 3, 3, 0, 7, 7, 7],
+    [0, 3, 3, 1, 1, 1, 3, 3, 3, 3, 3, 0, 0, 7, 7, 0],
+    [0, 0, 3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 6, 6, 6, 0, 0, 1, 1, 1, 0],
+    [0, 0, 0, 0, 0, 0, 6, 6, 6, 6, 6, 0, 1, 1, 1, 0],
+  ],
+  initialPartyPosition: { x: 4, y: 4 },
+  pois: [
+    { id: 1, name: 'Whispering Ruins', position: { x: 4, y: 5 }, description: 'The ancient ruins of a forgotten castle.' },
+    { id: 2, name: 'Sandy Shore', position: { x: 13, y: 1 }, description: 'A calm beach overlooking the Great Sea.' },
+    { id: 3, name: "Goblin's Fen", position: { x: 8, y: 8 }, description: 'A murky swamp, home to unpleasant creatures.' },
+  ],
+};
+
+export const BATTLE_MAP_DATA: MapData = {
+  grid: [
+    [0, 0, 7, 7, 0, 0, 0, 1, 1, 0],
+    [0, 3, 3, 7, 0, 0, 6, 6, 1, 0],
+    [3, 3, 3, 3, 0, 6, 6, 6, 0, 0],
+    [3, 3, 3, 0, 0, 0, 6, 0, 2, 2],
+    [0, 0, 0, 0, 5, 5, 0, 2, 2, 2],
+    [0, 0, 0, 0, 5, 5, 0, 0, 2, 2],
+    [0, 1, 1, 0, 0, 0, 3, 3, 3, 0],
+    [1, 1, 1, 1, 0, 3, 3, 3, 3, 0],
+  ],
+};
+
+
+--- components/Header.tsx ---
+
+
+import React from 'react';
+import { AppView } from '../types';
+
+interface HeaderProps {
+  currentView: AppView;
+  setCurrentView: (view: AppView) => void;
+}
+
+const NavButton: React.FC<{
+  view: AppView;
+  currentView: AppView;
+  onClick: (view: AppView) => void;
+  children: React.ReactNode;
+}> = ({ view, currentView, onClick, children }) => {
+  const isActive = view === currentView;
+  const baseClasses = 'px-4 py-2 rounded-md font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900';
+  const activeClasses = 'bg-indigo-600 text-white shadow-lg';
+  const inactiveClasses = 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white';
+
+  return (
+    <button
+      onClick={() => onClick(view)}
+      className={`${baseClasses} ${isActive ? activeClasses : inactiveClasses}`}
+    >
+      {children}
+    </button>
+  );
+};
+
+
+export const Header: React.FC<HeaderProps> = ({ currentView, setCurrentView }) => {
+  return (
+    <header className="w-full flex flex-col sm:flex-row justify-between items-center bg-gray-800/50 p-4 rounded-lg shadow-md border border-gray-700">
+      <h1 className="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-500 mb-4 sm:mb-0">
+        Pixel VTT Stylizer
+      </h1>
+      <nav className="flex items-center space-x-2">
+        <NavButton view={AppView.EXPLORATION} currentView={currentView} onClick={setCurrentView}>Exploration</NavButton>
+        <NavButton view={AppView.BATTLE} currentView={currentView} onClick={setCurrentView}>Battle</NavButton>
+        <NavButton view={AppView.ASSEMBLER} currentView={currentView} onClick={setCurrentView}>Assembler</NavButton>
+      </nav>
+    </header>
+  );
+};
+
+
+--- components/ExplorationView.tsx ---
+
+
+import React, { useEffect, useRef, useState } from 'react';
+import { MapData, Tile, POI } from '../types';
+import { Modal } from './Modal';
+
+interface ExplorationViewProps {
+  mapData: MapData;
+  tiles: Record<number, Tile>;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+}
+
+const FOG_REVEAL_RADIUS = 3.5;
+
+export const ExplorationView: React.FC<ExplorationViewProps> = ({ mapData, tiles, canvasRef }) => {
+  const [partyPosition, setPartyPosition] = useState(mapData.initialPartyPosition || { x: 1, y: 1 });
+  const [fog, setFog] = useState<boolean[][]>([]);
+  const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
+
+  useEffect(() => {
+    // Initialize fog
+    const initialFog = mapData.grid.map(row => row.map(() => true));
+    setFog(initialFog);
+  }, [mapData.grid]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || fog.length === 0) return; // FIX: Guard against uninitialized fog
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { width, height } = canvas.getBoundingClientRect();
+    canvas.width = width;
+    canvas.height = height;
+    
+    const mapHeight = mapData.grid.length;
+    const mapWidth = mapData.grid[0].length;
+    
+    const tileSize = Math.min(width / mapWidth, height / mapHeight);
+
+    // Update fog based on party position
+    const newFog = fog.map(row => [...row]);
+    let fogUpdated = false;
+    for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+            const distance = Math.sqrt(Math.pow(x - partyPosition.x, 2) + Math.pow(y - partyPosition.y, 2));
+            if (distance < FOG_REVEAL_RADIUS && newFog[y][x]) {
+                newFog[y][x] = false;
+                fogUpdated = true;
+            }
+        }
+    }
+    if(fogUpdated) setFog(newFog);
+
+    // --- Drawing ---
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, width, height);
+
+    // Draw map
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const tileId = mapData.grid[y][x];
+        const tile = tiles[tileId];
+        ctx.fillStyle = tile ? tile.color : '#FF00FF'; // Use magenta for unknown tiles
+        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+      }
+    }
+
+    // Draw party token
+    ctx.fillStyle = 'yellow';
+    ctx.beginPath();
+    ctx.arc(partyPosition.x * tileSize + tileSize / 2, partyPosition.y * tileSize + tileSize / 2, tileSize / 2.5, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw POIs
+    ctx.font = `${tileSize * 0.8}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    mapData.pois?.forEach(poi => {
+        ctx.fillStyle = 'white';
+        ctx.fillText('?', poi.position.x * tileSize + tileSize / 2, poi.position.y * tileSize + tileSize / 2);
+    });
+
+    // Draw Fog of War
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        if (fog[y]?.[x]) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+        }
+      }
+    }
+
+  }, [mapData, tiles, canvasRef, partyPosition, fog]);
+  
+  // Simulate party movement
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPartyPosition(prev => {
+        const dx = Math.floor(Math.random() * 3) - 1;
+        const dy = Math.floor(Math.random() * 3) - 1;
+        const newX = Math.max(0, Math.min(mapData.grid[0].length - 1, prev.x + dx));
+        const newY = Math.max(0, Math.min(mapData.grid.length - 1, prev.y + dy));
+        const tileId = mapData.grid[newY][newX];
+        if (tiles[tileId]?.isImpassable) {
+            return prev;
+        }
+        return { x: newX, y: newY };
+      });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [mapData.grid, tiles]);
+
+  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    const mapHeight = mapData.grid.length;
+    const mapWidth = mapData.grid[0].length;
+    const tileSize = Math.min(rect.width / mapWidth, rect.height / mapHeight);
+
+    const clickedX = Math.floor(x / tileSize);
+    const clickedY = Math.floor(y / tileSize);
+
+    const clickedPoi = mapData.pois?.find(poi => poi.position.x === clickedX && poi.position.y === clickedY);
+    if (clickedPoi) {
+      setSelectedPoi(clickedPoi);
+    }
+  };
+
+  return (
+    <>
+      <canvas ref={canvasRef} className="w-full h-full" onClick={handleCanvasClick} />
+      {selectedPoi && (
+        <Modal title={selectedPoi.name} onClose={() => setSelectedPoi(null)}>
+            <p className="text-gray-300">{selectedPoi.description}</p>
+        </Modal>
+      )}
+    </>
+  );
+};
+
+
+--- components/BattleView.tsx ---
+
+
+import React, { useEffect, useState, useRef } from 'react';
+import { MapData, Tile } from '../types';
+
+interface BattleViewProps {
+  mapData: MapData;
+  tiles: Record<number, Tile>;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+}
+
+const TOKEN_START_POS = { x: 1, y: 1 };
+const MOVEMENT_RANGE = 4;
+
+export const BattleView: React.FC<BattleViewProps> = ({ mapData, tiles, canvasRef }) => {
+  const [tokenPos, setTokenPos] = useState(TOKEN_START_POS);
+  const [reachableTiles, setReachableTiles] = useState<Set<string>>(new Set());
+  const [showMovement, setShowMovement] = useState(true);
+
+  const calculateReachableTiles = () => {
+    const queue: { x: number, y: number, cost: number }[] = [{ ...tokenPos, cost: 0 }];
+    const visited = new Set<string>([`${tokenPos.x},${tokenPos.y}`]);
+    const reachable = new Set<string>();
+
+    while (queue.length > 0) {
+        const { x, y, cost } = queue.shift()!;
+        reachable.add(`${x},${y}`);
+
+        const neighbors = [
+            { nx: x + 1, ny: y },
+            { nx: x - 1, ny: y },
+            { nx: x, ny: y + 1 },
+            { nx: x, ny: y - 1 },
+        ];
+
+        for (const { nx, ny } of neighbors) {
+            const key = `${nx},${ny}`;
+            if (nx >= 0 && nx < mapData.grid[0].length && ny >= 0 && ny < mapData.grid.length && !visited.has(key)) {
+                visited.add(key);
+                const tileId = mapData.grid[ny][nx];
+                const tile = tiles[tileId];
+                if (tile && !tile.isImpassable) {
+                    const moveCost = tile.movementCost || 1;
+                    if (cost + moveCost <= MOVEMENT_RANGE) {
+                        queue.push({ x: nx, y: ny, cost: cost + moveCost });
+                    }
+                }
+            }
+        }
+    }
+    setReachableTiles(reachable);
+  };
+
+  useEffect(() => {
+    if (showMovement) {
+      calculateReachableTiles();
+    } else {
+      setReachableTiles(new Set());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenPos, showMovement, mapData, tiles]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { width, height } = canvas.getBoundingClientRect();
+    canvas.width = width;
+    canvas.height = height;
+
+    const mapHeight = mapData.grid.length;
+    const mapWidth = mapData.grid[0].length;
+    
+    const tileSize = Math.min(width / mapWidth, height / mapHeight);
+
+    // --- Drawing ---
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw map tiles
+    for (let y = 0; y < mapHeight; y++) {
+      for (let x = 0; x < mapWidth; x++) {
+        const tileId = mapData.grid[y][x];
+        const tile = tiles[tileId];
+        ctx.fillStyle = tile ? tile.color : '#FF00FF'; // Use magenta for unknown tiles
+        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+      }
+    }
+    
+    // Draw movement range
+    if (showMovement) {
+        ctx.fillStyle = 'rgba(79, 70, 229, 0.4)';
+        reachableTiles.forEach(key => {
+            const [x, y] = key.split(',').map(Number);
+            ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+        });
+    }
+
+    // Draw grid lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= mapWidth; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * tileSize, 0);
+      ctx.lineTo(x * tileSize, height);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= mapHeight; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, y * tileSize);
+      ctx.lineTo(width, y * tileSize);
+      ctx.stroke();
+    }
+    
+    // Draw token
+    ctx.fillStyle = 'red';
+    ctx.beginPath();
+    // FIX: Corrected arguments for arc method to draw a visible, centered token.
+    ctx.arc(tokenPos.x * tileSize + tileSize / 2, tokenPos.y * tileSize + tileSize / 2, tileSize / 3, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+  }, [mapData, tiles, canvasRef, tokenPos, reachableTiles, showMovement]);
+  
+  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    const mapHeight = mapData.grid.length;
+    const mapWidth = mapData.grid[0].length;
+    const tileSize = Math.min(rect.width / mapWidth, rect.height / mapHeight);
+
+    const clickedX = Math.floor(x / tileSize);
+    const clickedY = Math.floor(y / tileSize);
+
+    if (showMovement && reachableTiles.has(`${clickedX},${clickedY}`)) {
+        setTokenPos({ x: clickedX, y: clickedY });
+        setShowMovement(false);
+    } else if (clickedX === tokenPos.x && clickedY === tokenPos.y) {
+        setShowMovement(prev => !prev);
+    }
+  };
+
+  return <canvas ref={canvasRef} className="w-full h-full cursor-pointer" onClick={handleCanvasClick} />;
+};
+
+
+--- components/AssemblerView.tsx ---
+
+
+import React, { useEffect } from 'react';
+import { SpritePartCategory, AssembledCharacter, SpritePart } from '../types';
+
+interface AssemblerViewProps {
+  spriteParts: SpritePartCategory;
+  character: AssembledCharacter;
+  setCharacter: (character: AssembledCharacter) => void;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+}
+
+const PartSelector: React.FC<{
+    label: string;
+    parts: SpritePart[];
+    selectedPart: SpritePart;
+    onSelect: (part: SpritePart) => void;
+}> = ({ label, parts, selectedPart, onSelect }) => (
+    <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-400 mb-2">{label}</label>
+        <div className="flex flex-wrap gap-2">
+            {parts.map(part => (
+                <button
+                    key={part.id}
+                    onClick={() => onSelect(part)}
+                    className={`w-10 h-10 rounded-full border-2 transition-transform duration-150 ${
+                        selectedPart.id === part.id ? 'border-indigo-400 scale-110 ring-2 ring-indigo-400' : 'border-gray-600'
+                    }`}
+                    style={{ backgroundColor: part.color }}
+                    title={part.name}
+                />
+            ))}
+        </div>
+    </div>
+);
+
+export const AssemblerView: React.FC<AssemblerViewProps> = ({ spriteParts, character, setCharacter, canvasRef }) => {
+  
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { width, height } = canvas.getBoundingClientRect();
+    canvas.width = width;
+    canvas.height = height;
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const bodyHeight = height * 0.4;
+    const bodyWidth = bodyHeight * 0.6;
+    const headRadius = bodyWidth * 0.5;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw body
+    ctx.fillStyle = character.body.color;
+    ctx.fillRect(centerX - bodyWidth / 2, centerY - bodyHeight / 2, bodyWidth, bodyHeight);
+    
+    // Draw head
+    ctx.fillStyle = character.head.color;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY - bodyHeight / 2, headRadius, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // Draw weapon
+    ctx.fillStyle = character.weapon.color;
+    ctx.fillRect(centerX + bodyWidth / 2, centerY - bodyHeight * 0.1, bodyWidth * 0.2, bodyHeight * 0.8);
+
+  }, [character, canvasRef]);
+  
+  return (
+    <div className="w-full h-full flex flex-col md:flex-row gap-4">
+      <div className="flex-1 relative bg-black rounded-l-md">
+        <canvas ref={canvasRef} className="w-full h-full" />
+      </div>
+      <div className="md:w-64 bg-gray-900 p-4 rounded-r-md overflow-y-auto">
+        <h3 className="text-lg font-bold text-indigo-300 mb-4 border-b border-gray-700 pb-2">Character Parts</h3>
+        <PartSelector
+            label="Head"
+            parts={spriteParts.heads}
+            selectedPart={character.head}
+            onSelect={part => setCharacter({...character, head: part})}
+        />
+        <PartSelector
+            label="Body"
+            parts={spriteParts.bodies}
+            selectedPart={character.body}
+            onSelect={part => setCharacter({...character, body: part})}
+        />
+        <PartSelector
+            label="Weapon"
+            parts={spriteParts.weapons}
+            selectedPart={character.weapon}
+            onSelect={part => setCharacter({...character, weapon: part})}
+        />
+      </div>
+    </div>
+  );
+};
+
+
+--- components/Modal.tsx ---
+
+
+import React from 'react';
+
+interface ModalProps {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+export const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => {
+  return (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-gray-800 rounded-lg shadow-2xl p-6 border border-indigo-500/50 max-w-4xl w-full relative transform transition-all animate-fade-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center border-b border-gray-700 pb-3 mb-4">
+          <h2 className="text-2xl font-bold text-indigo-400">{title}</h2>
+          <button 
+            onClick={onClose} 
+            className="text-gray-400 hover:text-white transition-colors p-1 rounded-full hover:bg-gray-700"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+--- components/StylizerButton.tsx ---
+
+import React from 'react';
+import { LoadingSpinner } from './LoadingSpinner';
+
+interface StylizerButtonProps {
+    onStylize: () => void;
+    isLoading: boolean;
+}
+
+export const StylizerButton: React.FC<StylizerButtonProps> = ({ onStylize, isLoading }) => {
+    return (
+        <button
+            onClick={onStylize}
+            disabled={isLoading}
+            className="inline-flex items-center justify-center px-6 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+        >
+            {isLoading ? (
+                <>
+                    <LoadingSpinner />
+                    <span className="ml-2">Stylizing...</span>
+                </>
+            ) : (
+                <>
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                 </svg>
+                 Render HD
+                </>
+            )}
+        </button>
+    );
+};
+
+--- components/LoadingSpinner.tsx ---
+
+
+import React from 'react';
+
+export const LoadingSpinner: React.FC = () => (
+  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
+
+
+--- package.json ---
+
+{
+  "name": "pixel-vtt-stylizer",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "@google/genai": "^1.28.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
+
+
+--- index.html ---
+
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pixel VTT Stylizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-gray-900 text-white">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
+
+
+--- index.tsx ---
+
+
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error("Could not find root element to mount to");
+}
+
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
+--- tsconfig.json ---
+
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "module": "ESNext",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  }
+}
+
+--- vite.config.ts ---
+
+import path from 'path';
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig(({ mode }) => {
+    const env = loadEnv(mode, '.', '');
+    return {
+      server: {
+        port: 3000,
+        host: '0.0.0.0',
+      },
+      plugins: [react()],
+      define: {
+        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
+      },
+      resolve: {
+        alias: {
+          '@': path.resolve(__dirname, '.'),
+        }
+      }
+    };
+});

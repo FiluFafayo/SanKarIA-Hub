@@ -307,6 +307,8 @@ export interface NPC {
     location: string;
     disposition: 'Friendly' | 'Neutral' | 'Hostile' | 'Unknown';
     interactionHistory: string[];
+    image?: string; // URL potret NPC (opsional)
+    imagePending?: boolean; // Status pembuatan potret otomatis
     // (Poin 4) NPC Mendalam
     opinion?: Record<string, number>; // mapping characterId -> opinion score
     secret?: string; // Rahasia tersembunyi

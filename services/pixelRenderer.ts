@@ -11,6 +11,7 @@ import { BATTLE_TILESET, EXPLORATION_TILESET } from "../data/tileset";
 const CHAR_CANVAS_WIDTH = 96;
 const CHAR_CANVAS_HEIGHT = 96;
 const MAP_TILE_SIZE = 10; // 10x10px per tile di layout
+const NPC_CANVAS_SIZE = 64; // Ukuran mini-sprite NPC
 
 // Shim sederhana untuk OffscreenCanvas jika tersedia, fallback ke DOM Canvas
 const createCanvas = (width: number, height: number): HTMLCanvasElement => {
@@ -171,6 +172,87 @@ export const renderMapLayout = (
             ctx.fillRect(x * MAP_TILE_SIZE, y * MAP_TILE_SIZE, MAP_TILE_SIZE, MAP_TILE_SIZE);
         }
     }
+
+    return canvas.toDataURL('image/png');
+};
+
+/**
+ * Mini Sprite Builder untuk NPC berdasarkan ringkasan/deskripsi.
+ * Tidak membutuhkan input pengguna; digunakan oleh AI DM saat runtime.
+ * Menghasilkan layout pixel sederhana (headshot) sebagai dasar img2img.
+ * @param summary Teks ringkasan/karakter NPC
+ * @returns string data URL base64 (image/png)
+ */
+export const renderNpcMiniSprite = (summary: string): string => {
+    const canvas = createCanvas(NPC_CANVAS_SIZE, NPC_CANVAS_SIZE);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error("Gagal mendapatkan 2D context untuk pixelRenderer");
+
+    ctx.clearRect(0, 0, NPC_CANVAS_SIZE, NPC_CANVAS_SIZE);
+
+    // Hash sederhana dari summary untuk variasi warna
+    const hash = Array.from(summary || 'npc').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    const pick = (arr: string[]) => arr[hash % arr.length];
+
+    const skinTones = ['#f2d0a4', '#d8a47f', '#b5835a', '#8d5a38', '#6b3f26'];
+    const hairColors = ['#2f1b0c', '#4b2e14', '#704214', '#a0522d', '#c68642', '#1c1c1c', '#3f3f3f'];
+    const outfitColors = ['#445b3c', '#2c3e50', '#7f8c8d', '#8e6c3a', '#6d4c41', '#3a3a6a'];
+
+    // Deteksi sederhana dari keyword untuk variasi bentuk
+    const hasHelmet = /helm|knight|guard|soldier|militia/i.test(summary);
+    const hasBeard = /beard|jenggot|dwarf|orang tua|sage/i.test(summary);
+    const isMage = /mage|wizard|penyihir|sorcerer|warlock/i.test(summary);
+
+    const skin = pick(skinTones);
+    const hair = pick(hairColors);
+    const outfit = isMage ? '#4b0082' : pick(outfitColors);
+
+    const cx = NPC_CANVAS_SIZE / 2;
+    const cy = NPC_CANVAS_SIZE / 2;
+
+    // Latar belakang warna lembut sesuai outift
+    ctx.fillStyle = outfit + '22'; // transparan
+    ctx.fillRect(0, 0, NPC_CANVAS_SIZE, NPC_CANVAS_SIZE);
+
+    // Kepala
+    ctx.fillStyle = skin;
+    ctx.beginPath();
+    ctx.arc(cx, cy - 6, 18, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rambut
+    ctx.fillStyle = hair;
+    ctx.beginPath();
+    ctx.arc(cx, cy - 12, 20, Math.PI, 0);
+    ctx.fill();
+
+    // Helm (opsional)
+    if (hasHelmet) {
+        ctx.fillStyle = '#888888';
+        ctx.fillRect(cx - 20, cy - 22, 40, 12);
+    }
+
+    // Jenggot (opsional)
+    if (hasBeard) {
+        ctx.fillStyle = hair;
+        ctx.beginPath();
+        ctx.arc(cx, cy + 6, 12, 0, Math.PI);
+        ctx.fill();
+    }
+
+    // Bahu / Torso
+    ctx.fillStyle = outfit;
+    ctx.fillRect(cx - 24, cy + 10, 48, 20);
+
+    // Highlight sederhana untuk memberi kontras (ai-friendly blueprint)
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, NPC_CANVAS_SIZE - 2, NPC_CANVAS_SIZE - 2);
+
+    // Mata sederhana
+    ctx.fillStyle = '#1c1c1c';
+    ctx.fillRect(cx - 6, cy - 4, 4, 4);
+    ctx.fillRect(cx + 2, cy - 4, 4, 4);
 
     return canvas.toDataURL('image/png');
 };

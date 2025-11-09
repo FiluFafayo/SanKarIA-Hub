@@ -5,6 +5,7 @@
 import { Type, FunctionDeclaration, Modality } from "@google/genai";
 import { Campaign, ToolCall, MapMarker, WorldTime, WorldWeather } from '../../types';
 import { geminiService } from "../geminiService"; // Import klien inti
+import { renderNpcMiniSprite } from "../pixelRenderer";
 import { formatDndTime } from "../../utils"; // Import helper waktu
 
 // SKEMA LAMA (Dipindah dari geminiService.ts)
@@ -104,6 +105,39 @@ const SETUP_TOOLS: FunctionDeclaration[] = [
 
 // FUNGSI LAMA (Dipindah dari geminiService.ts)
 class GenerationService {
+    // Cache ringan untuk potret NPC agar tidak memanggil API berulang
+    private portraitCache = new Map<string, string>();
+
+    constructor() {
+        this.loadCacheFromStorage();
+    }
+
+    private loadCacheFromStorage() {
+        try {
+            if (typeof window === 'undefined') return;
+            const raw = window.localStorage.getItem('npcPortraitCache');
+            if (!raw) return;
+            const entries: Array<{ k: string; v: string }> = JSON.parse(raw);
+            // Batasi maksimum 12 entri untuk menghindari membengkak
+            for (const { k, v } of entries.slice(-12)) {
+                this.portraitCache.set(k, v);
+            }
+        } catch (e) {
+            console.warn('Gagal memuat cache potret NPC dari storage:', e);
+        }
+    }
+
+    private persistCacheToStorage() {
+        try {
+            if (typeof window === 'undefined') return;
+            // Ambil maksimum 12 entri terbaru
+            const entries = Array.from(this.portraitCache.entries());
+            const trimmed = entries.slice(-12).map(([k, v]) => ({ k, v }));
+            window.localStorage.setItem('npcPortraitCache', JSON.stringify(trimmed));
+        } catch (e) {
+            console.warn('Gagal menyimpan cache potret NPC ke storage:', e);
+        }
+    }
 
     async generateCampaignFramework(pillars: { premise: string; keyElements: string; endGoal: string }): Promise<any> {
         const prompt = `Berdasarkan pilar-pilar kampanye D&D berikut, hasilkan kerangka kampanye yang kreatif dan menarik.
@@ -162,16 +196,22 @@ class GenerationService {
     }
 
     async generateOpeningScene(campaign: Campaign): Promise<string> {
-        const prompt = `Anda adalah Dungeon Master. Mulai kampanye baru dengan detail berikut dan tuliskan adegan pembuka yang menarik (1-2 paragraf).
+        const prompt = `Anda adalah Dungeon Master.
+        Tulis ADEGAN PEMBUKA SINGKAT (1 paragraf, 3–5 kalimat) bergaya aktif, konkret, tanpa fluff.
+        Fokus langsung pada LOKASI dan SITUASI saat ini.
         
+        Konteks kampanye:
         Judul: ${campaign.title}
         Deskripsi: ${campaign.description}
         Kepribadian DM: ${campaign.dmPersonality}
 
-        ATURAN WAJIB (Poin 11):
-        1.  **Transisi:** Mulai adegan *sebelum* pemain tiba di lokasi utama (misal: "Kalian telah berjalan selama tiga hari...", "Kereta kuda berderit berhenti di gerbang..."). JANGAN mulai di dalam ruangan/kota secara tiba-tiba.
-        2.  **Hook:** Sertakan SATU alasan yang jelas mengapa para pemain ada di sana (misal: "Kalian semua menjawab panggilan pekerjaan dari...", "Rumor tentang artefak itu terlalu menggiurkan...", "Surat mendesak dari kerabatmu...").
-        3.  Tulis adegan imersif yang mengatur panggung. Jangan ajukan pertanyaan.`;
+        Ketentuan gaya:
+        - Gunakan kalimat aktif, kata-kata sederhana, dan detail konkret (suasana, benda, orang relevan).
+        - Sertakan SATU hook halus (alasan berada di sana atau peluang tindakan) tanpa menggurui.
+        - Hindari transisi perjalanan panjang, sejarah detil, atau paparan eksposisi; langsung ke lokasi/situasi.
+        - Jangan ajukan pertanyaan ke pemain, jangan memberi instruksi eksplisit, jangan menutup dengan pilihan.
+        - Jika ada dialog alami, gunakan format tag: [DIALOGUE:Nama NPC|Kalimat dialog] (opsional, hanya bila wajar).
+        - Batas keras: tetap 1 paragraf dan maksimal 5 kalimat.`;
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
@@ -238,6 +278,38 @@ class GenerationService {
                 }
             }
             throw new Error("Tidak ada gambar yang dihasilkan untuk peta.");
+        };
+        return geminiService.makeApiCall(call);
+    }
+
+    // BARU: Generator eksplorasi berbasis layout (img2img)
+    async generateExplorationMapVisual(base64Layout: string, theme: string): Promise<string> {
+        const imagePart = {
+            inlineData: {
+                mimeType: 'image/png',
+                data: base64Layout.split(',')[1] || base64Layout,
+            },
+        };
+
+        const textPart = {
+            text: `Transform this pixel exploration layout into a detailed, HD fantasy world map.
+            - Style: digital painting, fantasy art, high quality, gridless.
+            - Theme: "${theme}".
+            - Ignore fog of war.
+            - Preserve the original structure, terrain distribution, and coastline faithfully.`,
+        };
+
+        const call = async (client: any) => {
+            const response = await client.models.generateContent({
+                model: 'gemini-2.0-flash-preview-image-generation',
+                contents: { parts: [imagePart, textPart] },
+                config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
+            });
+            if (response.candidates && response.candidates[0].content.parts[0].inlineData) {
+                const base64ImageBytes: string = response.candidates[0].content.parts[0].inlineData.data;
+                return `data:image/png;base64,${base64ImageBytes}`;
+            }
+            throw new Error('Tidak dapat menghasilkan peta eksplorasi dari layout.');
         };
         return geminiService.makeApiCall(call);
     }
@@ -328,6 +400,20 @@ class GenerationService {
             throw new Error("Tidak ada gambar yang dihasilkan oleh API (stylizePixelLayout).");
         };
         return geminiService.makeApiCall(call);
+    }
+
+    // BARU: Mini-pipeline otomatis untuk potret NPC dari ringkasan
+    async autoCreateNpcPortrait(summary: string): Promise<string> {
+        const key = `npc:${summary.trim()}`.slice(0, 256);
+        const cached = this.portraitCache.get(key);
+        if (cached) return cached;
+
+        const base64Mini = renderNpcMiniSprite(summary);
+        const stylePrompt = `Fantasy NPC portrait, head-and-shoulders, painterly, detailed, high quality, dramatic lighting, cohesive color palette, in-world believable character`;
+        const result = await this.stylizePixelLayout(base64Mini, stylePrompt, 'Sprite');
+        this.portraitCache.set(key, result);
+        this.persistCacheToStorage();
+        return result;
     }
 
     async generateMapMarkers(campaignFramework: any): Promise<{ markers: MapMarker[], startLocationId: string }> {

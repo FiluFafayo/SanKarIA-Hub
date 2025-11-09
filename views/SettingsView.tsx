@@ -1,5 +1,6 @@
 import React, { Dispatch, SetStateAction, useState } from "react";
 import { ViewWrapper } from "../components/ViewWrapper";
+import { useGameStore } from "../store/gameStore";
 
 // REFAKTOR G-4: Disederhanakan
 interface SettingsViewProps {
@@ -48,6 +49,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 								}`}
 						>
 							Tampilan
+						</button>
+						<button
+							onClick={() => setActiveStation("Gameplay")}
+							className={`flex-1 md:flex-none p-3 rounded text-center md:text-left font-cinzel transition-colors ${activeStation === "Gameplay"
+								? "bg-amber-700 text-white"
+								: "hover:bg-amber-800/50"
+							}`}
+						>
+							Permainan
 						</button>
 					</nav>
 					{userEmail && (
@@ -144,8 +154,45 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 							</div>
 						</div>
 					)}
+					{activeStation === "Gameplay" && (
+						<div>
+							<h3 className="text-2xl font-cinzel mb-2">Konduktor Permainan</h3>
+							<p className="text-sm text-amber-200/70 mb-6">
+								Pengaturan perilaku sistem selama sesi.
+							</p>
+							<div className="space-y-6">
+								<AutoNpcPortraitToggle />
+							</div>
+						</div>
+					)}
 				</div>
 			</div>
 		</ViewWrapper>
 	);
+};
+
+const AutoNpcPortraitToggle: React.FC = () => {
+    const autoEnabled = useGameStore((s) => s.runtime.runtimeSettings.autoNpcPortraits);
+    const setAuto = useGameStore((s) => s.actions.setAutoNpcPortraits);
+    return (
+        <div className="flex items-center justify-between">
+            <div>
+                <label className="block mb-1 font-cinzel">Buat potret NPC otomatis</label>
+                <p className="text-xs text-amber-200/70">
+                    Saat aktif, sistem akan mencoba membuat potret dari ringkasan NPC.
+                </p>
+            </div>
+            <label className="inline-flex items-center cursor-pointer">
+                <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={autoEnabled}
+                    onChange={(e) => setAuto(e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-amber-900 peer-focus:outline-none rounded-full peer peer-checked:bg-amber-600 transition-colors relative">
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-black/70 rounded-full transition-all ${autoEnabled ? 'translate-x-5 bg-amber-950' : ''}`}></span>
+                </div>
+            </label>
+        </div>
+    );
 };

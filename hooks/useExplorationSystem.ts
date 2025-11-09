@@ -40,8 +40,8 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
     }, []);
 
     // processToolCalls tetap sama (sudah di-patch G-1)
-    const processToolCalls = useCallback((turnId: string, toolCalls: ToolCall[]) => {
-        toolCalls.forEach(call => {
+    const processToolCalls = useCallback(async (turnId: string, toolCalls: ToolCall[]) => {
+        for (const call of toolCalls) {
             let message = '';
             switch (call.functionName) {
                 case 'add_items_to_inventory':
@@ -53,7 +53,22 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                     message = `Jurnal diperbarui: ${call.args.title}`;
                     break;
                 case 'log_npc_interaction':
-                    campaignActions.logNpcInteraction(call.args);
+                    try {
+                        const autoEnabled = useGameStore.getState().runtime.runtimeSettings.autoNpcPortraits;
+                        if (autoEnabled) {
+                            // Tandai status pembuatan potret agar UI bisa menampilkan badge
+                            campaignActions.logNpcInteraction({ ...call.args, imagePending: true });
+                            const portraitUrl = await generationService.autoCreateNpcPortrait(call.args.description || call.args.summary);
+                            campaignActions.logNpcInteraction({ ...call.args, image: portraitUrl, imagePending: false });
+                        } else {
+                            // Jika dimatikan, tetap log interaksi tanpa gambar
+                            campaignActions.logNpcInteraction({ ...call.args, imagePending: false });
+                        }
+                    } catch (err) {
+                        console.warn('Gagal membuat potret NPC otomatis:', err);
+                        // Hapus status pending agar tidak “menggantung” di UI
+                        campaignActions.logNpcInteraction({ ...call.args, imagePending: false });
+                    }
                     message = `Catatan NPC diperbarui: ${call.args.npcName}`;
                     break;
                 case 'spawn_monsters':
@@ -97,7 +112,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             if (message) {
                 campaignActions.logEvent({ type: 'system', text: `--- ${message} ---` }, turnId);
             }
-        });
+        }
     }, [campaignActions, players, onCharacterUpdate, campaign.players]); // FASE 2 FIX: Tambah dependensi
 
     // processMechanics disederhanakan (G-2)
@@ -109,7 +124,7 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
 
         const hasTools = response.tool_calls && response.tool_calls.length > 0;
         if (hasTools) {
-            processToolCalls(turnId, response.tool_calls!);
+            await processToolCalls(turnId, response.tool_calls!);
         }
 
         // Cek apakah 'spawn_monsters' dipanggil

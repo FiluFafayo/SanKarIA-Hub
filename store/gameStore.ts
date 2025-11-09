@@ -17,12 +17,18 @@ interface RuntimeState {
     playingCharacter: Character | null;
     isGameLoading: boolean;
     sessionAbortController: AbortController | null;
+    runtimeSettings: {
+        autoNpcPortraits: boolean;
+    };
 }
 const initialRuntimeState: RuntimeState = {
     playingCampaign: null,
     playingCharacter: null,
     isGameLoading: false,
     sessionAbortController: null,
+    runtimeSettings: {
+        autoNpcPortraits: true,
+    },
 };
 interface RuntimeActions {
     loadGameSession: (campaign: Campaign, character: Character) => Promise<void>;
@@ -34,6 +40,7 @@ interface RuntimeActions {
     _setRuntimeCharacterState: (character: Character) => void;
     // Pembatalan level sesi
     cancelAllInFlight: () => void;
+    setAutoNpcPortraits: (enabled: boolean) => void;
 }
 
 // --- Gabungan Store ---
@@ -163,5 +170,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 runtime: { ...state.runtime, sessionAbortController: new AbortController() }
             }));
         },
-	},
+        setAutoNpcPortraits: (enabled) => {
+            set((state) => ({
+                runtime: {
+                    ...state.runtime,
+                    runtimeSettings: { ...state.runtime.runtimeSettings, autoNpcPortraits: enabled },
+                },
+            }));
+        },
+ 	},
 }));

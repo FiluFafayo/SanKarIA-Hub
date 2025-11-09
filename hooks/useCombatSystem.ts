@@ -53,11 +53,11 @@ export const useCombatSystem = ({
 	campaignActions,
 	onCharacterUpdate, // FASE 1 (Tugas 3)
 }: CombatSystemProps) => {
-	const processToolCalls = useCallback(
-		(turnId: string, toolCalls: ToolCall[]) => {
-			toolCalls.forEach((call) => {
-				let message = "";
-				switch (call.functionName) {
+    const processToolCalls = useCallback(
+        async (turnId: string, toolCalls: ToolCall[]) => {
+            for (const call of toolCalls) {
+                let message = "";
+                switch (call.functionName) {
 					case "add_items_to_inventory":
 						campaignActions.addItemsToInventory(call.args);
 						message = `Inventaris diperbarui: ${call.args.items
@@ -68,10 +68,25 @@ export const useCombatSystem = ({
 						campaignActions.updateQuestLog(call.args);
 						message = `Jurnal diperbarui: ${call.args.title}`;
 						break;
-					case "log_npc_interaction":
-						campaignActions.logNpcInteraction(call.args);
-						message = `Catatan NPC diperbarui: ${call.args.npcName}`;
-						break;
+                    case "log_npc_interaction":
+                        try {
+                            const autoEnabled = useGameStore.getState().runtime.runtimeSettings.autoNpcPortraits;
+                            if (autoEnabled) {
+                                // Tandai pending sebelum generate agar UI bisa menampilkan status
+                                campaignActions.logNpcInteraction({ ...call.args, imagePending: true });
+                                const portraitUrl = await generationService.autoCreateNpcPortrait(call.args.description || call.args.summary);
+                                campaignActions.logNpcInteraction({ ...call.args, image: portraitUrl, imagePending: false });
+                            } else {
+                                // Jika dimatikan, tetap log interaksi tanpa gambar
+                                campaignActions.logNpcInteraction({ ...call.args, imagePending: false });
+                            }
+                        } catch (err) {
+                            console.warn('Gagal membuat potret NPC otomatis (combat):', err);
+                            // Bersihkan pending agar tidak menggantung
+                            campaignActions.logNpcInteraction({ ...call.args, imagePending: false });
+                        }
+                        message = `Catatan NPC diperbarui: ${call.args.npcName}`;
+                        break;
 					case "spawn_monsters":
 						campaignActions.spawnMonsters(call.args.monsters);
 						message = `Bahaya! Musuh baru muncul!`;
@@ -109,17 +124,17 @@ export const useCombatSystem = ({
 							message = `Opini ${npc.name} terhadap ${char.name} berubah (${call.args.change > 0 ? '+' : ''}${call.args.change} karena: ${call.args.reason})`;
 						}
 						break;
-				}
-				if (message) {
-					campaignActions.logEvent(
-						{ type: "system", text: `--- ${message} ---` },
-						turnId
-					);
-				}
-			});
-		},
-		[campaignActions, players, campaign.players, onCharacterUpdate] // FASE 3: Tambah dependensi
-	);
+                }
+                if (message) {
+                    campaignActions.logEvent(
+                        { type: "system", text: `--- ${message} ---` },
+                        turnId
+                    );
+                }
+            }
+        },
+        [campaignActions, players, campaign.players, onCharacterUpdate] // FASE 3: Tambah dependensi
+    );
 
 	// =================================================================
 	// FUNGSI INTI 1: handleRollComplete (HANYA menangani hasil roll)
@@ -372,12 +387,12 @@ export const useCombatSystem = ({
 	// =================================================================
 	// FUNGSI INTI 2: processMechanics (Menentukan aksi)
 	// =================================================================
-	const processMechanics = useCallback(
-		(
-			turnId: string,
-			mechanics: Omit<StructuredApiResponse, "reaction" | "narration">,
-			originalActionText: string
-		) => {
+    const processMechanics = useCallback(
+        async (
+            turnId: string,
+            mechanics: Omit<StructuredApiResponse, "reaction" | "narration">,
+            originalActionText: string
+        ) => {
 			if (!turnId) {
 				console.error("processMechanics dipanggil tanpa turnId aktif!");
 				return;
@@ -385,14 +400,14 @@ export const useCombatSystem = ({
 
 			let turnShouldEnd = true;
 
-			if (mechanics.tool_calls && mechanics.tool_calls.length > 0) {
-				processToolCalls(turnId, mechanics.tool_calls);
-				if (
-					mechanics.tool_calls.some((c) => c.functionName === "spawn_monsters")
-				) {
-					turnShouldEnd = false; // Biarkan combat loop baru mengambil alih
-				}
-			}
+            if (mechanics.tool_calls && mechanics.tool_calls.length > 0) {
+                await processToolCalls(turnId, mechanics.tool_calls);
+                if (
+                    mechanics.tool_calls.some((c) => c.functionName === "spawn_monsters")
+                ) {
+                    turnShouldEnd = false; // Biarkan combat loop baru mengambil alih
+                }
+            }
 
 			const hasChoices = mechanics.choices && mechanics.choices.length > 0;
 			const hasRollRequest = !!mechanics.rollRequest;
@@ -503,18 +518,18 @@ export const useCombatSystem = ({
 					}, delay);
 				}
 			}
-		},
-		[
-			campaign.currentPlayerId,
-			campaign.monsters,
-			players,
-			campaignActions,
-			processToolCalls,
-			handleRollComplete,
-			campaign.activeRollRequest,
-			campaign.turnId,
-		]
-	); // <-- handleRollComplete adalah dependensi yang valid
+        },
+        [
+            campaign.currentPlayerId,
+            campaign.monsters,
+            players,
+            campaignActions,
+            processToolCalls,
+            handleRollComplete,
+            campaign.activeRollRequest,
+            campaign.turnId,
+        ]
+    ); // <-- handleRollComplete adalah dependensi yang valid
 
 	// =================================================================
 	// FUNGSI INTI 3: advanceTurn (Menangani alur giliran)
@@ -602,9 +617,9 @@ export const useCombatSystem = ({
 				// (Poin 3) Gunakan parser baru untuk dialog
 				parseAndLogNarration(response.narration, turnId, campaignActions);
 
-				// 2. Proses Mekanik
-				// PANGGILAN AMAN: advanceTurn -> processMechanics (tidak ada circular)
-				processMechanics(turnId, response, actionText);
+                // 2. Proses Mekanik
+                // PANGGILAN AMAN: advanceTurn -> processMechanics (tidak ada circular)
+                await processMechanics(turnId, response, actionText);
 
 				// Jika tidak ada roll/choice, mechanics akan panggil endTurn()
 				// Jika ada choice, turnId akan tetap aktif
@@ -688,9 +703,9 @@ export const useCombatSystem = ({
 						// (Poin 3) Gunakan parser baru untuk dialog
 						parseAndLogNarration(response.narration, turnId, campaignActions);
 
-						// 2. Proses Mekanik (yang akan di-auto-roll)
-						// PANGGILAN AMAN: advanceTurn -> processMechanics
-						processMechanics(turnId, response, actionText);
+                        // 2. Proses Mekanik (yang akan di-auto-roll)
+                        // PANGGILAN AMAN: advanceTurn -> processMechanics
+                        await processMechanics(turnId, response, actionText);
 					} else {
 						campaignActions.logEvent(
 							{

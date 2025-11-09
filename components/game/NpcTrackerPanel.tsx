@@ -24,12 +24,36 @@ export const NpcTrackerPanel: React.FC<NpcTrackerPanelProps> = ({ npcs }) => {
                     {npcs.map(npc => (
                         <details key={npc.id} className="bg-gray-800/50 p-3 rounded-lg">
                             <summary className="font-bold cursor-pointer text-base flex justify-between items-center">
-                                <span>{npc.name}</span>
+                                <span className="flex items-center gap-2">
+                                    {npc.image ? (
+                                        <img src={npc.image} alt={npc.name} className="w-8 h-8 rounded object-cover border border-gray-700" />
+                                    ) : npc.imagePending ? (
+                                        <div className="w-8 h-8 rounded bg-gray-700/50 border border-gray-600 animate-pulse" />
+                                    ) : null}
+                                    <span>{npc.name}</span>
+                                    {npc.imagePending && (
+                                        <span className="text-xs text-cyan-300 ml-2 animate-pulse">Membuat potret…</span>
+                                    )}
+                                </span>
                                 <span className={`text-xs font-mono ${getDispositionColor(npc.disposition)}`}>
                                     {npc.disposition}
                                 </span>
                             </summary>
                             <div className="mt-2 text-sm text-gray-300 border-t border-gray-700 pt-2">
+                                {npc.image ? (
+                                    <div className="flex justify-center mb-3 relative">
+                                        <img src={npc.image} alt={npc.name} className="w-32 h-32 rounded-lg object-cover shadow border border-gray-700" />
+                                        {npc.imagePending && (
+                                            <span className="absolute bottom-2 right-2 text-[10px] bg-cyan-900/60 text-cyan-200 px-2 py-1 rounded animate-pulse">
+                                                Memperindah potret…
+                                            </span>
+                                        )}
+                                    </div>
+                                ) : npc.imagePending ? (
+                                    <div className="flex justify-center mb-3">
+                                        <div className="w-32 h-32 rounded-lg bg-gray-700/50 border border-gray-600 animate-pulse" />
+                                    </div>
+                                ) : null}
                                 <p><strong className="text-gray-400">Deskripsi:</strong> {npc.description}</p>
                                 <p><strong className="text-gray-400">Lokasi:</strong> {npc.location}</p>
                                 <div className="mt-2">

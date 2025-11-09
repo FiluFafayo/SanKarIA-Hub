@@ -5,7 +5,7 @@
 // Panel Info/Karakter sekarang menjadi "halaman" tab, bukan overlay.
 // Layout 3-kolom desktop (lg:) dicapai secara responsif.
 
-import React, { useState, useEffect, useCallback, MouseEvent } from "react";
+import React, { useState, useEffect, useCallback, MouseEvent, useRef } from "react";
 import {
 	Campaign,
 	Character,
@@ -156,6 +156,20 @@ const { _setRuntimeCampaignState, _setRuntimeCharacterState } = useGameStore((s)
 		campaignActions,
 		onCharacterUpdate: handleRuntimeCharacterUpdate, // FASE 2 FIX
 	});
+
+	// Inisialisasi otomatis opsi eksplorasi saat awal sesi
+	const didInitChoicesRef = useRef(false);
+	useEffect(() => {
+		if (didInitChoicesRef.current) return;
+		const hasOpeningNarration = campaign.eventLog.some(e => e.type === "dm_narration");
+		const noTurnYet = campaign.turnId === null;
+		const noChoices = !campaign.choices || campaign.choices.length === 0;
+
+		if (campaign.gameState === "exploration" && hasOpeningNarration && noTurnYet && noChoices) {
+			didInitChoicesRef.current = true;
+			explorationSystem.handlePlayerAction("Lihat sekeliling lebih teliti.", null);
+		}
+	}, [campaign.gameState, campaign.eventLog, campaign.turnId, campaign.choices, explorationSystem]);
 
 	const isCombat = campaign.gameState === "combat";
 	const isMyCombatTurn = isCombat && isMyTurn && !!campaign.turnId;

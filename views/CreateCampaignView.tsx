@@ -3,6 +3,7 @@ import { ViewWrapper } from '../components/ViewWrapper';
 import { Campaign, Quest, NPC, MapMarker, TerrainType, GridCell } from '../types'; // BARU
 import { generateId, generateJoinCode } from '../utils';
 import { generationService } from '../services/ai/generationService';
+import { renderMapLayout } from '../services/pixelRenderer';
 import { InteractiveMap } from '../components/game/InteractiveMap';
 // FASE 0: Hapus appStore (kecuali untuk onClose)
 // import { useAppStore } from '../store/appStore'; 
@@ -167,6 +168,14 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                     playerGridPosition.y = Math.max(0, Math.min(EXPLORATION_HEIGHT - 1, Math.floor((startMarker.y / 100) * EXPLORATION_HEIGHT)));
                 }
             }
+
+            // Buat HD exploration map dari layout pixel (img2img)
+            setLoadingMessage("Menghasilkan visual HD eksplorasi dari layout...");
+            const explorationLayoutB64 = renderMapLayout(explorationGrid, false);
+            const explorationImageUrl = await generationService.generateExplorationMapVisual(
+                explorationLayoutB64,
+                framework.proposedTitle || 'Exploration'
+            );
             // --- AKHIR GENERATOR PETA EKSPLORASI ---
 
             // REFAKTOR G-2
@@ -225,7 +234,7 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                 currentTime: 43200, // (Poin 5) 12:00 PM
                 currentWeather: 'Cerah',
                 worldEventCounter: 0,
-                mapImageUrl: mapData?.imageUrl,
+                mapImageUrl: explorationImageUrl || mapData?.imageUrl,
                 mapMarkers: mapData?.markers || [],
                 currentPlayerLocation: mapData?.startLocationId,
 

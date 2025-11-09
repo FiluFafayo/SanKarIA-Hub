@@ -70,12 +70,14 @@ interface UpdateQuestPayload {
 }
 
 interface LogNpcInteractionPayload {
-	npcId?: string;
-	npcName: string;
-	summary: string;
-	description?: string;
-	location?: string;
-	disposition?: "Friendly" | "Neutral" | "Hostile" | "Unknown";
+    npcId?: string;
+    npcName: string;
+    summary: string;
+    description?: string;
+    location?: string;
+    disposition?: "Friendly" | "Neutral" | "Hostile" | "Unknown";
+    image?: string; // URL potret NPC (opsional)
+    imagePending?: boolean; // Status pembuatan potret (opsional)
 }
 
 type LoggableGameEvent =
@@ -300,41 +302,42 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
 				);
 			}
 
-			if (existingNpcIndex > -1) {
-				const existingNpc = { ...npcs[existingNpcIndex] };
+            if (existingNpcIndex > -1) {
+                const existingNpc = { ...npcs[existingNpcIndex] };
 
-				const lastNote =
-					existingNpc.interactionHistory[
-					existingNpc.interactionHistory.length - 1
-					];
-				if (lastNote === payload.summary) {
-					return state; // Abort update if it's a duplicate
-				}
-
-				existingNpc.interactionHistory = [
-					...existingNpc.interactionHistory,
-					payload.summary,
-				];
+                const lastNote = existingNpc.interactionHistory[existingNpc.interactionHistory.length - 1];
+                const isDuplicateNote = lastNote === payload.summary;
+                // Jika ringkasan duplikat, jangan tambahkan lagi, tapi tetap update field lain
+                if (!isDuplicateNote) {
+                    existingNpc.interactionHistory = [
+                        ...existingNpc.interactionHistory,
+                        payload.summary,
+                    ];
+                }
 
 				if (payload.npcName) existingNpc.name = payload.npcName;
 				if (payload.description) existingNpc.description = payload.description;
 				if (payload.location) existingNpc.location = payload.location;
-				if (payload.disposition) existingNpc.disposition = payload.disposition;
+                if (payload.disposition) existingNpc.disposition = payload.disposition;
+                if (payload.image) existingNpc.image = payload.image;
+                if (payload.imagePending !== undefined) existingNpc.imagePending = payload.imagePending;
 
-				npcs[existingNpcIndex] = existingNpc;
-			} else {
-				const newNpc: NPC = {
-					id: generateId("npc"),
-					name: payload.npcName,
-					description: payload.description || "Belum ada deskripsi.",
-					location: payload.location || "Tidak diketahui",
-					disposition: payload.disposition || "Unknown",
-					interactionHistory: [payload.summary],
-				};
-				npcs.push(newNpc);
-			}
-			return { ...state, npcs };
-		}
+                npcs[existingNpcIndex] = existingNpc;
+            } else {
+                const newNpc: NPC = {
+                    id: generateId("npc"),
+                    name: payload.npcName,
+                    description: payload.description || "Belum ada deskripsi.",
+                    location: payload.location || "Tidak diketahui",
+                    disposition: payload.disposition || "Unknown",
+                    interactionHistory: [payload.summary],
+                    image: payload.image,
+                    imagePending: payload.imagePending || false,
+                };
+                npcs.push(newNpc);
+            }
+            return { ...state, npcs };
+        }
 		// (Poin 5) Ganti reducer UPDATE_WORLD_STATE
 		case "ADVANCE_TIME": {
 			return {
