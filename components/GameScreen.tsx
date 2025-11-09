@@ -244,6 +244,7 @@ const { _setRuntimeCampaignState, _setRuntimeCharacterState } = useGameStore((s)
 						characterId={character.id}
 						onObjectClick={handleObjectClick}
 						campaignActions={campaignActions}
+						onMoveUnit={combatSystem.handleMovementWithOA}
 					/>
 				);
 			case "character":
@@ -338,6 +339,7 @@ const { _setRuntimeCampaignState, _setRuntimeCharacterState } = useGameStore((s)
 							characterId={character.id}
 							onObjectClick={handleObjectClick}
 							campaignActions={campaignActions}
+							onMoveUnit={combatSystem.handleMovementWithOA}
 						/>
 					</div>
 

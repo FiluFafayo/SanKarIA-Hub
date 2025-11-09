@@ -3,21 +3,22 @@ import { CampaignState, CampaignActions } from "./useCampaign";
 // FASE 0: Hapus dependensi UI store dari hook logika
 // import { useAppStore } from "../store/appStore"; 
 import {
-	Character,
-	DiceRoll,
-	RollRequest,
-	CharacterInventoryItem,
-	SpellDefinition,
-	MonsterInstance,
-	StructuredApiResponse,
-	ToolCall,
-	Ability,
-	// BARU: Impor tipe dari Fase 1 & 3
-	BattleState,
-	BattleStatus,
-	GridCell,
-	TerrainType,
-	Unit,
+    Character,
+    DiceRoll,
+    RollRequest,
+    CharacterInventoryItem,
+    SpellDefinition,
+    MonsterInstance,
+    StructuredApiResponse,
+    ToolCall,
+    Ability,
+    Skill,
+    // BARU: Impor tipe dari Fase 1 & 3
+    BattleState,
+    BattleStatus,
+    GridCell,
+    TerrainType,
+    Unit,
 } from "../types";
 import {
 	rollInitiative,
@@ -36,6 +37,7 @@ import { BATTLE_TILESET } from "../data/tileset";
 // (Cleanup DRY) Impor dari utils
 import { parseAndLogNarration, composeAbortSignals } from "../utils";
 import { useGameStore } from "../store/gameStore";
+import { canDash, canDisengage, canDodge, canHide } from "../services/rulesEngine";
 
 
 interface CombatSystemProps {
@@ -822,7 +824,7 @@ export const useCombatSystem = ({
 
 			const allUnits = [...playerUnits, ...monsterUnits];
 
-			// 3. Hitung Inisiatif (Logika P1)
+			// 3. Hitung Inisiatif (Logika P1) + tie-breaker Dex mod
 			const initiatives = allUnits.map(u => {
 				let dexScore = 10;
 				if (u.isPlayer) {
@@ -830,12 +832,18 @@ export const useCombatSystem = ({
 				} else {
 					dexScore = campaign.monsters.find(m => m.instanceId === u.id)?.definition.abilityScores.dexterity || 10;
 				}
+				const dexMod = getAbilityModifier(dexScore);
 				return {
 					id: u.id,
-					initiative: rollInitiative(dexScore)
+					initiative: rollInitiative(dexScore),
+					dexMod,
 				};
 			});
-			initiatives.sort((a, b) => b.initiative - a.initiative);
+			initiatives.sort((a, b) => {
+				if (b.initiative !== a.initiative) return b.initiative - a.initiative;
+				if (b.dexMod !== a.dexMod) return b.dexMod - a.dexMod;
+				return a.id.localeCompare(b.id);
+			});
 			const order = initiatives.map(i => i.id);
 
 			// 4. Kirim State Awal (Grid, Unit, Urutan) ke Reducer
@@ -1005,7 +1013,7 @@ export const useCombatSystem = ({
 			turnId
 		);
 
-		await updateCharacter({
+		onCharacterUpdate({
 			...character,
 			currentHp: newHp,
 			usedBonusAction: true,
@@ -1019,6 +1027,244 @@ export const useCombatSystem = ({
 			campaignActions,
 		]
 	);
+
+	// BARU: Aksi Dash (Aksi Utama)
+	const handleDash = useCallback(async () => {
+		if (
+			character.currentHp <= 0 ||
+			!campaign.turnId ||
+			campaign.currentPlayerId !== character.id
+		) {
+			return;
+		}
+
+		const check = canDash(character, campaign);
+		if (!check.ok) {
+			campaignActions.logEvent(
+				{ type: "system", text: check.reason || "Tidak dapat melakukan Dash." },
+				campaign.turnId!
+			);
+			return;
+		}
+
+		const turnId = campaign.turnId!;
+		campaignActions.logEvent(
+			{ type: "player_action", characterId: character.id, text: `${character.name} melakukan Dash (Aksi).` },
+			turnId
+		);
+
+		// Tingkatkan movement unit aktif (jika ada battleState)
+		if (campaign.battleState && campaign.battleState.activeUnitId) {
+			const activeId = campaign.battleState.activeUnitId;
+			const units = campaign.battleState.units.map(u =>
+				u.id === activeId
+					? { ...u, remainingMovement: u.movementSpeed * 2 }
+					: u
+			);
+			campaignActions.setBattleUnits(units);
+		}
+
+		// Tandai aksi utama digunakan & akhiri giliran
+		onCharacterUpdate({ ...character, usedAction: true });
+		campaignActions.endTurn();
+	}, [character, campaign.turnId, campaign.currentPlayerId, campaign.battleState, onCharacterUpdate, campaignActions]);
+
+	// BARU: Aksi Disengage (Aksi Utama)
+	const handleDisengage = useCallback(async () => {
+		if (
+			character.currentHp <= 0 ||
+			!campaign.turnId ||
+			campaign.currentPlayerId !== character.id
+		) {
+			return;
+		}
+
+		const check = canDisengage(character, campaign);
+		if (!check.ok) {
+			campaignActions.logEvent(
+				{ type: "system", text: check.reason || "Tidak dapat melakukan Disengage." },
+				campaign.turnId!
+			);
+			return;
+		}
+
+		const turnId = campaign.turnId!;
+		campaignActions.logEvent(
+			{ type: "player_action", characterId: character.id, text: `${character.name} melakukan Disengage (Aksi).` },
+			turnId
+		);
+
+		// Jika ada battleState dan unit aktif adalah karakter kita, tandai disengage pada unit
+		if (campaign.battleState && campaign.battleState.activeUnitId === character.id) {
+			const units = campaign.battleState.units.map(u =>
+				u.id === character.id ? { ...u, hasDisengaged: true } : u
+			);
+			campaignActions.setBattleUnits(units);
+		}
+
+		onCharacterUpdate({ ...character, usedAction: true });
+		campaignActions.endTurn();
+	}, [character, campaign.turnId, campaign.currentPlayerId, onCharacterUpdate, campaignActions]);
+
+	// BARU: Aksi Dodge (Aksi Utama)
+	const handleDodge = useCallback(async () => {
+		if (
+			character.currentHp <= 0 ||
+			!campaign.turnId ||
+			campaign.currentPlayerId !== character.id
+		) {
+			return;
+		}
+
+		const check = canDodge(character, campaign);
+		if (!check.ok) {
+			campaignActions.logEvent(
+				{ type: "system", text: check.reason || "Tidak dapat melakukan Dodge." },
+				campaign.turnId!
+			);
+			return;
+		}
+
+		const turnId = campaign.turnId!;
+		campaignActions.logEvent(
+			{ type: "player_action", characterId: character.id, text: `${character.name} mengambil posisi Dodge (Aksi).` },
+			turnId
+		);
+
+		// Catatan: Efek Dodge (disadvantage pada penyerang) belum dimodelkan.
+		onCharacterUpdate({ ...character, usedAction: true });
+		campaignActions.endTurn();
+	}, [character, campaign.turnId, campaign.currentPlayerId, onCharacterUpdate, campaignActions]);
+
+	// BARU: Aksi Hide (Aksi Utama + Skill Stealth)
+	const handleHide = useCallback(async () => {
+		if (
+			character.currentHp <= 0 ||
+			!campaign.turnId ||
+			campaign.currentPlayerId !== character.id
+		) {
+			return;
+		}
+
+		const check = canHide(character, campaign);
+		if (!check.ok) {
+			campaignActions.logEvent(
+				{ type: "system", text: check.reason || "Tidak dapat melakukan Hide." },
+				campaign.turnId!
+			);
+			return;
+		}
+
+		const turnId = campaign.turnId!;
+		// Tentukan DC: gunakan Passive Perception tertinggi musuh hidup
+		const aliveMonsters = campaign.monsters.filter(m => m.currentHp > 0);
+		const dc = aliveMonsters.length > 0
+			? Math.max(...aliveMonsters.map(m => m.definition.senses.passivePerception))
+			: 10;
+
+		// Disadvantage jika mengenakan armor dengan stealthDisadvantage
+		const hasStealthDisadvantage = character.inventory.some(i => i.isEquipped && i.item.type === 'armor' && i.item.stealthDisadvantage);
+
+		const hideRoll: RollRequest = {
+			type: 'skill',
+			characterId: character.id,
+			reason: 'Mencoba bersembunyi',
+			skill: Skill.Stealth,
+			ability: Ability.Dexterity,
+			dc,
+			isDisadvantage: hasStealthDisadvantage,
+		};
+
+		campaignActions.logEvent(
+			{ type: 'player_action', characterId: character.id, text: `${character.name} mencoba bersembunyi (Aksi).` },
+			turnId
+		);
+		campaignActions.setActiveRollRequest(hideRoll);
+	}, [character, campaign.turnId, campaign.currentPlayerId, campaign.monsters, onCharacterUpdate, campaignActions]);
+
+	// Helper: cek sel bersebelahan (jarak Manhattan 1)
+	const isAdjacent = useCallback((a: { x: number; y: number }, b: { x: number; y: number }) => {
+		return Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1;
+	}, []);
+
+	// Reaction: Monster melakukan Opportunity Attack terhadap target yang meninggalkan adjacency
+	const triggerOpportunityAttack = useCallback((attackerUnitId: string, targetUnitId: string) => {
+		const attackerMonster = campaign.monsters.find(m => m.instanceId === attackerUnitId);
+		const targetPlayer = players.find(p => p.id === targetUnitId);
+		const targetMonster = campaign.monsters.find(m => m.instanceId === targetUnitId);
+
+		// Hanya auto-roll untuk monster; lewati OA oleh pemain untuk sekarang
+		if (!attackerMonster) return;
+
+		const attackerName = attackerMonster.name;
+		let targetAC = 10;
+		let targetName = "Target";
+		if (targetPlayer) {
+			targetAC = targetPlayer.armorClass;
+			targetName = targetPlayer.name;
+		} else if (targetMonster) {
+			targetAC = targetMonster.definition.armorClass;
+			targetName = targetMonster.name;
+		}
+
+		const action = attackerMonster.definition.actions[0];
+		const toHit = action?.toHitBonus ?? 0;
+		const damageDice = action?.damageDice ?? "1d4";
+
+		const d20 = rollDice("1d20");
+		const total = d20.total + toHit;
+		const success = total >= targetAC;
+
+		campaignActions.logEvent(
+			{ type: "system", text: `${attackerName} melakukan Opportunity Attack terhadap ${targetName} (Total ${total} vs AC ${targetAC})${success ? " dan mengenai!" : "."}` },
+			campaign.turnId!
+		);
+
+		if (success) {
+			const dmg = rollDice(damageDice);
+			const damage = dmg.total;
+			if (targetPlayer) {
+				const newHp = Math.max(0, targetPlayer.currentHp - damage);
+				onCharacterUpdate({ ...targetPlayer, currentHp: newHp });
+			} else if (targetMonster) {
+				const newHp = Math.max(0, targetMonster.currentHp - damage);
+				campaignActions.updateMonster({ ...targetMonster, currentHp: newHp });
+			}
+			campaignActions.logEvent(
+				{ type: "system", text: `${targetName} menerima ${damage} kerusakan dari Opportunity Attack!` },
+				campaign.turnId!
+			);
+		}
+	}, [campaign.monsters, players, campaign.turnId, campaignActions, onCharacterUpdate]);
+
+	// Handler: Pergerakan unit dengan memicu OA jika meninggalkan adjacency
+	const handleMovementWithOA = useCallback((unitId: string, path: { x: number; y: number }[], cost: number) => {
+		if (!campaign.battleState) return;
+		const { battleState } = campaign;
+		const unit = battleState.units.find(u => u.id === unitId);
+		if (!unit) return;
+
+		const enemiesAdjacentBefore = battleState.units.filter(u => u.id !== unit.id && u.isPlayer !== unit.isPlayer && isAdjacent(u.gridPosition, unit.gridPosition));
+
+		// Commit movement jika biaya valid
+		if (cost <= (unit.remainingMovement ?? unit.movementSpeed)) {
+			const finalPos = path[path.length - 1];
+			campaignActions.moveUnit({ unitId, newPosition: finalPos, cost });
+		}
+
+		// Jika unit memiliki Disengage di turn ini, jangan trigger OA
+		if (unit.hasDisengaged) return;
+
+		// Cek adjacency setelah bergerak
+		const updatedUnit = (campaign.battleState?.units || []).find(u => u.id === unitId) || unit;
+		const enemiesNoLongerAdjacent = enemiesAdjacentBefore.filter(e => !isAdjacent(e.gridPosition, updatedUnit.gridPosition));
+
+		// Trigger satu OA dari musuh pertama (monster) yang tidak lagi adjacent
+		const attacker = enemiesNoLongerAdjacent.find(e => !e.isPlayer);
+		if (attacker) {
+			triggerOpportunityAttack(attacker.id, unitId);
+		}
+	}, [campaign.battleState, campaignActions, isAdjacent, triggerOpportunityAttack]);
 
 	const handleItemUse = useCallback(
 		async (item: CharacterInventoryItem) => {
@@ -1061,7 +1307,7 @@ export const useCombatSystem = ({
 					currentHp: newHp,
 					inventory: newInventory,
 				};
-				await updateCharacter(updatedCharacter);
+				onCharacterUpdate(updatedCharacter);
 				campaignActions.endTurn();
 			}
 		},
@@ -1130,6 +1376,7 @@ export const useCombatSystem = ({
 				);
 				isTurnEndingAction = true;
 				usedAction = true;
+				updatedCharacterState.usedAction = true;
 			}
 
 			if (usedAction) {
@@ -1156,7 +1403,7 @@ export const useCombatSystem = ({
 						return;
 					}
 				}
-				await updateCharacter(updatedCharacterState);
+				onCharacterUpdate(updatedCharacterState);
 			}
 
 			if (isTurnEndingAction) {
@@ -1178,5 +1425,10 @@ export const useCombatSystem = ({
 		handleItemUse,
 		handleSpellCast,
 		handleSecondWind,
+		handleDash,
+		handleDisengage,
+		handleDodge,
+		handleHide,
+		handleMovementWithOA,
 	};
 };

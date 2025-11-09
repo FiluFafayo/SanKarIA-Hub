@@ -113,12 +113,44 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
                                 </select>
                                 <button 
                                     onClick={handleAttack} 
-                                    disabled={!isMyTurn || !targetId || !equippedWeapon}
+                                    disabled={!isMyTurn || !targetId || !equippedWeapon || !!character.usedAction}
                                     className="w-full bg-red-600 hover:bg-red-500 text-white font-bold p-2 rounded disabled:bg-gray-600 disabled:cursor-not-allowed"
                                 >
                                    {/* REFAKTOR: Akses nama dari item.item.name */}
                                    Serang dengan {equippedWeapon?.item.name || 'Senjata'} (Aksi)
                                 </button>
+
+                                {/* Aksi Umum 5e */}
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                    <button
+                                        onClick={combatSystem.handleDash}
+                                        disabled={!isMyTurn || !!character.usedAction}
+                                        className="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold p-2 rounded disabled:bg-gray-600 disabled:cursor-not-allowed"
+                                    >
+                                        Dash (Aksi)
+                                    </button>
+                                    <button
+                                        onClick={combatSystem.handleDisengage}
+                                        disabled={!isMyTurn || !!character.usedAction}
+                                        className="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold p-2 rounded disabled:bg-gray-600 disabled:cursor-not-allowed"
+                                    >
+                                        Disengage (Aksi)
+                                    </button>
+                                    <button
+                                        onClick={combatSystem.handleDodge}
+                                        disabled={!isMyTurn || !!character.usedAction}
+                                        className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold p-2 rounded disabled:bg-gray-600 disabled:cursor-not-allowed"
+                                    >
+                                        Dodge (Aksi)
+                                    </button>
+                                    <button
+                                        onClick={combatSystem.handleHide}
+                                        disabled={!isMyTurn || !!character.usedAction}
+                                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold p-2 rounded disabled:bg-gray-600 disabled:cursor-not-allowed"
+                                    >
+                                        Hide (Aksi)
+                                    </button>
+                                </div>
 
                                 {/* FITUR KELAS: Fighter - Second Wind (Kesenjangan #4) */}
                                 {character.class === 'Fighter' && (

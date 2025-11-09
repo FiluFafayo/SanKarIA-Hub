@@ -282,6 +282,7 @@ export interface Character {
     // Status Runtime (Non-Persisten) untuk kombat
     usedBonusAction?: boolean;
     usedReaction?: boolean;
+    usedAction?: boolean;
 }
 
 
@@ -484,6 +485,7 @@ export interface Unit {
   movementSpeed: number; // (dalam sel grid)
   remainingMovement: number;
   gridPosition: { x: number; y: number };
+  hasDisengaged?: boolean; // Menandai Disengage untuk mencegah OA hingga akhir giliran
 }
 
 export interface BattleState {

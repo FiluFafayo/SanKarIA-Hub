@@ -177,7 +177,9 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
 				turnId: null,
 				thinkingState: "idle",
 				players: state.players.map((p) =>
-					p.id === currentPlayerId ? { ...p, usedBonusAction: false } : p
+					p.id === currentPlayerId
+						? { ...p, usedBonusAction: false, usedAction: false }
+						: p
 				),
 			};
 		case "UPDATE_MONSTER": // REFAKTOR: Bekerja dengan MonsterInstance

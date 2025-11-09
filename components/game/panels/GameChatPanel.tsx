@@ -20,6 +20,7 @@ interface GameChatPanelProps {
     characterId: string;
     onObjectClick: (objectName: string, objectId: string, event: MouseEvent<HTMLButtonElement>) => void;
     campaignActions: CampaignActions; // Untuk BattleMap
+    onMoveUnit?: (unitId: string, path: { x: number; y: number }[], cost: number) => void;
 }
 
 export const GameChatPanel: React.FC<GameChatPanelProps> = React.memo(({
@@ -31,6 +32,7 @@ export const GameChatPanel: React.FC<GameChatPanelProps> = React.memo(({
     characterId,
     onObjectClick,
     campaignActions,
+    onMoveUnit,
 }) => {
 
     // Tentukan apakah kita harus merender Peta Tempur
@@ -44,6 +46,7 @@ export const GameChatPanel: React.FC<GameChatPanelProps> = React.memo(({
                     battleState={battleState!}
                     campaignActions={campaignActions}
                     currentUserId={characterId}
+                    onMoveUnit={onMoveUnit}
                 />
             ) : (
                 <ChatLog

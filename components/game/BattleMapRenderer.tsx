@@ -7,13 +7,14 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { BattleState, Unit, TerrainType, GridCell } from '../../types';
 import { CampaignActions } from '../../hooks/useCampaign';
-import { calculateMovementOptions } from '../../services/battleRules';
+import { calculateMovementOptions, findShortestPath } from '../../services/battleRules';
 import { BATTLE_TILESET } from '../../data/tileset'; // Impor tileset
 
 interface BattleMapRendererProps {
   battleState: BattleState;
   campaignActions: CampaignActions;
   currentUserId: string; // Untuk menentukan apakah unit adalah 'kita'
+  onMoveUnit?: (unitId: string, path: { x: number; y: number }[], cost: number) => void;
 }
 
 // Ukuran grid (bisa diubah)
@@ -21,7 +22,7 @@ const BATTLE_GRID_WIDTH = 30;
 const BATTLE_GRID_HEIGHT = 20;
 // FASE 3: CELL_SIZE_PX dihapus. Ukuran akan responsif.
 
-export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleState, campaignActions, currentUserId }) => {
+export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleState, campaignActions, currentUserId, onMoveUnit }) => {
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(battleState.activeUnitId);
 
   // Cek apakah unit yang terpilih adalah milik kita
@@ -49,12 +50,17 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
     if (unitAtCell) {
       setSelectedUnitId(unitAtCell.id); // Pilih unit
     } else if (selectedUnit && isMyUnitSelected && movementOptions.has(`${x},${y}`)) {
-      // Hitung biaya (Manhattan distance sederhana untuk prototipe P2)
-      const start = selectedUnit.gridPosition;
-      const cost = Math.abs(start.x - x) + Math.abs(start.y - y); 
-      
-      // Panggil aksi dari useCampaign (P1)
-      campaignActions.moveUnit({ unitId: selectedUnit.id, newPosition: { x, y }, cost });
+      // Gunakan path terpendek berbasis medan untuk biaya gerak
+      const result = findShortestPath(selectedUnit, battleState, { x, y });
+      if (!result) return;
+      const { cost, path } = result;
+
+      if (onMoveUnit) {
+        onMoveUnit(selectedUnit.id, path, cost);
+      } else {
+        // Fallback: langsung pesan moveUnit jika handler tidak disediakan
+        campaignActions.moveUnit({ unitId: selectedUnit.id, newPosition: { x, y }, cost });
+      }
     }
   };
 
