@@ -93,42 +93,72 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ campaign, players }) => {
           <div className="bg-gray-900/50 p-4 rounded-lg">
             <h2 className="font-cinzel text-2xl text-blue-300 border-b border-gray-600 pb-2 mb-3">Para Petualang</h2>
             <ul className="space-y-3">
-              {players.map(player => (
-                <li key={player.id} className="flex items-center gap-3">
-                  <img src={player.image} alt={player.name} className="w-12 h-12 rounded-full border-2 border-gray-500" />
-                  <div>
-                    <p className="font-bold">{player.name}</p>
-                    <p className="text-xs text-gray-400">{player.race} {player.class} - Level {player.level}</p>
-                    {player.conditions && player.conditions.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs text-amber-300 font-semibold">Kondisi Aktif:</p>
-                        <ul className="mt-1 space-y-1">
-                          {player.conditions.map((c, idx) => {
-                            const eff = CONDITION_RULES[c] || {};
-                            const impact: string[] = [];
-                            if (eff.attackAdvantage) impact.push('Advantage serangan');
-                            if (eff.attackDisadvantage) impact.push('Disadvantage serangan');
-                            if (eff.grantsAdvantageToAttackers) impact.push('Musuh mendapat advantage');
-                            if (eff.grantsDisadvantageToAttackers) impact.push('Musuh mendapat disadvantage');
-                            if (eff.speedZero) impact.push('Kecepatan 0');
-                            else if (eff.speedMultiplier && eff.speedMultiplier < 1) impact.push(`Kecepatan x${eff.speedMultiplier}`);
-                            if (eff.acModifier) impact.push(`AC ${eff.acModifier >= 0 ? '+' : ''}${eff.acModifier}`);
-                            if (eff.attackRollModifier) impact.push(`Serangan ${eff.attackRollModifier >= 0 ? '+' : ''}${eff.attackRollModifier}`);
-                            return (
-                              <li key={idx} className="text-xs text-gray-300">
-                                <span className="inline-block px-2 py-0.5 bg-gray-700 rounded mr-2">{c}</span>
-                                <span className="italic">{impact.length > 0 ? impact.join(', ') : '—'}</span>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
+                    {players.map(player => (
+                        <li key={player.id} className="flex items-center gap-3">
+                            <img src={player.image} alt={player.name} className="w-12 h-12 rounded-full border-2 border-gray-500" />
+                            <div>
+                                <p className="font-bold">{player.name}</p>
+                                <p className="text-xs text-gray-400">{player.race} {player.class} - Level {player.level}</p>
+                                {player.conditions && player.conditions.length > 0 && (
+                                    <div className="mt-2">
+                                        <p className="text-xs text-amber-300 font-semibold">Kondisi Aktif:</p>
+                                        <ul className="mt-1 space-y-1">
+                                            {player.conditions.map((c, idx) => {
+                                                const eff = CONDITION_RULES[c] || {};
+                                                const impact: string[] = [];
+                                                if (eff.attackAdvantage) impact.push('Advantage serangan');
+                                                if (eff.attackDisadvantage) impact.push('Disadvantage serangan');
+                                                if (eff.grantsAdvantageToAttackers) impact.push('Musuh mendapat advantage');
+                                                if (eff.grantsDisadvantageToAttackers) impact.push('Musuh mendapat disadvantage');
+                                                if (eff.speedZero) impact.push('Kecepatan 0');
+                                                else if (eff.speedMultiplier && eff.speedMultiplier < 1) impact.push(`Kecepatan x${eff.speedMultiplier}`);
+                                                if (eff.acModifier) impact.push(`AC ${eff.acModifier >= 0 ? '+' : ''}${eff.acModifier}`);
+                                                if (eff.attackRollModifier) impact.push(`Serangan ${eff.attackRollModifier >= 0 ? '+' : ''}${eff.attackRollModifier}`);
+                                                return (
+                                                    <li key={idx} className="text-xs text-gray-300">
+                                                        <span className="inline-block px-2 py-0.5 bg-gray-700 rounded mr-2">{c}</span>
+                                                        <span className="italic">{impact.length > 0 ? impact.join(', ') : '—'}</span>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    </div>
+                                )}
+                                {player.activeEffects && player.activeEffects.length > 0 && (
+                                    <div className="mt-2">
+                                        <p className="text-xs text-blue-300 font-semibold">Efek Sihir Aktif:</p>
+                                        <ul className="mt-1 space-y-1">
+                                            {player.activeEffects.map((e) => {
+                                                const impact: string[] = [];
+                                                if (e.acBonus) impact.push(`AC ${e.acBonus >= 0 ? '+' : ''}${e.acBonus}`);
+                                                if (e.blessDie) impact.push(`Bless +1${e.blessDie}`);
+                                                if (e.grantsDisadvantageToAttackers) impact.push('Penyerang mendapat disadvantage');
+                                                return (
+                                                    <li key={e.id} className="text-xs text-gray-300">
+                                                        <span className="inline-block px-2 py-0.5 bg-indigo-700/50 rounded mr-2">{e.label || e.spellId}</span>
+                                                        <span className="italic mr-2">{impact.length > 0 ? impact.join(', ') : '—'}</span>
+                                                        {typeof e.remainingRounds === 'number' && (
+                                                            <span className="text-xs text-gray-400">({e.remainingRounds} rnd tersisa)</span>
+                                                        )}
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    </div>
+                                )}
+                                {player.concentration && (
+                                    <div className="mt-2">
+                                        <p className="text-xs text-green-300 font-semibold">Konsentrasi:</p>
+                                        <p className="text-xs text-gray-300">
+                                            {player.concentration.spellName} — {player.concentration.remainingRounds} rnd tersisa
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </div>
         </div>
       )}
 

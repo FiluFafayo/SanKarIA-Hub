@@ -287,11 +287,39 @@ export const useCombatSystem = ({
 				);
 				const attackerName = attacker?.name || "Seseorang";
 
-                const isCritical = (request.type === "attack") && roll.rolls && roll.rolls[0] === 20;
-                const rollMessage = `${attackerName} menyerang ${target.name} dan ${successText}${isCritical ? ' — KRITIS!' : ''}.`;
-                campaignActions.logEvent({ type: "system", text: rollMessage }, turnId);
+				// Coba reaksi Shield pada target pemain bila serangan mengenai namun akan meleset dengan +5 AC
+				let shieldNegated = false;
+				if (roll.success && ("ownerId" in target)) {
+					const hasShieldSpell = target.knownSpells?.some((s) => s.name === "Shield");
+					const hasReaction = !target.usedReaction;
+					const slotIndex = target.spellSlots.findIndex((s) => s.level >= 1 && s.spent < s.max);
+					const wouldMissWithShield = roll.total < (targetAC + 5);
+					if (hasShieldSpell && hasReaction && slotIndex > -1 && wouldMissWithShield) {
+						const newSlots = [...target.spellSlots];
+						newSlots[slotIndex] = { ...newSlots[slotIndex], spent: newSlots[slotIndex].spent + 1 };
+						const shieldEffectId = `Shield-${Date.now()}`;
+						const updatedTarget = {
+							...target,
+							spellSlots: newSlots,
+							usedReaction: true,
+							activeEffects: [
+								...(target.activeEffects || []),
+								{ id: shieldEffectId, label: 'Shield', sourceCharacterId: target.id, targetCharacterId: target.id, remainingRounds: 1, acBonus: 5 },
+							],
+							armorClass: target.armorClass + 5,
+						};
+						onCharacterUpdate(updatedTarget);
+						campaignActions.logEvent({ type: 'system', text: `${target.name} menggunakan reaksi Shield: +5 AC hingga awal gilirannya berikutnya.` }, turnId);
+						shieldNegated = true;
+						successText = `gagal mengenai (Total ${roll.total} vs AC ${targetAC}+5)`;
+					}
+				}
 
-				if (roll.success) {
+				const isCritical = (request.type === "attack") && roll.rolls && roll.rolls[0] === 20;
+				const rollMessage = `${attackerName} menyerang ${target.name} dan ${successText}${isCritical ? ' — KRITIS!' : ''}.`;
+				campaignActions.logEvent({ type: "system", text: rollMessage }, turnId);
+
+				if (roll.success && !shieldNegated) {
 					let finalDamageDice = request.damageDice;
 
 					// FITUR KELAS: Rogue - Sneak Attack (Kesenjangan #4)
@@ -573,10 +601,11 @@ export const useCombatSystem = ({
                             // Tentukan advantage/disadvantage dari kondisi
                             const attackerConds = monster.conditions || [];
                             const targetConds = targetPlayer.conditions || [];
+                            const targetEffs = targetPlayer.activeEffects || [];
                             const hasAdvFromAttacker = attackerConds.some((c) => CONDITION_RULES[c]?.attackAdvantage);
                             const hasDisFromAttacker = attackerConds.some((c) => CONDITION_RULES[c]?.attackDisadvantage);
-                            const hasAdvFromTarget = targetConds.some((c) => CONDITION_RULES[c]?.grantsAdvantageToAttackers);
-                            const hasDisFromTarget = targetConds.some((c) => CONDITION_RULES[c]?.grantsDisadvantageToAttackers);
+                            const hasAdvFromTarget = targetConds.some((c) => CONDITION_RULES[c]?.grantsAdvantageToAttackers) || targetEffs.some((e) => (e as any).grantsAdvantageToAttackers);
+                            const hasDisFromTarget = targetConds.some((c) => CONDITION_RULES[c]?.grantsDisadvantageToAttackers) || targetEffs.some((e) => e.grantsDisadvantageToAttackers);
                             let isAdv = !!(hasAdvFromAttacker || hasAdvFromTarget);
                             let isDis = !!(hasDisFromAttacker || hasDisFromTarget);
                             if (isAdv && isDis) { isAdv = false; isDis = false; }
@@ -767,6 +796,51 @@ export const useCombatSystem = ({
 
 		const turnId = campaignActions.startTurn();
 		campaignActions.setCurrentPlayerId(nextPlayerId);
+
+		// Tick durasi efek & konsentrasi pada karakter kita (runtime lokal)
+		if (character.activeEffects && character.activeEffects.length > 0) {
+			let effectsChanged = false;
+			let newArmorClass = character.armorClass;
+			const updatedEffects = character.activeEffects
+				.map((e) => ({ ...e, remainingRounds: Math.max(0, (e.remainingRounds || 0) - 1) }))
+				.filter((e) => {
+					if (e.remainingRounds === 0) {
+						// Efek habis: rollback AC jika ada
+						if (e.acBonus) {
+							newArmorClass = newArmorClass - e.acBonus;
+						}
+						campaignActions.logEvent({ type: 'system', text: `${character.name}: Efek ${e.label} berakhir.` }, turnId);
+						effectsChanged = true;
+						return false;
+					}
+					return true;
+				});
+			if (effectsChanged) {
+				onCharacterUpdate({ ...character, activeEffects: updatedEffects, armorClass: newArmorClass });
+			}
+		}
+
+		// Tick konsentrasi jika ada
+		if (character.concentration) {
+			const newRemaining = Math.max(0, character.concentration.remainingRounds - 1);
+			let updatedChar = { ...character, concentration: { ...character.concentration, remainingRounds: newRemaining } };
+			let concentrationEnded = false;
+			if (newRemaining === 0) {
+				// Hapus efek yang bergantung pada konsentrasi dari caster
+				const toRemoveIds = (character.activeEffects || []).filter(e => e.isConcentration && e.sourceCharacterId === character.id).map(e => e.id);
+				let newEffects = (character.activeEffects || []).filter(e => !toRemoveIds.includes(e.id));
+				let newArmorClass = updatedChar.armorClass;
+				for (const e of (character.activeEffects || [])) {
+					if (toRemoveIds.includes(e.id) && e.acBonus) newArmorClass -= e.acBonus;
+				}
+				updatedChar = { ...updatedChar, activeEffects: newEffects, armorClass: newArmorClass, concentration: null };
+				concentrationEnded = true;
+				campaignActions.logEvent({ type: 'system', text: `${character.name}: Konsentrasi pada ${character.concentration.spellName} berakhir.` }, turnId);
+			}
+			if (newRemaining !== character.concentration.remainingRounds || concentrationEnded) {
+				onCharacterUpdate(updatedChar);
+			}
+		}
 
 		const nextCombatant = [...players, ...monsters].find(
 			(c) => ("ownerId" in c ? c.id : c.instanceId) === nextPlayerId
@@ -1607,6 +1681,81 @@ export const useCombatSystem = ({
 						return;
 					}
 				}
+				// Terapkan efek berdasarkan spell
+				const effectId = `${spell.name}-${Date.now()}`;
+				if (spell.name === 'Bless') {
+					// Penyederhanaan: Bless ke diri sendiri
+					const newEffect = {
+						id: effectId,
+						spellId: spell.id,
+						label: 'Bless',
+						sourceCharacterId: character.id,
+						targetCharacterId: character.id,
+						remainingRounds: spell.durationRounds || 10,
+						isConcentration: spell.requiresConcentration,
+						blessDie: '1d4',
+					};
+					updatedCharacterState.activeEffects = [
+						...(updatedCharacterState.activeEffects || []),
+						newEffect,
+					];
+					if (spell.requiresConcentration) {
+						updatedCharacterState.concentration = {
+							spellId: spell.id,
+							spellName: spell.name,
+							remainingRounds: spell.durationRounds || 10,
+						};
+					}
+					campaignActions.logEvent({ type: 'system', text: `${character.name} memberkati dirinya (Bless): +1d4 untuk Attack & Saving Throw (${spell.duration}).` }, turnId);
+				} else if (spell.name === 'Shield of Faith') {
+					const newEffect = {
+						id: effectId,
+						spellId: spell.id,
+						label: 'Shield of Faith',
+						sourceCharacterId: character.id,
+						targetCharacterId: character.id,
+						remainingRounds: spell.durationRounds || 100,
+						isConcentration: spell.requiresConcentration,
+						acBonus: 2,
+					};
+					updatedCharacterState.activeEffects = [
+						...(updatedCharacterState.activeEffects || []),
+						newEffect,
+					];
+					updatedCharacterState.armorClass = (updatedCharacterState.armorClass || 10) + 2;
+					if (spell.requiresConcentration) {
+						updatedCharacterState.concentration = {
+							spellId: spell.id,
+							spellName: spell.name,
+							remainingRounds: spell.durationRounds || 100,
+						};
+					}
+					campaignActions.logEvent({ type: 'system', text: `${character.name} mendapatkan +2 AC dari Shield of Faith (${spell.duration}).` }, turnId);
+				} else if (spell.name === 'Darkness') {
+					const newEffect = {
+						id: effectId,
+						spellId: spell.id,
+						label: 'Darkness',
+						sourceCharacterId: character.id,
+						targetCharacterId: character.id,
+						remainingRounds: spell.durationRounds || 100,
+						isConcentration: spell.requiresConcentration,
+						grantsDisadvantageToAttackers: true,
+					};
+					updatedCharacterState.activeEffects = [
+						...(updatedCharacterState.activeEffects || []),
+						newEffect,
+					];
+					if (spell.requiresConcentration) {
+						updatedCharacterState.concentration = {
+							spellId: spell.id,
+							spellName: spell.name,
+							remainingRounds: spell.durationRounds || 100,
+						};
+					}
+					campaignActions.logEvent({ type: 'system', text: `${character.name} menciptakan kegelapan pekat (Darkness). Penyerang memiliki disadvantage (${spell.duration}).` }, turnId);
+				}
+
 				onCharacterUpdate(updatedCharacterState);
 			}
 

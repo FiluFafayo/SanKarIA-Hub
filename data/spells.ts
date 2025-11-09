@@ -89,6 +89,8 @@ export const SPELL_DEFINITIONS: Omit<SpellDefinition, 'id'>[] = [
         range: '30 feet',
         components: ['V', 'S', 'M'],
         duration: 'Concentration, 1 minute',
+        requiresConcentration: true,
+        durationRounds: 10,
         effectType: 'buff',
         description: 'Hingga 3 makhluk pilihanmu mendapat +1d4 untuk Attack Roll dan Saving Throw.'
     },
@@ -100,6 +102,8 @@ export const SPELL_DEFINITIONS: Omit<SpellDefinition, 'id'>[] = [
         range: '60 feet',
         components: ['V', 'S', 'M'],
         duration: 'Concentration, 10 minutes',
+        requiresConcentration: true,
+        durationRounds: 100,
         effectType: 'buff',
         description: 'Satu makhluk pilihanmu mendapat +2 AC selama durasi.'
     },
@@ -165,6 +169,7 @@ export const SPELL_DEFINITIONS: Omit<SpellDefinition, 'id'>[] = [
         range: 'Self',
         components: ['V', 'S'],
         duration: '1 round',
+        durationRounds: 1,
         effectType: 'buff',
         description: 'Sebagai reaksi saat terkena serangan, kamu mendapat +5 AC hingga awal giliranmu berikutnya.'
     },
@@ -190,5 +195,19 @@ export const SPELL_DEFINITIONS: Omit<SpellDefinition, 'id'>[] = [
         effectType: 'control',
         damageDice: '5d8', // (Bukan damage, tapi total HP yang terpengaruh)
         description: 'Menidurkan makhluk dalam radius 20 kaki, total 5d8 HP, dimulai dari HP terendah.'
+    },
+    // Level 2 (untuk fungsi Darkness)
+    {
+        name: 'Darkness',
+        level: 2,
+        school: 'Evocation',
+        castingTime: 'action',
+        range: '60 feet',
+        components: ['V', 'M'],
+        duration: 'Concentration, 10 minutes',
+        requiresConcentration: true,
+        durationRounds: 100,
+        effectType: 'control',
+        description: 'Area dalam radius 15 kaki menjadi gelap pekat; makhluk yang tidak bisa melihat memiliki disadvantage dalam serangan.'
     },
 ];

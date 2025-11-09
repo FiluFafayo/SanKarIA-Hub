@@ -15,6 +15,7 @@ export const RollModal: React.FC<RollModalProps> = ({ request, character, onComp
     // State untuk menyimpan SEMUA lemparan dadu (untuk adv/disadv)
     const [allRolls, setAllRolls] = useState<number[][]>([]);
     const [finalRoll, setFinalRoll] = useState<DiceRoll | null>(null);
+    const [blessApplied, setBlessApplied] = useState<number>(0);
 
     // Ambil status adv/disadv dari request
 const { diceNotation, modifier, title, dc, modifierBreakdown, relevantAbility, isAdvantage, isDisadvantage } = useMemo(() => {
@@ -155,7 +156,16 @@ const { diceNotation, modifier, title, dc, modifierBreakdown, relevantAbility, i
                 // (Kita akan gunakan `winningRollIndex` di UI nanti)
             }
 
-            const total = finalResult.total + modifier;
+            // Tambah efek Bless jika aktif (untuk Attack & Saving Throw)
+            let blessBonus = 0;
+            const hasBless = character.activeEffects?.some(e => e.blessDie && e.remainingRounds > 0);
+            if (hasBless && (request.stage === 'attack' || request.type === 'savingThrow')) {
+                const blessEffect = character.activeEffects?.find(e => e.blessDie && e.remainingRounds > 0);
+                if (blessEffect?.blessDie) {
+                    blessBonus = rollDice(blessEffect.blessDie).total;
+                }
+            }
+            const total = finalResult.total + modifier + blessBonus;
             const success = dc ? total >= dc : true;
             const totalModifier = finalResult.modifier + modifier;
             
@@ -171,6 +181,7 @@ const { diceNotation, modifier, title, dc, modifierBreakdown, relevantAbility, i
 
             setAllRolls(rollsToShow); // Simpan kedua hasil roll untuk ditampilkan
             setFinalRoll(finalRollResult); // Simpan hasil akhir
+            setBlessApplied(blessBonus);
             setPhase('finished');
             
             setTimeout(() => {
@@ -259,6 +270,12 @@ const { diceNotation, modifier, title, dc, modifierBreakdown, relevantAbility, i
                                         <span>Bonus Kecakapan:</span>
                                         <span className="font-mono font-bold">+{modifierBreakdown.proficiency}</span>
                                     </div>
+                                    {(character.activeEffects?.some(e => e.blessDie && e.remainingRounds > 0) && (request.stage === 'attack' || request.type === 'savingThrow')) && (
+                                        <div className="flex justify-between">
+                                            <span>Bless:</span>
+                                            <span className="font-mono font-bold">+{blessApplied}</span>
+                                        </div>
+                                    )}
                                     </>
                                     )}
                                     <hr className="border-gray-600 my-1" />

@@ -197,6 +197,10 @@ export interface SpellDefinition {
     saveRequired?: Ability;
     saveOnSuccess?: 'half_damage' | 'no_effect';
     conditionApplied?: string;
+    // Tambahan untuk Tahap 5
+    requiresConcentration?: boolean;
+    // Durasi dalam ronde (untuk memudahkan ticking saat kombat)
+    durationRounds?: number;
 }
 
 // Merepresentasikan tabel 'monsters'
@@ -246,6 +250,21 @@ export interface CharacterSpellSlot {
     level: number;
     max: number;
     spent: number;
+}
+
+// Efek runtime berkelanjutan dari spell/ability
+export interface ActiveEffect {
+    id: string; // unique instance id
+    spellId?: string; // optional: id dari SpellDefinition
+    label: string; // e.g., 'Bless', 'Shield'
+    sourceCharacterId: string; // siapa yang memberikan efek
+    targetCharacterId: string; // siapa penerima efek
+    remainingRounds: number; // berkurang setiap giliran
+    isConcentration?: boolean; // true jika bergantung pada konsentrasi caster
+    // Payload mekanikal sederhana (disederhanakan untuk tahap ini)
+    blessDie?: string; // e.g., '1d4' untuk Bless
+    acBonus?: number; // e.g., +5 untuk Shield, +2 untuk Shield of Faith
+    grantsDisadvantageToAttackers?: boolean; // e.g., Darkness (disederhanakan)
 }
 
 // Tipe Karakter SSoT (Single Source of Truth)
@@ -303,6 +322,15 @@ export interface Character {
     usedBonusAction?: boolean;
     usedReaction?: boolean;
     usedAction?: boolean;
+
+    // Efek berkelanjutan (runtime, non-persisten)
+    activeEffects?: ActiveEffect[];
+    // Hanya satu konsentrasi aktif per caster
+    concentration?: {
+        spellId: string;
+        spellName: string;
+        remainingRounds: number; // dihitung dalam ronde/giliran
+    } | null;
 }
 
 
