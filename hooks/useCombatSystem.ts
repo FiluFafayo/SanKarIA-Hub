@@ -22,6 +22,7 @@ import {
     DamageType,
 } from "../types";
 import { RACES } from "../data/races";
+import { CONDITION_RULES } from "../types";
 import {
 	rollInitiative,
 	rollDice,
@@ -202,6 +203,53 @@ export const useCombatSystem = ({
 						{ type: "system", text: `${playerToSave.name} telah tewas.` },
 						turnId
 					);
+				}
+
+				campaignActions.endTurn();
+				return;
+			}
+
+			// --- HANDLE SAVING THROW ---
+			if (request.type === "savingThrow") {
+				const target: MonsterInstance | Character | undefined = [
+					...campaign.monsters,
+					...players,
+				].find(
+					(c) => ("ownerId" in c ? c.id : c.instanceId) === request.target?.id
+				);
+				if (!target) {
+					campaignActions.logEvent({ type: 'system', text: `Target saving throw tidak ditemukan.` }, turnId);
+					campaignActions.endTurn();
+					return;
+				}
+
+				const succeeded = !!roll.success;
+				const reason = (request.reason || '').toLowerCase();
+				let appliedCondition: string | null = null;
+				if (!succeeded) {
+					if (reason.includes('poison')) appliedCondition = 'Poisoned';
+					else if (reason.includes('blind')) appliedCondition = 'Blinded';
+					else if (reason.includes('fright')) appliedCondition = 'Frightened';
+					else if (reason.includes('restrain') || reason.includes('entangle') || reason.includes('web')) appliedCondition = 'Restrained';
+					else if (reason.includes('paraly')) appliedCondition = 'Paralyzed';
+					else if (reason.includes('stun')) appliedCondition = 'Stunned';
+					else if (reason.includes('charm')) appliedCondition = 'Charmed';
+					else if (reason.includes('petrif') || reason.includes('flesh to stone')) appliedCondition = 'Petrified';
+				}
+
+				if (appliedCondition) {
+					const text = `${target.name} gagal saving throw dan terkena kondisi ${appliedCondition}.`;
+					campaignActions.logEvent({ type: 'system', text }, turnId);
+					if ("ownerId" in target) {
+						const updated = { ...target, conditions: [...target.conditions, appliedCondition] };
+						onCharacterUpdate(updated);
+					} else {
+						const updated = { ...target, conditions: [...target.conditions, appliedCondition] };
+						campaignActions.updateMonster(updated);
+					}
+				} else {
+					const text = `${target.name} berhasil saving throw${reason ? ` terhadap '${request.reason}'` : ''}.`;
+					campaignActions.logEvent({ type: 'system', text }, turnId);
 				}
 
 				campaignActions.endTurn();
@@ -470,25 +518,25 @@ export const useCombatSystem = ({
 				turnShouldEnd = false;
 			}
 
-			if (hasRollRequest) {
-				const request = mechanics.rollRequest!;
-				const fullRollRequest: RollRequest = {
-					...request,
-					characterId: campaign.currentPlayerId!,
-					originalActionText: originalActionText,
-					isAdvantage: request.isAdvantage,
-					isDisadvantage: request.isDisadvantage,
-				};
+            if (hasRollRequest) {
+                const request = mechanics.rollRequest!;
+                const fullRollRequest: RollRequest = {
+                    ...request,
+                    characterId: campaign.currentPlayerId!,
+                    originalActionText: originalActionText,
+                    isAdvantage: request.isAdvantage,
+                    isDisadvantage: request.isDisadvantage,
+                };
 
-				if (isMonsterTurn) {
-					// --- Logika Auto-Roll Monster ---
-					const monster = campaign.monsters.find(
-						(m) => m.instanceId === campaign.currentPlayerId
-					)!;
-					let rollNotation = "1d20";
-					let modifier = 0;
-					let dc = 10;
-					let damageDice = "1d4";
+                if (isMonsterTurn) {
+                    // --- Logika Auto-Roll Monster ---
+                    const monster = campaign.monsters.find(
+                        (m) => m.instanceId === campaign.currentPlayerId
+                    )!;
+                    let rollNotation = "1d20";
+                    let modifier = 0;
+                    let dc = 10;
+                    let damageDice = "1d4";
 
 					if (request.type === "attack") {
 						const targetPlayer =
@@ -509,9 +557,9 @@ export const useCombatSystem = ({
 									request.reason.toLowerCase().includes(a.name.toLowerCase())
 								) || monster.definition.actions[0];
 
-							modifier = monsterAction.toHitBonus || 0;
-							dc = targetPlayer.armorClass;
-							damageDice = monsterAction.damageDice || "1d4";
+                            modifier = monsterAction.toHitBonus || 0;
+                            dc = targetPlayer.armorClass;
+                            damageDice = monsterAction.damageDice || "1d4";
 
                             fullRollRequest.stage = "attack";
                             fullRollRequest.damageDice = damageDice;
@@ -522,17 +570,43 @@ export const useCombatSystem = ({
                                 ac: dc,
                             };
 
-							const result = rollDice(rollNotation);
-							const total = result.total + modifier;
-							const success = total >= dc;
-							const simulatedRoll: DiceRoll = {
-								notation: rollNotation,
-								rolls: result.rolls,
-								modifier: modifier,
-								total: total,
-								success: success,
-								type: request.type,
-							};
+                            // Tentukan advantage/disadvantage dari kondisi
+                            const attackerConds = monster.conditions || [];
+                            const targetConds = targetPlayer.conditions || [];
+                            const hasAdvFromAttacker = attackerConds.some((c) => CONDITION_RULES[c]?.attackAdvantage);
+                            const hasDisFromAttacker = attackerConds.some((c) => CONDITION_RULES[c]?.attackDisadvantage);
+                            const hasAdvFromTarget = targetConds.some((c) => CONDITION_RULES[c]?.grantsAdvantageToAttackers);
+                            const hasDisFromTarget = targetConds.some((c) => CONDITION_RULES[c]?.grantsDisadvantageToAttackers);
+                            let isAdv = !!(hasAdvFromAttacker || hasAdvFromTarget);
+                            let isDis = !!(hasDisFromAttacker || hasDisFromTarget);
+                            if (isAdv && isDis) { isAdv = false; isDis = false; }
+                            fullRollRequest.isAdvantage = fullRollRequest.isAdvantage || isAdv;
+                            fullRollRequest.isDisadvantage = fullRollRequest.isDisadvantage || isDis;
+
+                            // Roll dengan adv/disadv jika perlu
+                            const first = rollDice(rollNotation);
+                            let pick = first;
+                            let details = '';
+                            if (fullRollRequest.isAdvantage) {
+                                const second = rollDice(rollNotation);
+                                pick = (first.total >= second.total) ? first : second;
+                                details = `Advantage (${first.total} vs ${second.total})`;
+                            } else if (fullRollRequest.isDisadvantage) {
+                                const second = rollDice(rollNotation);
+                                pick = (first.total <= second.total) ? first : second;
+                                details = `Disadvantage (${first.total} vs ${second.total})`;
+                            }
+                            const total = pick.total + modifier;
+                            const success = total >= dc;
+                            const simulatedRoll: DiceRoll = {
+                                notation: rollNotation,
+                                rolls: pick.rolls,
+                                modifier: modifier,
+                                total: total,
+                                success: success,
+                                type: request.type,
+                                details,
+                            };
 
 							setTimeout(() => {
 								if (campaign.turnId === turnId) {
@@ -847,29 +921,61 @@ export const useCombatSystem = ({
 			const gridData = generateProceduralGrid(30, 20); // 30x20
 
 			// 2. Buat Data Unit (Logika P1 + P2)
-			const playerUnits: Unit[] = players
-				.filter(p => campaign.playerIds.includes(p.id))
-				.map((p, i) => ({
-					id: p.id,
-					name: p.name,
-					isPlayer: true,
-					hp: p.currentHp,
-					maxHp: p.maxHp,
-					movementSpeed: Math.floor(p.speed / 5), // Konversi ft ke sel
-					remainingMovement: Math.floor(p.speed / 5),
-					gridPosition: { x: 2, y: 5 + i * 2 }
-				}));
+            const playerUnits: Unit[] = players
+                .filter(p => campaign.playerIds.includes(p.id))
+                .map((p, i) => ({
+                    id: p.id,
+                    name: p.name,
+                    isPlayer: true,
+                    hp: p.currentHp,
+                    maxHp: p.maxHp,
+                    movementSpeed: (() => {
+                        const conds = p.conditions || [];
+                        const speedZero = conds.some(c => CONDITION_RULES[c]?.speedZero);
+                        const mults = conds.map(c => CONDITION_RULES[c]?.speedMultiplier).filter(Boolean) as number[];
+                        const base = Math.floor(p.speed / 5);
+                        if (speedZero) return 0;
+                        const mult = mults.length > 0 ? mults.reduce((a, b) => a * b, 1) : 1;
+                        return Math.max(0, Math.floor(base * mult));
+                    })(), // Konversi ft ke sel dengan modifier kondisi
+                    remainingMovement: (() => {
+                        const conds = p.conditions || [];
+                        const speedZero = conds.some(c => CONDITION_RULES[c]?.speedZero);
+                        const mults = conds.map(c => CONDITION_RULES[c]?.speedMultiplier).filter(Boolean) as number[];
+                        const base = Math.floor(p.speed / 5);
+                        if (speedZero) return 0;
+                        const mult = mults.length > 0 ? mults.reduce((a, b) => a * b, 1) : 1;
+                        return Math.max(0, Math.floor(base * mult));
+                    })(),
+                    gridPosition: { x: 2, y: 5 + i * 2 }
+                }));
 
-			const monsterUnits: Unit[] = campaign.monsters.map((m, i) => ({
-				id: m.instanceId,
-				name: m.name,
-				isPlayer: false,
-				hp: m.currentHp,
-				maxHp: m.definition.maxHp,
-				movementSpeed: 6,
-				remainingMovement: 6,
-				gridPosition: { x: 25, y: 5 + i * 2 }
-			}));
+            const monsterUnits: Unit[] = campaign.monsters.map((m, i) => ({
+                id: m.instanceId,
+                name: m.name,
+                isPlayer: false,
+                hp: m.currentHp,
+                maxHp: m.definition.maxHp,
+                movementSpeed: (() => {
+                    const conds = m.conditions || [];
+                    const speedZero = conds.some(c => CONDITION_RULES[c]?.speedZero);
+                    const mults = conds.map(c => CONDITION_RULES[c]?.speedMultiplier).filter(Boolean) as number[];
+                    const base = 6;
+                    if (speedZero) return 0;
+                    const mult = mults.length > 0 ? mults.reduce((a, b) => a * b, 1) : 1;
+                    return Math.max(0, Math.floor(base * mult));
+                })(),
+                remainingMovement: (() => {
+                    const conds = m.conditions || [];
+                    const speedZero = conds.some(c => CONDITION_RULES[c]?.speedZero);
+                    const mults = conds.map(c => CONDITION_RULES[c]?.speedMultiplier).filter(Boolean) as number[];
+                    const base = 6;
+                    if (speedZero) return 0;
+                    const mult = mults.length > 0 ? mults.reduce((a, b) => a * b, 1) : 1;
+                    return Math.max(0, Math.floor(base * mult));
+                })(),
+                gridPosition: { x: 25, y: 5 + i * 2 }
+            }));
 
 			const allUnits = [...playerUnits, ...monsterUnits];
 
@@ -1330,6 +1436,17 @@ export const useCombatSystem = ({
 		const { battleState } = campaign;
 		const unit = battleState.units.find(u => u.id === unitId);
 		if (!unit) return;
+
+        // Cek kondisi yang mencegah pergerakan
+        const sourceChar = unit.isPlayer ? players.find(p => p.id === unit.id) : undefined;
+        const sourceMon = !unit.isPlayer ? campaign.monsters.find(m => m.instanceId === unit.id) : undefined;
+        const conds = sourceChar?.conditions || sourceMon?.conditions || [];
+        const preventsMove = conds.some(c => CONDITION_RULES[c]?.speedZero);
+        if (preventsMove) {
+            const turnId = campaign.turnId || '';
+            campaignActions.logEvent({ type: 'system', text: `${unit.name} tidak bisa bergerak karena kondisi (kecepatan 0).` }, turnId);
+            return;
+        }
 
 		const enemiesAdjacentBefore = battleState.units.filter(u => u.id !== unit.id && u.isPlayer !== unit.isPlayer && isAdjacent(u.gridPosition, unit.gridPosition));
 

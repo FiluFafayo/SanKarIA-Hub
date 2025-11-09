@@ -593,3 +593,90 @@ export interface StructuredApiResponse {
     rollRequest?: Omit<RollRequest, 'characterId' | 'originalActionText'>;
     tool_calls?: ToolCall[];
 }
+
+// =============================
+// Kondisi & Dampak Mekanis (5e)
+// =============================
+export interface ConditionEffects {
+    attackAdvantage?: boolean;
+    attackDisadvantage?: boolean;
+    grantsAdvantageToAttackers?: boolean;
+    grantsDisadvantageToAttackers?: boolean;
+    speedZero?: boolean;
+    speedMultiplier?: number; // 0.5 untuk gerak setengah, dst.
+    acModifier?: number;
+    attackRollModifier?: number;
+    notes?: string;
+}
+
+// Standar nama kondisi sebagai key string agar kompatibel dengan existing state `conditions: string[]`
+export const CONDITION_RULES: Record<string, ConditionEffects> = {
+    Hidden: {
+        attackAdvantage: true,
+        notes: 'Keuntungan menyerang, hilang saat menyerang atau terdeteksi.'
+    },
+    Prone: {
+        grantsAdvantageToAttackers: true,
+        notes: 'Penyerang memiliki keuntungan (disederhanakan).'
+    },
+    Grappled: {
+        speedZero: true,
+        notes: 'Kecepatan menjadi 0.'
+    },
+    Restrained: {
+        attackDisadvantage: true,
+        grantsAdvantageToAttackers: true,
+        speedZero: true,
+        notes: 'Disadvantage serangan, serangan terhadap punya advantage, tidak bisa bergerak.'
+    },
+    Blinded: {
+        attackDisadvantage: true,
+        grantsAdvantageToAttackers: true,
+        notes: 'Tidak bisa melihat; serangan memiliki disadvantage, lawan punya advantage.'
+    },
+    Charmed: {
+        attackDisadvantage: true,
+        notes: 'Tidak bisa menyerang pemberi charm (disederhanakan: disadvantage serangan).'
+    },
+    Frightened: {
+        attackDisadvantage: true,
+        notes: 'Disadvantage pada serangan dan ability checks.'
+    },
+    Poisoned: {
+        attackDisadvantage: true,
+        notes: 'Disadvantage pada serangan dan ability checks.'
+    },
+    Invisible: {
+        attackAdvantage: true,
+        grantsDisadvantageToAttackers: true,
+        notes: 'Serangan sendiri advantage; musuh sulit menyerang (disadvantage untuk penyerang).'
+    },
+    Paralyzed: {
+        grantsAdvantageToAttackers: true,
+        attackDisadvantage: true,
+        speedZero: true,
+        notes: 'Tidak bisa bergerak; serangan terhadap advantage (disederhanakan).'
+    },
+    Petrified: {
+        grantsAdvantageToAttackers: true,
+        attackDisadvantage: true,
+        speedZero: true,
+        notes: 'Incapacitated; serangan terhadap advantage.'
+    },
+    Stunned: {
+        grantsAdvantageToAttackers: true,
+        attackDisadvantage: true,
+        speedZero: true,
+        notes: 'Tidak bisa bergerak; serangan terhadap advantage.'
+    },
+    Unconscious: {
+        grantsAdvantageToAttackers: true,
+        attackDisadvantage: true,
+        speedZero: true,
+        notes: 'Tidak sadar; serangan terhadap advantage.'
+    },
+    Exhaustion: {
+        attackDisadvantage: true,
+        notes: 'Disadvantage ability checks; disederhanakan berdampak pada serangan.'
+    },
+};

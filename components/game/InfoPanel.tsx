@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Campaign, Character, Quest, WorldWeather } from '../../types'; // Hapus WorldTime
+import { Campaign, Character, Quest, WorldWeather, CONDITION_RULES } from '../../types'; // Hapus WorldTime
 import { formatDndTime } from '../../utils'; // (Poin 5) Impor helper format
 import { QuestLogPanel } from './QuestLogPanel';
 import { NpcTrackerPanel } from './NpcTrackerPanel';
@@ -99,6 +99,31 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ campaign, players }) => {
                   <div>
                     <p className="font-bold">{player.name}</p>
                     <p className="text-xs text-gray-400">{player.race} {player.class} - Level {player.level}</p>
+                    {player.conditions && player.conditions.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs text-amber-300 font-semibold">Kondisi Aktif:</p>
+                        <ul className="mt-1 space-y-1">
+                          {player.conditions.map((c, idx) => {
+                            const eff = CONDITION_RULES[c] || {};
+                            const impact: string[] = [];
+                            if (eff.attackAdvantage) impact.push('Advantage serangan');
+                            if (eff.attackDisadvantage) impact.push('Disadvantage serangan');
+                            if (eff.grantsAdvantageToAttackers) impact.push('Musuh mendapat advantage');
+                            if (eff.grantsDisadvantageToAttackers) impact.push('Musuh mendapat disadvantage');
+                            if (eff.speedZero) impact.push('Kecepatan 0');
+                            else if (eff.speedMultiplier && eff.speedMultiplier < 1) impact.push(`Kecepatan x${eff.speedMultiplier}`);
+                            if (eff.acModifier) impact.push(`AC ${eff.acModifier >= 0 ? '+' : ''}${eff.acModifier}`);
+                            if (eff.attackRollModifier) impact.push(`Serangan ${eff.attackRollModifier >= 0 ? '+' : ''}${eff.attackRollModifier}`);
+                            return (
+                              <li key={idx} className="text-xs text-gray-300">
+                                <span className="inline-block px-2 py-0.5 bg-gray-700 rounded mr-2">{c}</span>
+                                <span className="italic">{impact.length > 0 ? impact.join(', ') : '—'}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </li>
               ))}
