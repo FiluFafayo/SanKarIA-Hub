@@ -1,5 +1,5 @@
 // data/monsters.ts
-import { MonsterDefinition, Ability, Skill } from '../types';
+import { MonsterDefinition, Ability, Skill, DamageType } from '../types';
 
 // Ini adalah SSoT untuk Stat Block Monster, sesuai D&D Basic Rules Ch. 12
 // Kita akan menggunakan 'name' sebagai ID unik sementara sebelum seeding ke DB.
@@ -28,13 +28,15 @@ export const MONSTER_DEFINITIONS: Omit<MonsterDefinition, 'id'>[] = [
         name: "Scimitar",
         toHitBonus: 4, // +2 DEX + 2 PROF
         damageDice: "1d6+2",
-        description: "Melee Weapon Attack."
+        description: "Melee Weapon Attack.",
+        damageType: DamageType.Slashing,
       },
       {
         name: "Shortbow",
         toHitBonus: 4, // +2 DEX + 2 PROF
         damageDice: "1d6+2",
-        description: "Ranged Weapon Attack (range 80/320)."
+        description: "Ranged Weapon Attack (range 80/320).",
+        damageType: DamageType.Piercing,
       }
     ]
   },
@@ -62,13 +64,15 @@ export const MONSTER_DEFINITIONS: Omit<MonsterDefinition, 'id'>[] = [
         name: "Greataxe",
         toHitBonus: 5, // +3 STR + 2 PROF
         damageDice: "1d12+3",
-        description: "Melee Weapon Attack."
+        description: "Melee Weapon Attack.",
+        damageType: DamageType.Slashing,
       },
       {
         name: "Javelin",
         toHitBonus: 5, // +3 STR + 2 PROF
         damageDice: "1d6+3",
-        description: "Melee or Ranged Weapon Attack (range 30/120)."
+        description: "Melee or Ranged Weapon Attack (range 30/120).",
+        damageType: DamageType.Piercing,
       }
     ]
   },
@@ -90,18 +94,22 @@ export const MONSTER_DEFINITIONS: Omit<MonsterDefinition, 'id'>[] = [
       { name: 'Damage Immunities', description: 'Poison' },
       { name: 'Condition Immunities', description: 'Exhaustion, Poisoned' }
     ],
+    damageVulnerabilities: [DamageType.Bludgeoning],
+    damageImmunities: [DamageType.Poison],
     actions: [
       {
         name: "Shortsword",
         toHitBonus: 4, // +2 DEX + 2 PROF
         damageDice: "1d6+2",
-        description: "Melee Weapon Attack."
+        description: "Melee Weapon Attack.",
+        damageType: DamageType.Piercing,
       },
       {
         name: "Shortbow",
         toHitBonus: 4, // +2 DEX + 2 PROF
         damageDice: "1d6+2",
-        description: "Ranged Weapon Attack (range 80/320)."
+        description: "Ranged Weapon Attack (range 80/320).",
+        damageType: DamageType.Piercing,
       }
     ]
   },
@@ -133,7 +141,8 @@ export const MONSTER_DEFINITIONS: Omit<MonsterDefinition, 'id'>[] = [
         name: "Bite",
         toHitBonus: 4, // +2 DEX + 2 PROF
         damageDice: "2d4+2",
-        description: "Melee Weapon Attack. Jika target adalah makhluk, ia harus lolos STR save (DC 11) atau dijatuhkan (Prone)."
+        description: "Melee Weapon Attack. Jika target adalah makhluk, ia harus lolos STR save (DC 11) atau dijatuhkan (Prone).",
+        damageType: DamageType.Piercing,
       }
     ]
   },
@@ -165,7 +174,8 @@ export const MONSTER_DEFINITIONS: Omit<MonsterDefinition, 'id'>[] = [
         name: "Bite",
         toHitBonus: 4, // +2 DEX + 2 PROF
         damageDice: "1d4+2",
-        description: "Melee Weapon Attack."
+        description: "Melee Weapon Attack.",
+        damageType: DamageType.Piercing,
       }
     ]
   }

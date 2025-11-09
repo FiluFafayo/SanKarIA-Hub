@@ -146,6 +146,22 @@ export const SKILL_ABILITY_MAP: Record<Skill, Ability> = {
 // =================================================================
 
 // Merepresentasikan tabel 'items'
+export enum DamageType {
+    Bludgeoning = 'bludgeoning',
+    Piercing = 'piercing',
+    Slashing = 'slashing',
+    Fire = 'fire',
+    Cold = 'cold',
+    Lightning = 'lightning',
+    Thunder = 'thunder',
+    Acid = 'acid',
+    Poison = 'poison',
+    Psychic = 'psychic',
+    Radiant = 'radiant',
+    Necrotic = 'necrotic',
+    Force = 'force',
+}
+
 export interface ItemDefinition {
     id: string;
     name: string;
@@ -156,7 +172,7 @@ export interface ItemDefinition {
     requiresAttunement: boolean;
     bonuses?: { attack?: number; damage?: number; ac?: number };
     damageDice?: string;
-    damageType?: string;
+    damageType?: DamageType;
     baseAc?: number;
     armorType?: 'light' | 'medium' | 'heavy' | 'shield';
     stealthDisadvantage?: boolean;
@@ -177,7 +193,7 @@ export interface SpellDefinition {
     school: string;
     effectType: 'damage' | 'heal' | 'buff' | 'debuff' | 'control' | 'utility';
     damageDice?: string;
-    damageType?: string;
+    damageType?: DamageType;
     saveRequired?: Ability;
     saveOnSuccess?: 'half_damage' | 'no_effect';
     conditionApplied?: string;
@@ -192,11 +208,15 @@ export interface MonsterDefinition {
     abilityScores: AbilityScores;
     skills: Partial<Record<Skill, number>>;
     traits: { name: string; description: string }[];
-    actions: { name: string; toHitBonus?: number; damageDice?: string; description?: string }[];
+    actions: { name: string; toHitBonus?: number; damageDice?: string; description?: string; damageType?: DamageType }[];
     senses: { darkvision: number; passivePerception: number; tremorsense?: number; truesight?: number };
     languages: string[];
     challengeRating: number;
     xp: number;
+    // BARU: Defenses bawaan monster
+    damageResistances?: DamageType[];
+    damageImmunities?: DamageType[];
+    damageVulnerabilities?: DamageType[];
 }
 
 // =================================================================
@@ -555,6 +575,8 @@ export interface RollRequest {
     originalActionText?: string;
     stage?: 'attack' | 'damage';
     damageDice?: string;
+    damageType?: DamageType;
+    isCritical?: boolean;
     isAdvantage?: boolean;
     isDisadvantage?: boolean;
 }

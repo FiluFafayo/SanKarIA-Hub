@@ -19,7 +19,9 @@ import {
     GridCell,
     TerrainType,
     Unit,
+    DamageType,
 } from "../types";
+import { RACES } from "../data/races";
 import {
 	rollInitiative,
 	rollDice,
@@ -237,8 +239,9 @@ export const useCombatSystem = ({
 				);
 				const attackerName = attacker?.name || "Seseorang";
 
-				const rollMessage = `${attackerName} menyerang ${target.name} dan ${successText}.`;
-				campaignActions.logEvent({ type: "system", text: rollMessage }, turnId);
+                const isCritical = (request.type === "attack") && roll.rolls && roll.rolls[0] === 20;
+                const rollMessage = `${attackerName} menyerang ${target.name} dan ${successText}${isCritical ? ' — KRITIS!' : ''}.`;
+                campaignActions.logEvent({ type: "system", text: rollMessage }, turnId);
 
 				if (roll.success) {
 					let finalDamageDice = request.damageDice;
@@ -271,18 +274,20 @@ export const useCombatSystem = ({
 						}
 					}
 
-					const damageRollRequest: RollRequest = {
-						type: "damage",
-						characterId: request.characterId,
-						reason: `Menentukan kerusakan terhadap ${target.name}`,
-						target: {
-							id: "ownerId" in target ? target.id : target.instanceId,
-							name: target.name,
-							ac: targetAC,
-						},
-						stage: "damage",
-						damageDice: finalDamageDice,
-					};
+                    const damageRollRequest: RollRequest = {
+                        type: "damage",
+                        characterId: request.characterId,
+                        reason: `Menentukan kerusakan terhadap ${target.name}`,
+                        target: {
+                            id: "ownerId" in target ? target.id : target.instanceId,
+                            name: target.name,
+                            ac: targetAC,
+                        },
+                        stage: "damage",
+                        damageDice: finalDamageDice,
+                        damageType: request.item?.item.damageType,
+                        isCritical,
+                    };
 
 					if (attacker && "definition" in attacker) {
 						// Ini MonsterInstance
@@ -317,10 +322,53 @@ export const useCombatSystem = ({
 				}
 
 				// --- STAGE: DAMAGE ---
-			} else if (request.stage === "damage") {
-				const newHp = Math.max(0, target.currentHp - roll.total);
-				const rollMessage = `${target.name} menerima ${roll.total} kerusakan! Sisa HP: ${newHp}.`;
-				campaignActions.logEvent({ type: "system", text: rollMessage }, turnId);
+            } else if (request.stage === "damage") {
+                // === DAMAGE PIPELINE ===
+                let appliedDamage = roll.total;
+                const appliedType = request.damageType;
+                const wasCritical = !!request.isCritical;
+
+                // Critical doubling
+                if (wasCritical) {
+                    appliedDamage = appliedDamage * 2;
+                }
+
+                // Collect defenses from target
+                let resistances: DamageType[] = [];
+                let immunities: DamageType[] = [];
+                let vulnerabilities: DamageType[] = [];
+
+                if ("ownerId" in target) {
+                    const raceDef = RACES.find(r => r.name.toLowerCase() === target.race.toLowerCase());
+                    resistances = raceDef?.damageResistances || [];
+                    immunities = raceDef?.damageImmunities || [];
+                    vulnerabilities = raceDef?.damageVulnerabilities || [];
+                } else {
+                    resistances = target.definition.damageResistances || [];
+                    immunities = target.definition.damageImmunities || [];
+                    vulnerabilities = target.definition.damageVulnerabilities || [];
+                }
+
+                // Apply type-based adjustments
+                let pipelineNote = '';
+                if (appliedType) {
+                    if (immunities.includes(appliedType)) {
+                        appliedDamage = 0;
+                        pipelineNote = `(Imun terhadap ${appliedType})`;
+                    } else if (resistances.includes(appliedType)) {
+                        appliedDamage = Math.floor(appliedDamage / 2);
+                        pipelineNote = `(Resistan terhadap ${appliedType})`;
+                    } else if (vulnerabilities.includes(appliedType)) {
+                        appliedDamage = appliedDamage * 2;
+                        pipelineNote = `(Rentan terhadap ${appliedType})`;
+                    }
+                }
+
+                const newHp = Math.max(0, target.currentHp - appliedDamage);
+                const critText = wasCritical ? 'KRITIS! ' : '';
+                const typeText = appliedType ? ` [${appliedType}]` : '';
+                const rollMessage = `${target.name} menerima ${critText}${appliedDamage} kerusakan${typeText}${pipelineNote ? ' ' + pipelineNote : ''}! Sisa HP: ${newHp}.`;
+                campaignActions.logEvent({ type: "system", text: rollMessage }, turnId);
 
 				// F2.4: Hapus kondisi 'Hidden' dari penyerang
 				const attacker = players.find((p) => p.id === request.characterId);
@@ -465,13 +513,14 @@ export const useCombatSystem = ({
 							dc = targetPlayer.armorClass;
 							damageDice = monsterAction.damageDice || "1d4";
 
-							fullRollRequest.stage = "attack";
-							fullRollRequest.damageDice = damageDice;
-							fullRollRequest.target = {
-								id: targetPlayer.id,
-								name: targetPlayer.name,
-								ac: dc,
-							};
+                            fullRollRequest.stage = "attack";
+                            fullRollRequest.damageDice = damageDice;
+                            fullRollRequest.damageType = monsterAction.damageType;
+                            fullRollRequest.target = {
+                                id: targetPlayer.id,
+                                name: targetPlayer.name,
+                                ac: dc,
+                            };
 
 							const result = rollDice(rollNotation);
 							const total = result.total + modifier;
@@ -1207,9 +1256,10 @@ export const useCombatSystem = ({
 			targetName = targetMonster.name;
 		}
 
-		const action = attackerMonster.definition.actions[0];
-		const toHit = action?.toHitBonus ?? 0;
-		const damageDice = action?.damageDice ?? "1d4";
+        const action = attackerMonster.definition.actions[0];
+        const toHit = action?.toHitBonus ?? 0;
+        const damageDice = action?.damageDice ?? "1d4";
+        const damageType = action?.damageType;
 
 		const d20 = rollDice("1d20");
 		const total = d20.total + toHit;
@@ -1220,21 +1270,58 @@ export const useCombatSystem = ({
 			campaign.turnId!
 		);
 
-		if (success) {
-			const dmg = rollDice(damageDice);
-			const damage = dmg.total;
-			if (targetPlayer) {
-				const newHp = Math.max(0, targetPlayer.currentHp - damage);
-				onCharacterUpdate({ ...targetPlayer, currentHp: newHp });
-			} else if (targetMonster) {
-				const newHp = Math.max(0, targetMonster.currentHp - damage);
-				campaignActions.updateMonster({ ...targetMonster, currentHp: newHp });
-			}
-			campaignActions.logEvent(
-				{ type: "system", text: `${targetName} menerima ${damage} kerusakan dari Opportunity Attack!` },
-				campaign.turnId!
-			);
-		}
+        if (success) {
+            const dmg = rollDice(damageDice);
+            let appliedDamage = dmg.total;
+            const isCrit = d20.rolls[0] === 20;
+            if (isCrit) {
+                appliedDamage *= 2;
+            }
+
+            // Collect defenses
+            let resistances: DamageType[] = [];
+            let immunities: DamageType[] = [];
+            let vulnerabilities: DamageType[] = [];
+            if (targetPlayer) {
+                const raceDef = RACES.find(r => r.name.toLowerCase() === targetPlayer.race.toLowerCase());
+                resistances = raceDef?.damageResistances || [];
+                immunities = raceDef?.damageImmunities || [];
+                vulnerabilities = raceDef?.damageVulnerabilities || [];
+            } else if (targetMonster) {
+                resistances = targetMonster.definition.damageResistances || [];
+                immunities = targetMonster.definition.damageImmunities || [];
+                vulnerabilities = targetMonster.definition.damageVulnerabilities || [];
+            }
+
+            // Apply type effects
+            let pipelineNote = '';
+            if (damageType) {
+                if (immunities.includes(damageType)) {
+                    appliedDamage = 0;
+                    pipelineNote = `(Imun terhadap ${damageType})`;
+                } else if (resistances.includes(damageType)) {
+                    appliedDamage = Math.floor(appliedDamage / 2);
+                    pipelineNote = `(Resistan terhadap ${damageType})`;
+                } else if (vulnerabilities.includes(damageType)) {
+                    appliedDamage = appliedDamage * 2;
+                    pipelineNote = `(Rentan terhadap ${damageType})`;
+                }
+            }
+
+            const critText = isCrit ? 'KRITIS! ' : '';
+            campaignActions.logEvent(
+                { type: "system", text: `${attackerName} memberikan ${critText}${appliedDamage} kerusakan${damageType ? ` [${damageType}]` : ''} ${pipelineNote} kepada ${targetName}.` },
+                campaign.turnId!
+            );
+
+            if (targetPlayer) {
+                const newHp = Math.max(0, targetPlayer.currentHp - appliedDamage);
+                onCharacterUpdate({ ...targetPlayer, currentHp: newHp });
+            } else if (targetMonster) {
+                const newHp = Math.max(0, targetMonster.currentHp - appliedDamage);
+                campaignActions.updateMonster({ ...targetMonster, currentHp: newHp });
+            }
+        }
 	}, [campaign.monsters, players, campaign.turnId, campaignActions, onCharacterUpdate]);
 
 	// Handler: Pergerakan unit dengan memicu OA jika meninggalkan adjacency

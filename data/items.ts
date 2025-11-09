@@ -1,5 +1,5 @@
 // data/items.ts
-import { ItemDefinition } from '../types';
+import { ItemDefinition, DamageType } from '../types';
 
 // Ini adalah SSoT untuk item.
 // Kita akan menggunakan 'name' sebagai ID unik sementara sebelum seeding ke DB.
@@ -113,7 +113,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d4',
-        damageType: 'piercing',
+        damageType: DamageType.Piercing,
     },
     {
         name: 'Mace',
@@ -122,7 +122,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d6',
-        damageType: 'bludgeoning',
+        damageType: DamageType.Bludgeoning,
     },
     {
         name: 'Quarterstaff',
@@ -131,7 +131,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d6', // Versatile (1d8)
-        damageType: 'bludgeoning',
+        damageType: DamageType.Bludgeoning,
     },
     {
         name: 'Light Crossbow',
@@ -140,7 +140,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d8',
-        damageType: 'piercing',
+        damageType: DamageType.Piercing,
     },
     {
         name: 'Longsword',
@@ -149,7 +149,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d8', // Versatile (1d10)
-        damageType: 'slashing',
+        damageType: DamageType.Slashing,
     },
     {
         name: 'Warhammer',
@@ -158,7 +158,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d8', // Versatile (1d10)
-        damageType: 'bludgeoning',
+        damageType: DamageType.Bludgeoning,
     },
     {
         name: 'Rapier',
@@ -167,7 +167,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d8',
-        damageType: 'piercing',
+        damageType: DamageType.Piercing,
     },
     {
         name: 'Shortsword',
@@ -176,7 +176,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d6',
-        damageType: 'piercing',
+        damageType: DamageType.Piercing,
     },
     {
         name: 'Shortbow',
@@ -185,7 +185,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d6',
-        damageType: 'piercing',
+        damageType: DamageType.Piercing,
     },
     {
         name: 'Longbow',
@@ -194,7 +194,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d8',
-        damageType: 'piercing',
+        damageType: DamageType.Piercing,
     },
     {
         name: 'Small Knife',
@@ -203,7 +203,7 @@ export const ITEM_DEFINITIONS: Omit<ItemDefinition, 'id'>[] = [
         isMagical: false,
         requiresAttunement: false,
         damageDice: '1d4',
-        damageType: 'piercing',
+        damageType: DamageType.Piercing,
         description: 'Pisau kecil serbaguna.'
     },
     

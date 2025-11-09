@@ -64,6 +64,9 @@ const { diceNotation, modifier, title, dc, modifierBreakdown, relevantAbility, i
 
     } else if (request.stage === 'damage') {
             title = "Lemparan Kerusakan";
+            if (request.isCritical) {
+                title += " — KRITIS";
+            }
             diceNotation = request.damageDice || '1d4';
             mod = 0;
         } else {
