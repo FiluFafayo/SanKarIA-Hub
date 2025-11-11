@@ -33,8 +33,8 @@ const ExplorationMap = React.lazy(() => import("./game/ExplorationMap"));
 // Import komponen UI (tidak berubah)
 import { ChoiceButtons } from "./game/ChoiceButtons";
 import { CardActionBar, CardAction } from "./game/CardActionBar";
-import { QuickSpellSelectModal } from "./game/modals/QuickSpellSelectModal";
-import { QuickItemSelectModal } from "./game/modals/QuickItemSelectModal";
+const QuickSpellSelectModal = React.lazy(() => import("./game/modals/QuickSpellSelectModal").then(m => ({ default: m.QuickSpellSelectModal })));
+const QuickItemSelectModal = React.lazy(() => import("./game/modals/QuickItemSelectModal").then(m => ({ default: m.QuickItemSelectModal })));
 import { ActionBar } from "./game/ActionBar";
 import { RollModal } from "./game/RollModal";
 import { ModalWrapper } from "./ModalWrapper";
@@ -576,20 +576,24 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 							)}
 
 							{/* Quick Select Modals */}
-							{showSpellSelector && (
-								<QuickSpellSelectModal
-									character={character}
-									onSelect={(spell) => { combatSystem.handleSpellCast(spell); setShowSpellSelector(false); }}
-									onClose={() => setShowSpellSelector(false)}
-								/>
-							)}
-							{showItemSelector && (
-								<QuickItemSelectModal
-									character={character}
-									onSelect={(item) => { combatSystem.handleItemUse(item); setShowItemSelector(false); }}
-									onClose={() => setShowItemSelector(false)}
-								/>
-							)}
+                            {showSpellSelector && (
+                                <React.Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center"><div className="bg-gray-800 text-gray-300 p-4 rounded">Memuat modal spell…</div></div>}>
+                                    <QuickSpellSelectModal
+                                        character={character}
+                                        onSelect={(spell) => { combatSystem.handleSpellCast(spell); setShowSpellSelector(false); }}
+                                        onClose={() => setShowSpellSelector(false)}
+                                    />
+                                </React.Suspense>
+                            )}
+                            {showItemSelector && (
+                                <React.Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center"><div className="bg-gray-800 text-gray-300 p-4 rounded">Memuat modal item…</div></div>}>
+                                    <QuickItemSelectModal
+                                        character={character}
+                                        onSelect={(item) => { combatSystem.handleItemUse(item); setShowItemSelector(false); }}
+                                        onClose={() => setShowItemSelector(false)}
+                                    />
+                                </React.Suspense>
+                            )}
 
 			{contextMenu && (
 				<div

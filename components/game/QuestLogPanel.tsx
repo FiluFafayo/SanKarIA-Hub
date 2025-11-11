@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useRef, useState, useLayoutEffect, useCallback } from 'react';
 import { Quest } from '../../types';
 
 interface QuestLogPanelProps {
@@ -24,17 +24,35 @@ const QuestItem: React.FC<{ quest: Quest }> = ({ quest }) => (
 );
 
 export const QuestLogPanel: React.FC<QuestLogPanelProps> = ({ quests }) => {
-    const activeQuests = quests.filter(q => q.status === 'active' || q.status === 'proposed').sort((a,b) => (b.isMainQuest ? 1 : 0) - (a.isMainQuest ? 1 : 0));
-    const completedQuests = quests.filter(q => q.status === 'completed' || q.status === 'failed');
+    const containerRef = useRef<HTMLDivElement>(null);
+    const activeQuests = useMemo(() => quests.filter(q => q.status === 'active' || q.status === 'proposed').sort((a,b) => (b.isMainQuest ? 1 : 0) - (a.isMainQuest ? 1 : 0)), [quests]);
+    const completedQuests = useMemo(() => quests.filter(q => q.status === 'completed' || q.status === 'failed'), [quests]);
+
+    const [visibleActive, setVisibleActive] = useState<number>(Math.min(50, activeQuests.length));
+    const [visibleCompleted, setVisibleCompleted] = useState<number>(Math.min(50, completedQuests.length));
+
+    useLayoutEffect(() => {
+        setVisibleActive(v => Math.min(Math.max(v, 50), activeQuests.length));
+        setVisibleCompleted(v => Math.min(Math.max(v, 50), completedQuests.length));
+    }, [activeQuests.length, completedQuests.length]);
+
+    const handleScroll = useCallback(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        if (el.scrollTop < 48) {
+            setVisibleActive(v => Math.min(v + 50, activeQuests.length));
+            setVisibleCompleted(v => Math.min(v + 50, completedQuests.length));
+        }
+    }, [activeQuests.length, completedQuests.length]);
 
     return (
-        <div className="bg-gray-900/50 p-4 rounded-lg">
+        <div ref={containerRef} onScroll={handleScroll} className="bg-gray-900/50 p-4 rounded-lg max-h-80 overflow-y-auto">
             <h2 className="font-cinzel text-2xl text-green-300 border-b border-gray-600 pb-2 mb-3">Jurnal Misi</h2>
             
             <h3 className="font-cinzel text-lg text-yellow-400 mt-2">Misi Aktif</h3>
             {activeQuests.length > 0 ? (
                 <ul className="space-y-2 mt-1">
-                    {activeQuests.map(quest => <QuestItem key={quest.id} quest={quest} />)}
+                    {activeQuests.slice(-visibleActive).map(quest => <QuestItem key={quest.id} quest={quest} />)}
                 </ul>
             ) : (
                 <p className="text-sm text-gray-400 italic mt-1">Tidak ada misi aktif.</p>
@@ -43,7 +61,7 @@ export const QuestLogPanel: React.FC<QuestLogPanelProps> = ({ quests }) => {
             <h3 className="font-cinzel text-lg text-gray-500 mt-4">Misi Selesai</h3>
             {completedQuests.length > 0 ? (
                 <ul className="space-y-2 mt-1">
-                    {completedQuests.map(quest => (
+                    {completedQuests.slice(-visibleCompleted).map(quest => (
                         <li key={quest.id}>
                            <details className="text-sm text-gray-500">
                                <summary className="font-bold cursor-pointer line-through">{quest.title}</summary>

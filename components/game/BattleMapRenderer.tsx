@@ -250,7 +250,7 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
             tabIndex={0}
         >
             {/* Transform container for pinch/pan/zoom */}
-            <div className="absolute inset-0" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: '0 0' }}>
+            <div className="absolute inset-0" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: '0 0', willChange: 'transform' }}>
               {/* Background image follows transform */}
               <div className="absolute inset-0" style={{ backgroundImage: battleState.mapImageUrl ? `url(${battleState.mapImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }}></div>
               {/* 1. Render Grid & Movement Options (diadaptasi dari P2) */}

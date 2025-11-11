@@ -233,7 +233,7 @@ export const ExplorationMap: React.FC<ExplorationMapProps> = ({ grid, fog, playe
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      <div className="absolute inset-0" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: '0 0' }}>
+      <div className="absolute inset-0" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: '0 0', willChange: 'transform' }}>
         <canvas 
           ref={canvasRef}
           style={{ imageRendering: 'pixelated' }}

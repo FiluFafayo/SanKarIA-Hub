@@ -46,7 +46,7 @@ export const GameChatPanel: React.FC<GameChatPanelProps> = React.memo(({
     const showBattleMap = gameState === 'combat' && !!battleState;
 
     return (
-        <main className="flex-grow flex flex-col h-full overflow-hidden">
+        <main className="flex-grow flex flex-col h-full overflow-hidden p-comfortable rounded-comfortable bg-surface text-strong">
             {showBattleMap ? (
                 <BattleMapRenderer
                     battleState={battleState!}

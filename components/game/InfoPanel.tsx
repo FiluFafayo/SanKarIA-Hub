@@ -65,7 +65,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ campaign, players }) => {
   const [activeTab, setActiveTab] = useState('info');
 
   return (
-    <div className="p-4 h-full overflow-y-auto space-y-4">
+    <div className="p-comfortable rounded-comfortable h-full overflow-y-auto space-y-4 bg-surface text-strong">
       <div className="sticky top-0 bg-gray-800 z-10 flex rounded-lg overflow-hidden border border-gray-700">
         <button onClick={() => setActiveTab('info')} className={`flex-1 p-2 font-cinzel text-sm ${activeTab === 'info' ? 'bg-purple-700' : 'bg-gray-700/50 hover:bg-gray-600'}`}>Info</button>
         <button onClick={() => setActiveTab('map')} className={`flex-1 p-2 font-cinzel text-sm ${activeTab === 'map' ? 'bg-purple-700' : 'bg-gray-700/50 hover:bg-gray-600'}`} disabled={!campaign.mapImageUrl}>Peta</button>

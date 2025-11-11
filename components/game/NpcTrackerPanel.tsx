@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useRef, useState, useLayoutEffect, useCallback } from 'react';
 import { NPC } from '../../types';
 
 interface NpcTrackerPanelProps {
@@ -15,13 +15,30 @@ const getDispositionColor = (disposition: NPC['disposition']) => {
 };
 
 export const NpcTrackerPanel: React.FC<NpcTrackerPanelProps> = ({ npcs }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const sortedNpcs = useMemo(() => npcs, [npcs]);
+    const [visibleCount, setVisibleCount] = useState<number>(Math.min(50, sortedNpcs.length));
+
+    useLayoutEffect(() => {
+        setVisibleCount(v => Math.min(Math.max(v, 50), sortedNpcs.length));
+    }, [sortedNpcs.length]);
+
+    const handleScroll = useCallback(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 48;
+        if (nearBottom) {
+            setVisibleCount(v => Math.min(v + 50, sortedNpcs.length));
+        }
+    }, [sortedNpcs.length]);
+
     return (
-        <div className="bg-gray-900/50 p-4 rounded-lg">
+        <div ref={containerRef} onScroll={handleScroll} className="bg-gray-900/50 p-4 rounded-lg">
             <h2 className="font-cinzel text-2xl text-cyan-300 border-b border-gray-600 pb-2 mb-3">Karakter Ditemui</h2>
             
             {npcs.length > 0 ? (
                 <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                    {npcs.map(npc => (
+                    {sortedNpcs.slice(-visibleCount).map(npc => (
                         <details key={npc.id} className="bg-gray-800/50 p-3 rounded-lg">
                             <summary className="font-bold cursor-pointer text-base flex justify-between items-center">
                                 <span className="flex items-center gap-2">

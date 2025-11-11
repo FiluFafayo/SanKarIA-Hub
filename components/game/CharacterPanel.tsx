@@ -72,7 +72,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
 
 
     return (
-        <div className="bg-gray-900/50 p-3 rounded-lg flex flex-col gap-4 flex-grow">
+        <div className="bg-surface p-comfortable rounded-comfortable flex flex-col gap-4 flex-grow text-strong">
             {/* Character Info */}
             <div>
                 <h3 className="font-bold text-purple-300 text-lg">{character.name}</h3>
