@@ -4,7 +4,7 @@
 // dan logika kalkulasi dari P2 (ai-native rulesEngine).
 // Ini adalah komponen 'dumb' yang hanya me-render state dari useCampaign.
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { BattleState, Unit, TerrainType, GridCell } from '../../types';
 import { CampaignActions } from '../../hooks/useCampaign';
 import { calculateMovementOptions, findShortestPath } from '../../services/battleRules';
@@ -30,6 +30,14 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
   const [quickWheel, setQuickWheel] = useState<{ leftPercent: number; topPercent: number; unitId: string } | null>(null);
   const [pressTimer, setPressTimer] = useState<any>(null);
 
+  // Gesture state: pinch/pan/zoom & snap focus
+  const [scale, setScale] = useState<number>(1);
+  const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const isPanningRef = useRef<boolean>(false);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+
   // Cek apakah unit yang terpilih adalah milik kita
   const isMyUnitSelected = useMemo(() => {
     return selectedUnitId === currentUserId;
@@ -38,6 +46,71 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
   const selectedUnit = useMemo(() => {
     return battleState.units.find(u => u.id === selectedUnitId);
   }, [selectedUnitId, battleState.units]);
+
+  // Snap focus ke unit aktif ketika berubah
+  useEffect(() => {
+    const unitIdToFocus = selectedUnitId || battleState.activeUnitId;
+    const u = battleState.units.find(uu => uu.id === unitIdToFocus);
+    const container = containerRef.current;
+    if (!u || !container) return;
+    const rect = container.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const xPercent = (u.gridPosition.x / BATTLE_GRID_WIDTH) * 100;
+    const yPercent = (u.gridPosition.y / BATTLE_GRID_HEIGHT) * 100;
+    const targetX = (xPercent / 100) * rect.width * scale;
+    const targetY = (yPercent / 100) * rect.height * scale;
+    setOffset({ x: centerX - targetX, y: centerY - targetY });
+  }, [selectedUnitId, battleState.activeUnitId, battleState.units, scale]);
+
+  const clamp = (val: number, min: number, max: number) => Math.min(max, Math.max(min, val));
+
+  const handleContainerPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.setPointerCapture(e.pointerId);
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointersRef.current.size === 1) {
+      isPanningRef.current = true;
+      lastPointerRef.current = { x: e.clientX, y: e.clientY };
+    }
+  }, []);
+
+  const handleContainerPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!activePointersRef.current.has(e.pointerId)) return;
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = Array.from(activePointersRef.current.values());
+    if (pts.length === 1 && isPanningRef.current && lastPointerRef.current) {
+      const dx = e.clientX - lastPointerRef.current.x;
+      const dy = e.clientY - lastPointerRef.current.y;
+      lastPointerRef.current = { x: e.clientX, y: e.clientY };
+      setOffset(o => ({ x: o.x + dx, y: o.y + dy }));
+    } else if (pts.length === 2) {
+      // Pinch zoom
+      const [p1, p2] = pts;
+      const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      const center = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      const prevDist = (handleContainerPointerMove as any)._prevDist || dist;
+      const delta = dist - prevDist;
+      (handleContainerPointerMove as any)._prevDist = dist;
+      setScale(s => clamp(s + delta * 0.0015, 1, 3.5));
+      setOffset(o => ({ x: o.x + (o.x - center.x) * (delta * 0.0005), y: o.y + (o.y - center.y) * (delta * 0.0005) }));
+    }
+  }, []);
+
+  const handleContainerPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const container = containerRef.current;
+    if (!container) return;
+    try { container.releasePointerCapture(e.pointerId); } catch {}
+    activePointersRef.current.delete(e.pointerId);
+    if (activePointersRef.current.size === 0) {
+      isPanningRef.current = false;
+      lastPointerRef.current = null;
+      (handleContainerPointerMove as any)._prevDist = undefined;
+      const rect = container.getBoundingClientRect();
+      setOffset(o => ({ x: clamp(o.x, rect.width * -1, rect.width * 1), y: clamp(o.y, rect.height * -1, rect.height * 1) }));
+    }
+  }, [handleContainerPointerMove]);
 
   // Kalkulasi jangkauan gerak (diadaptasi dari P2)
   const movementOptions = useMemo(() => {
@@ -89,26 +162,33 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
     <div className="w-full h-full bg-gray-900 flex items-center justify-center p-2 md:p-4">
         {/* Wrapper untuk menjaga rasio aspek & sentering */}
         <div
-            className="relative bg-gray-800 bg-cover bg-center shadow-lg w-full max-w-full max-h-full"
+            ref={containerRef}
+            className="relative bg-gray-800 shadow-lg w-full max-w-full max-h-full"
             style={{
                 aspectRatio: aspectRatio, // Biarkan CSS menangani ukuran
-                backgroundImage: battleState.mapImageUrl ? `url(${battleState.mapImageUrl})` : 'none',
-                backgroundColor: battleState.mapImageUrl ? 'transparent' : '#333'
+                backgroundColor: '#333'
             }}
+            onPointerDown={handleContainerPointerDown}
+            onPointerMove={handleContainerPointerMove}
+            onPointerUp={handleContainerPointerUp}
         >
-            {/* 1. Render Grid & Movement Options (diadaptasi dari P2) */}
-            <div
-                className="absolute inset-0 grid"
-                style={{ 
-                    gridTemplateColumns: `repeat(${BATTLE_GRID_WIDTH}, 1fr)`,
-                    // FASE 3: Hapus width/height tetap. Biarkan 'inset-0' mengisi parent.
-                }}
-            >
+            {/* Transform container for pinch/pan/zoom */}
+            <div className="absolute inset-0" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: '0 0' }}>
+              {/* Background image follows transform */}
+              <div className="absolute inset-0" style={{ backgroundImage: battleState.mapImageUrl ? `url(${battleState.mapImageUrl})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.6 }}></div>
+              {/* 1. Render Grid & Movement Options (diadaptasi dari P2) */}
+              <div
+                  className="absolute inset-0 grid"
+                  style={{ 
+                      gridTemplateColumns: `repeat(${BATTLE_GRID_WIDTH}, 1fr)`,
+                      // FASE 3: Hapus width/height tetap. Biarkan 'inset-0' mengisi parent.
+                  }}
+              >
                 {battleState.gridMap.flat().map((cell, index) => {
-                    const x = index % BATTLE_GRID_WIDTH;
-                    const y = Math.floor(index / BATTLE_GRID_WIDTH);
-                    const isReachable = movementOptions.has(`${x},${y}`);
-                    const isSelectedUnit = selectedUnit?.gridPosition.x === x && selectedUnit?.gridPosition.y === y;
+                  const x = index % BATTLE_GRID_WIDTH;
+                  const y = Math.floor(index / BATTLE_GRID_WIDTH);
+                  const isReachable = movementOptions.has(`${x},${y}`);
+                  const isSelectedUnit = selectedUnit?.gridPosition.x === x && selectedUnit?.gridPosition.y === y;
                     
                     return (
                         <div
@@ -128,8 +208,8 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
                         ></div>
                     );
                 })}
-            </div>
-            
+              </div>
+
             {/* 2. Render Units (Tokens) (diadaptasi dari P2) */}
             {battleState.units.map(unit => {
                 // FASE 3: Kalkulasi posisi/ukuran responsif (persentase)
@@ -191,6 +271,8 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
                     </div>
                 );
             })}
+
+            </div>
 
             {/* 3. Loading Overlay (jika mapImageUrl belum ada) */}
             {!battleState.mapImageUrl &&

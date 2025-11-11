@@ -3,7 +3,7 @@
 // Komponen ini merender Peta Eksplorasi (grid + fog)
 // Diadaptasi dari P2 (pixel-vtt-stylizer ExplorationView)
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MapMarker, Tile } from '../../types';
 import { EXPLORATION_TILESET } from '../../data/tileset';
 
@@ -21,6 +21,12 @@ const FOG_COLOR = "#111827"; // (Warna BG Abu-900)
 
 export const ExplorationMap: React.FC<ExplorationMapProps> = ({ grid, fog, playerPos }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState<number>(1);
+  const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isPanningRef = useRef<boolean>(false);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
 
   useEffect(() => {
     if (!grid || !fog || !playerPos) return;
@@ -83,14 +89,85 @@ export const ExplorationMap: React.FC<ExplorationMapProps> = ({ grid, fog, playe
     
   }, [grid, fog, playerPos]);
 
+  // Snap focus ke posisi pemain setiap kali berubah
+  useEffect(() => {
+    const container = containerRef.current;
+    const canvas = canvasRef.current;
+    if (!container || !canvas) return;
+    const rect = container.getBoundingClientRect();
+    // Ukuran dasar canvas = grid width/height (px)
+    const mapWidth = canvas.width;
+    const mapHeight = canvas.height;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const targetX = (playerPos.x / mapWidth) * rect.width * scale;
+    const targetY = (playerPos.y / mapHeight) * rect.height * scale;
+    setOffset({ x: centerX - targetX, y: centerY - targetY });
+  }, [playerPos, scale]);
+
+  const clamp = (val: number, min: number, max: number) => Math.min(max, Math.max(min, val));
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.setPointerCapture(e.pointerId);
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointersRef.current.size === 1) {
+      isPanningRef.current = true;
+      lastPointerRef.current = { x: e.clientX, y: e.clientY };
+    }
+  }, []);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!activePointersRef.current.has(e.pointerId)) return;
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = Array.from(activePointersRef.current.values());
+    if (pts.length === 1 && isPanningRef.current && lastPointerRef.current) {
+      const dx = e.clientX - lastPointerRef.current.x;
+      const dy = e.clientY - lastPointerRef.current.y;
+      lastPointerRef.current = { x: e.clientX, y: e.clientY };
+      setOffset(o => ({ x: o.x + dx, y: o.y + dy }));
+    } else if (pts.length === 2) {
+      const [p1, p2] = pts;
+      const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      const center = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      const prevDist = (handlePointerMove as any)._prevDist || dist;
+      const delta = dist - prevDist;
+      (handlePointerMove as any)._prevDist = dist;
+      setScale(s => clamp(s + delta * 0.0015, 1, 4));
+      setOffset(o => ({ x: o.x + (o.x - center.x) * (delta * 0.0005), y: o.y + (o.y - center.y) * (delta * 0.0005) }));
+    }
+  }, []);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const container = containerRef.current;
+    if (!container) return;
+    try { container.releasePointerCapture(e.pointerId); } catch {}
+    activePointersRef.current.delete(e.pointerId);
+    if (activePointersRef.current.size === 0) {
+      isPanningRef.current = false;
+      lastPointerRef.current = null;
+      (handlePointerMove as any)._prevDist = undefined;
+      const rect = container.getBoundingClientRect();
+      setOffset(o => ({ x: clamp(o.x, rect.width * -1, rect.width * 1), y: clamp(o.y, rect.height * -1, rect.height * 1) }));
+    }
+  }, [handlePointerMove]);
+
   // Wrapper untuk scaling dan sentering
   return (
-    <div className="relative w-full aspect-square bg-black overflow-hidden rounded-lg border-2 border-gray-700">
+    <div
+      ref={containerRef}
+      className="relative w-full aspect-square bg-black overflow-hidden rounded-lg border-2 border-gray-700"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+    >
+      <div className="absolute inset-0" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: '0 0' }}>
         <canvas 
-            ref={canvasRef} 
-            className="w-full h-full object-contain"
-            style={{ imageRendering: 'pixelated' }}
+          ref={canvasRef}
+          style={{ imageRendering: 'pixelated' }}
         />
+      </div>
     </div>
   );
 };
