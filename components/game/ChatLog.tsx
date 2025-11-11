@@ -1,4 +1,4 @@
-import React, { useRef, useLayoutEffect, MouseEvent, useMemo } from 'react';
+import React, { useRef, useLayoutEffect, MouseEvent, useMemo, useState, useCallback } from 'react';
 import { GameEvent, Character, ThinkingState } from '../../types';
 import { TypingIndicator } from './TypingIndicator';
 import { RenderedHtml } from '../RenderedHtml';
@@ -13,14 +13,29 @@ interface ChatLogProps {
 
 export const ChatLog: React.FC<ChatLogProps> = React.memo(({ events, players, characterId, thinkingState, onObjectClick }) => {
     const endOfMessagesRef = useRef<HTMLDivElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [visibleCount, setVisibleCount] = useState<number>(Math.min(100, events.length));
 
+    // Scroll ke bawah saat ada pesan baru atau indikator mengetik
     useLayoutEffect(() => {
         endOfMessagesRef.current?.scrollIntoView({ behavior: 'auto' });
-    }, [events, thinkingState]);
+        // reset window jika jumlah pesan berubah signifikan
+        setVisibleCount(prev => Math.min(Math.max(prev, 100), events.length));
+    }, [events.length, thinkingState]);
 
-    // FASE 3: Memoize the mapping of events to prevent re-mapping when only thinkingState changes
+    const handleScroll = useCallback(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        // Saat mendekati bagian atas, tambah window untuk memuat pesan lama secara progresif
+        if (el.scrollTop < 48 && visibleCount < events.length) {
+            setVisibleCount(c => Math.min(c + 100, events.length));
+        }
+    }, [visibleCount, events.length]);
+
+    // FASE 3: Memoize mapping hanya untuk window yang sedang terlihat
     const renderedEvents = useMemo(() => {
-        return events.map(event => {
+        const sliced = events.slice(-visibleCount);
+        return sliced.map(event => {
             switch (event.type) {
                 case 'dm_narration':
                         return (
@@ -81,10 +96,17 @@ export const ChatLog: React.FC<ChatLogProps> = React.memo(({ events, players, ch
                         return null;
                 }
             });
-        }, [events, players, characterId, onObjectClick]); // Dependencies for the map
+        }, [events, players, characterId, onObjectClick, visibleCount]); // Dependencies for the map
 
     return (
-        <div className="flex-grow bg-black/30 p-4 overflow-y-auto flex flex-col gap-4">
+        <div
+            ref={containerRef}
+            className="flex-grow bg-black/30 p-4 overflow-y-auto flex flex-col gap-4"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+            onScroll={handleScroll}
+        >
             {renderedEvents}
             {thinkingState !== 'idle' && <TypingIndicator state={thinkingState} />}
             <div ref={endOfMessagesRef} />

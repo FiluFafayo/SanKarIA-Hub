@@ -17,7 +17,8 @@ export const ChoiceButtons: React.FC<ChoiceButtonsProps> = ({ choices, onChoiceS
           <button
             key={index}
             onClick={() => onChoiceSelect(choice)}
-            className="flex-1 bg-purple-700 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-sm"
+            aria-label={`Pilih: ${choice}`}
+            className="flex-1 bg-purple-700 hover:bg-purple-600 text-white font-bold py-3 px-4 rounded-lg transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800"
           >
             {choice}
           </button>

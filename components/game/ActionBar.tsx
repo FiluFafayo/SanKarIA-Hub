@@ -83,10 +83,11 @@ export const ActionBar: React.FC<ActionBarProps> = ({ disabled, onActionSubmit, 
                     onChange={e => setText(e.target.value)}
                     placeholder={disabled ? "Menunggu giliran atau respons DM..." : "Apa yang Anda lakukan?"}
                     disabled={disabled}
-                    className="flex-grow bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
+                    aria-label="Kolom input aksi"
+                    className="flex-grow bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500 focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800"
                 />
                 <VoicePTTButton lang={'id-ID'} onFinal={handleVoiceFinal} />
-                <button type="submit" disabled={disabled || !text.trim()} className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
+                <button type="submit" disabled={disabled || !text.trim()} aria-label="Kirim aksi" className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800">
                     {pendingSkill ? 'Lakukan Skill Check' : 'Kirim'}
                 </button>
             </form>

@@ -39,6 +39,9 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
   const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const rafIdRef = useRef<number | null>(null);
   const queuedPanRef = useRef<{ dx: number; dy: number } | null>(null);
+  const wheelDebounceRef = useRef<number | null>(null);
+  const wheelDeltaRef = useRef<number>(0);
+  const wheelPosRef = useRef<{ mx: number; my: number }>({ mx: 0, my: 0 });
 
   const queuePan = useCallback((dx: number, dy: number) => {
     queuedPanRef.current = {
@@ -139,12 +142,22 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
     const rect = container.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-    const factor = e.deltaY > 0 ? 0.95 : 1.05;
-    setScale(s => clamp(s * factor, 1, 3.5));
-    setOffset(o => ({
-      x: mx - (mx - o.x) * factor,
-      y: my - (my - o.y) * factor,
-    }));
+    wheelPosRef.current = { mx, my };
+    wheelDeltaRef.current += e.deltaY;
+    if (wheelDebounceRef.current) {
+      clearTimeout(wheelDebounceRef.current);
+    }
+    wheelDebounceRef.current = window.setTimeout(() => {
+      const delta = wheelDeltaRef.current;
+      wheelDeltaRef.current = 0;
+      const { mx: lmx, my: lmy } = wheelPosRef.current;
+      const factor = delta > 0 ? 0.95 : 1.05;
+      setScale(s => clamp(s * factor, 1, 3.5));
+      setOffset(o => ({
+        x: lmx - (lmx - o.x) * factor,
+        y: lmy - (lmy - o.y) * factor,
+      }));
+    }, 60);
   }, []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {

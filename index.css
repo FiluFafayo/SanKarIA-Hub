@@ -27,3 +27,29 @@
     .desktop-left, .desktop-right { display: none; }
   }
 }
+
+/* Design tokens: comfortable theme */
+:root {
+  --space-comfortable: 0.75rem; /* 12px */
+  --radius-comfortable: 0.75rem;
+  --color-surface-1: #1f2937; /* gray-800 */
+  --color-surface-2: #111827; /* gray-900 */
+  --color-text-strong: #f3f4f6; /* gray-100 */
+  --color-accent: #a78bfa; /* purple-400 */
+}
+
+.bg-surface { background-color: var(--color-surface-1); }
+.text-strong { color: var(--color-text-strong); }
+.rounded-comfortable { border-radius: var(--radius-comfortable); }
+.p-comfortable { padding: var(--space-comfortable); }
+
+/* Safe area utilities */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pl-safe { padding-left: env(safe-area-inset-left); }
+.pr-safe { padding-right: env(safe-area-inset-right); }
+
+/* Reduce motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

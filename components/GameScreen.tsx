@@ -24,11 +24,11 @@ import { GameTabs, GameTab } from "./game/GameTabs";
 // (SidePanel DIHAPUS)
 
 // FASE 0: Impor KONTEN Panel Modular (tidak berubah)
-import { GameChatPanel } from "./game/panels/GameChatPanel";
-import { GameCharacterPanel } from "./game/panels/GameCharacterPanel";
-import { GameInfoPanel } from "./game/panels/GameInfoPanel";
-import { ChatLog } from "./game/ChatLog";
-import { ExplorationMap } from "./game/ExplorationMap";
+const GameChatPanel = React.lazy(() => import("./game/panels/GameChatPanel"));
+const GameCharacterPanel = React.lazy(() => import("./game/panels/GameCharacterPanel"));
+const GameInfoPanel = React.lazy(() => import("./game/panels/GameInfoPanel"));
+const ChatLog = React.lazy(() => import("./game/ChatLog"));
+const ExplorationMap = React.lazy(() => import("./game/ExplorationMap"));
 
 // Import komponen UI (tidak berubah)
 import { ChoiceButtons } from "./game/ChoiceButtons";
@@ -417,13 +417,15 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
             <div className="flex-grow overflow-hidden flex lg:grid cq-root desktop-grid">
                 {/* Kolom 1 (Desktop): Chat / Log */}
                 <aside className="hidden lg:flex desktop-left flex-col h-full bg-gray-800 border-r-2 border-gray-700">
-                    <ChatLog
-                        events={campaign.eventLog}
-                        players={campaign.players}
-                        characterId={character.id}
-                        thinkingState={campaign.thinkingState}
-                        onObjectClick={handleObjectClick}
-                    />
+                    <React.Suspense fallback={<div className="p-4 text-gray-400">Memuat chat…</div>}>
+                        <ChatLog
+                            events={campaign.eventLog}
+                            players={campaign.players}
+                            characterId={character.id}
+                            thinkingState={campaign.thinkingState}
+                            onObjectClick={handleObjectClick}
+                        />
+                    </React.Suspense>
                 </aside>
 
 				{/* Kolom 2: Main Content (Chat/Map) + Input */}
@@ -435,7 +437,8 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
             <div className="flex-grow overflow-hidden hidden lg:flex desktop-center">
                 {/* Desktop: render peta di tengah */}
                 {isCombat ? (
-                    <GameChatPanel
+                    <React.Suspense fallback={<div className="p-4 text-gray-400">Memuat peta pertarungan…</div>}>
+                        <GameChatPanel
                         eventLog={campaign.eventLog}
                         thinkingState={campaign.thinkingState}
                         gameState={campaign.gameState}
@@ -448,20 +451,23 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
                         onTargetTap={handleTargetTap}
                         onQuickAction={handleQuickAction}
                         onRollD20={handleRollD20}
-                    />
+                        />
+                    </React.Suspense>
                 ) : (
                     <div className="w-full h-full p-2">
-                        <ExplorationMap
-                            grid={campaign.explorationGrid}
-                            fog={campaign.fogOfWar}
-                            playerPos={campaign.playerGridPosition}
-                        />
+                        <React.Suspense fallback={<div className="p-4 text-gray-400">Memuat peta eksplorasi…</div>}>
+                            <ExplorationMap
+                                grid={campaign.explorationGrid}
+                                fog={campaign.fogOfWar}
+                                playerPos={campaign.playerGridPosition}
+                            />
+                        </React.Suspense>
                     </div>
                 )}
             </div>
 
 					{/* Area Input (Selalu di atas tab mobile, atau di bawah chat desktop) */}
-					<div className="flex-shrink-0 z-10">
+					<div className="flex-shrink-0 z-10 pb-safe pt-safe">
 						{shouldShowChoices && (
 							<ChoiceButtons
 								choices={campaign.choices}
@@ -505,7 +511,8 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
                 <aside className="hidden lg:flex desktop-right flex-col h-full bg-gray-800 border-l-2 border-gray-700">
                     <div className="flex-shrink-0 border-b border-gray-700 p-2 text-sm text-gray-300">Status Karakter</div>
                     <div className="flex-1 overflow-y-auto">
-                        <GameCharacterPanel
+                        <React.Suspense fallback={<div className="p-4 text-gray-400">Memuat status karakter…</div>}>
+                            <GameCharacterPanel
                             character={character}
                             players={campaign.players}
                             monsters={campaign.monsters}
@@ -515,11 +522,13 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
                             combatSystem={combatSystem}
                             onSkillSelect={handleSkillSelect}
                             isMyTurn={isMyTurn}
-                        />
+                            />
+                        </React.Suspense>
                     </div>
                     <div className="flex-shrink-0 border-t border-gray-700 p-2 text-sm text-gray-300">Detail Kampanye</div>
                     <div className="flex-1 overflow-y-auto">
-                        <GameInfoPanel
+                        <React.Suspense fallback={<div className="p-4 text-gray-400">Memuat detail kampanye…</div>}>
+                            <GameInfoPanel
                             campaignSlice={{
                                 title: campaign.title,
                                 description: campaign.description,
@@ -534,7 +543,8 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
                                 npcs: campaign.npcs,
                             }}
                             players={campaign.players}
-                        />
+                            />
+                        </React.Suspense>
                     </div>
                 </aside>
             </div>
