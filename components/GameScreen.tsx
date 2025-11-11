@@ -30,6 +30,9 @@ import { GameInfoPanel } from "./game/panels/GameInfoPanel";
 
 // Import komponen UI (tidak berubah)
 import { ChoiceButtons } from "./game/ChoiceButtons";
+import { CardActionBar, CardAction } from "./game/CardActionBar";
+import { QuickSpellSelectModal } from "./game/modals/QuickSpellSelectModal";
+import { QuickItemSelectModal } from "./game/modals/QuickItemSelectModal";
 import { ActionBar } from "./game/ActionBar";
 import { RollModal } from "./game/RollModal";
 import { ModalWrapper } from "./ModalWrapper";
@@ -144,6 +147,9 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 	const [activeTab, setActiveTab] = useState<GameTab>("chat");
 
 	const [pendingSkill, setPendingSkill] = useState<Skill | null>(null);
+	const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+	const [showSpellSelector, setShowSpellSelector] = useState(false);
+	const [showItemSelector, setShowItemSelector] = useState(false);
 	const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 	const isMyTurn = campaign.currentPlayerId === character.id;
 
@@ -245,6 +251,60 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 		}
 	};
 
+	// Targeting & Quick Actions from BattleMapRenderer
+	const handleTargetTap = useCallback((unitId: string) => {
+		setSelectedTargetId(unitId);
+		if (campaign.turnId) {
+			const unitName = campaign.battleState?.units.find(u => u.id === unitId)?.name || 'Target';
+			campaignActions.logEvent({ type: 'system', text: `${character.name} memilih target: ${unitName}.` }, campaign.turnId);
+		}
+	}, [campaign.battleState?.units, campaign.turnId, campaignActions, character.name]);
+
+	const handleQuickAction = useCallback((action: string, unitId?: string) => {
+		if (unitId) setSelectedTargetId(unitId);
+		if (action === 'Attack') {
+			// Find equipped weapon
+			const equipped = character.inventory.find(i => i.isEquipped && i.item.type === 'weapon')
+				|| character.inventory.find(i => i.item.type === 'weapon');
+			if (!equipped) {
+				if (campaign.turnId) campaignActions.logEvent({ type: 'system', text: `${character.name} tidak memiliki senjata untuk menyerang.` }, campaign.turnId);
+				return;
+			}
+			const targetId = unitId || selectedTargetId;
+			if (!targetId) {
+				setActiveTab('chat');
+				return;
+			}
+			// Only attack monsters (by instanceId)
+			const isMonster = campaign.monsters.some(m => m.instanceId === targetId);
+			if (!isMonster) {
+				if (campaign.turnId) campaignActions.logEvent({ type: 'system', text: `Target bukan musuh.` }, campaign.turnId);
+				return;
+			}
+			combatSystem.handlePlayerAttack(targetId, equipped);
+		} else if (action === 'Disengage') {
+			combatSystem.handleDisengage();
+		} else if (action === 'Dodge') {
+			combatSystem.handleDodge();
+		} else if (action === 'Spell') {
+			setShowSpellSelector(true);
+		} else if (action === 'Item') {
+			setShowItemSelector(true);
+		} else if (action === 'Skill') {
+			setActiveTab('character');
+		}
+	}, [character.inventory, selectedTargetId, campaign.monsters, campaign.turnId, campaignActions, character.name, combatSystem]);
+
+	const handleRollD20 = useCallback(() => {
+		if (!campaign.turnId || campaign.currentPlayerId !== character.id) return;
+		const request: RollRequest = {
+			type: 'skill',
+			characterId: character.id,
+			reason: 'Lempar cepat d20',
+		};
+		campaignActions.setActiveRollRequest(request);
+	}, [campaign.turnId, campaign.currentPlayerId, character.id, campaignActions]);
+
 	const handleObjectClick = (
 		objectName: string,
 		objectId: string,
@@ -282,6 +342,9 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 						onObjectClick={handleObjectClick}
 						campaignActions={campaignActions}
 						onMoveUnit={combatSystem.handleMovementWithOA}
+						onTargetTap={handleTargetTap}
+						onQuickAction={handleQuickAction}
+						onRollD20={handleRollD20}
 					/>
 				);
 			case "character":
@@ -377,9 +440,9 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 					<div className="flex-grow overflow-hidden lg:hidden">
 						{renderMobileTabContent()}
 					</div>
-					<div className="flex-grow overflow-hidden hidden lg:flex">
-						{/* Desktop selalu menampilkan chat/map */}
-						<GameChatPanel
+			<div className="flex-grow overflow-hidden hidden lg:flex">
+				{/* Desktop selalu menampilkan chat/map */}
+				<GameChatPanel
 							// FASE 3: Kirim props yang di-slice
 							eventLog={campaign.eventLog}
 							thinkingState={campaign.thinkingState}
@@ -390,9 +453,12 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 							characterId={character.id}
 							onObjectClick={handleObjectClick}
 							campaignActions={campaignActions}
-							onMoveUnit={combatSystem.handleMovementWithOA}
-						/>
-					</div>
+					onMoveUnit={combatSystem.handleMovementWithOA}
+					onTargetTap={handleTargetTap}
+					onQuickAction={handleQuickAction}
+					onRollD20={handleRollD20}
+				/>
+			</div>
 
 					{/* Area Input (Selalu di atas tab mobile, atau di bawah chat desktop) */}
 					<div className="flex-shrink-0 z-10">
@@ -402,13 +468,36 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 								onChoiceSelect={handleActionSubmit}
 							/>
 						)}
-						{!shouldShowChoices && (
+					{!shouldShowChoices && (
+						<>
+							{isCombat && (
+							<CardActionBar
+								disabled={isDisabled}
+								currentCharacter={character}
+								onSelect={(a: CardAction) => {
+									if (a === 'Attack') {
+										// Try attack with selected target if any
+											handleQuickAction('Attack');
+										} else if (a === 'Defend') {
+											combatSystem.handleDodge();
+										} else if (a === 'Skill') {
+											setActiveTab('character');
+										} else if (a === 'Spell') {
+											setShowSpellSelector(true);
+										} else if (a === 'Item' || a === 'Custom') {
+											setShowItemSelector(true);
+										}
+									}}
+								onQuickSkill={(s) => handleSkillSelect(s)}
+							/>
+							)}
 							<ActionBar
 								disabled={isDisabled}
 								onActionSubmit={handleActionSubmit}
 								pendingSkill={pendingSkill}
 							/>
-						)}
+						</>
+					)}
 					</div>
 				</main>
 
@@ -451,10 +540,26 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 					<RollModal
 						key={`${campaign.activeRollRequest.type}-${campaign.activeRollRequest.reason}`}
 						request={campaign.activeRollRequest}
-						character={character}
-						onComplete={handleRollComplete}
-					/>
-				)}
+									character={character}
+									onComplete={handleRollComplete}
+								/>
+							)}
+
+							{/* Quick Select Modals */}
+							{showSpellSelector && (
+								<QuickSpellSelectModal
+									character={character}
+									onSelect={(spell) => { combatSystem.handleSpellCast(spell); setShowSpellSelector(false); }}
+									onClose={() => setShowSpellSelector(false)}
+								/>
+							)}
+							{showItemSelector && (
+								<QuickItemSelectModal
+									character={character}
+									onSelect={(item) => { combatSystem.handleItemUse(item); setShowItemSelector(false); }}
+									onClose={() => setShowItemSelector(false)}
+								/>
+							)}
 
 			{contextMenu && (
 				<div

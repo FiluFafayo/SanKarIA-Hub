@@ -22,6 +22,7 @@ import {
     DamageType,
 } from "../types";
 import { RACES } from "../data/races";
+import { calculateDamageAfterDefenses, getMonsterDefenses } from "../services/rulesEngine";
 import { CONDITION_RULES } from "../types";
 import {
 	rollInitiative,
@@ -1473,20 +1474,11 @@ export const useCombatSystem = ({
                 vulnerabilities = targetMonster.definition.damageVulnerabilities || [];
             }
 
-            // Apply type effects
-            let pipelineNote = '';
-            if (damageType) {
-                if (immunities.includes(damageType)) {
-                    appliedDamage = 0;
-                    pipelineNote = `(Imun terhadap ${damageType})`;
-                } else if (resistances.includes(damageType)) {
-                    appliedDamage = Math.floor(appliedDamage / 2);
-                    pipelineNote = `(Resistan terhadap ${damageType})`;
-                } else if (vulnerabilities.includes(damageType)) {
-                    appliedDamage = appliedDamage * 2;
-                    pipelineNote = `(Rentan terhadap ${damageType})`;
-                }
-            }
+            // Apply defenses via rulesEngine helper
+            const def = { resistances, immunities, vulnerabilities };
+            const defended = calculateDamageAfterDefenses(appliedDamage, damageType, def);
+            appliedDamage = defended.final;
+            const pipelineNote = defended.note ? ` ${defended.note}` : '';
 
             const critText = isCrit ? 'KRITIS! ' : '';
             campaignActions.logEvent(

@@ -15,6 +15,9 @@ interface BattleMapRendererProps {
   campaignActions: CampaignActions;
   currentUserId: string; // Untuk menentukan apakah unit adalah 'kita'
   onMoveUnit?: (unitId: string, path: { x: number; y: number }[], cost: number) => void;
+  onTargetTap?: (unitId: string) => void; // Tap target untuk aksi aktif (Attack/Spell/Item)
+  onQuickAction?: (action: 'Attack' | 'Skill' | 'Spell' | 'Item' | 'Disengage' | 'Dodge', unitId: string) => void; // Long-press quick wheel
+  onRollD20?: () => void; // Mini dice quick roll
 }
 
 // Ukuran grid (bisa diubah)
@@ -22,8 +25,10 @@ const BATTLE_GRID_WIDTH = 30;
 const BATTLE_GRID_HEIGHT = 20;
 // FASE 3: CELL_SIZE_PX dihapus. Ukuran akan responsif.
 
-export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleState, campaignActions, currentUserId, onMoveUnit }) => {
+export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleState, campaignActions, currentUserId, onMoveUnit, onTargetTap, onQuickAction, onRollD20 }) => {
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(battleState.activeUnitId);
+  const [quickWheel, setQuickWheel] = useState<{ leftPercent: number; topPercent: number; unitId: string } | null>(null);
+  const [pressTimer, setPressTimer] = useState<any>(null);
 
   // Cek apakah unit yang terpilih adalah milik kita
   const isMyUnitSelected = useMemo(() => {
@@ -139,6 +144,27 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
                 const leftPercent = (unit.gridPosition.x / BATTLE_GRID_WIDTH) * 100 + (cellWidthPercent / 2);
                 const topPercent = (unit.gridPosition.y / BATTLE_GRID_HEIGHT) * 100 + (cellHeightPercent / 2);
 
+                const handlePointerDown = (e: React.PointerEvent) => {
+                    // Mulai timer untuk long-press
+                    if (pressTimer) clearTimeout(pressTimer);
+                    const t = setTimeout(() => {
+                        setQuickWheel({ leftPercent, topPercent, unitId: unit.id });
+                    }, 450);
+                    setPressTimer(t);
+                };
+
+                const handlePointerUp = () => {
+                    if (pressTimer) {
+                        clearTimeout(pressTimer);
+                        setPressTimer(null);
+                    }
+                };
+
+                const handleClick = () => {
+                    setSelectedUnitId(unit.id);
+                    if (onTargetTap) onTargetTap(unit.id);
+                };
+
                 return (
                     <div
                         key={unit.id}
@@ -157,7 +183,9 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
                             left: `${leftPercent}%`,
                             top: `${topPercent}%`,
                         }}
-                        onClick={() => setSelectedUnitId(unit.id)}
+                        onClick={handleClick}
+                        onPointerDown={handlePointerDown}
+                        onPointerUp={handlePointerUp}
                     >
                         {unit.name.substring(0, 1)}
                     </div>
@@ -171,6 +199,31 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
                     <p className="mt-4 text-white text-lg font-cinzel">Mempersiapkan Medan Tempur...</p>
                 </div>
             }
+
+            {/* Quick Wheel (Long-press) */}
+            {quickWheel && (
+                <div
+                  className="absolute z-30"
+                  style={{ left: `${quickWheel.leftPercent}%`, top: `${quickWheel.topPercent}%`, transform: 'translate(-50%, -50%)' }}
+                >
+                  <div className="bg-gray-800/90 backdrop-blur rounded-full p-2 flex gap-2 border border-gray-600">
+                    {['Attack','Disengage','Dodge','Spell','Item','Skill'].map(a => (
+                      <button
+                        key={a}
+                        className="text-xs px-2 py-1 rounded-full bg-gray-700 text-white hover:bg-purple-600"
+                        onClick={() => { onQuickAction && onQuickAction(a as any, quickWheel.unitId); setQuickWheel(null); }}
+                      >{a}</button>
+                    ))}
+                    <button className="text-xs px-2 py-1 rounded-full bg-gray-700 text-amber-300 hover:bg-amber-600" onClick={() => { onRollD20 && onRollD20(); setQuickWheel(null); }}>d20</button>
+                    <button className="text-xs px-2 py-1 rounded-full bg-gray-700 text-gray-300 hover:bg-gray-600" onClick={() => setQuickWheel(null)}>×</button>
+                  </div>
+                </div>
+            )}
+
+            {/* Mini Dice (bottom-right) */}
+            <div className="absolute bottom-2 right-2 z-20">
+              <button className="rounded-full bg-gray-800 border border-gray-600 text-white px-3 py-2 text-sm shadow hover:border-purple-400" onClick={() => onRollD20 && onRollD20()}>Roll d20</button>
+            </div>
         </div>
     </div>
   );
