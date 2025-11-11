@@ -13,7 +13,7 @@ import {
 // import { dataService } from '../services/dataService'; // Tidak diperlukan di sini
 // import { useDataStore } from './dataStore'; // Tidak diperlukan di sini
 
-type View = Location | 'nexus' | 'character-selection';
+type View = Location | 'nexus' | 'character-selection' | 'wireframe-preview';
 
 // =================================================================
 // Tipe State & Aksi
@@ -31,7 +31,7 @@ const initialNavigationState: NavigationState = {
     templateToPreFill: null, // FASE 2
 };
 interface NavigationActions {
-    navigateTo: (view: Location) => void;
+    navigateTo: (view: View) => void;
     returnToNexus: () => void;
     startJoinFlow: (campaign: Campaign) => void;
     startTemplateFlow: (template: RawCharacterData) => void; // FASE 2

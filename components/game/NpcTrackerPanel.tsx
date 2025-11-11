@@ -43,7 +43,7 @@ export const NpcTrackerPanel: React.FC<NpcTrackerPanelProps> = ({ npcs }) => {
                             <summary className="font-bold cursor-pointer text-base flex justify-between items-center">
                                 <span className="flex items-center gap-2">
                                     {npc.image ? (
-                                        <img src={npc.image} alt={npc.name} className="w-8 h-8 rounded object-cover border border-gray-700" />
+                                        <img src={npc.image} alt={npc.name} className="w-8 h-8 rounded object-cover border border-gray-700" loading="lazy" decoding="async" fetchpriority="low" />
                                     ) : npc.imagePending ? (
                                         <div className="w-8 h-8 rounded bg-gray-700/50 border border-gray-600 animate-pulse" />
                                     ) : null}
@@ -59,7 +59,7 @@ export const NpcTrackerPanel: React.FC<NpcTrackerPanelProps> = ({ npcs }) => {
                             <div className="mt-2 text-sm text-gray-300 border-t border-gray-700 pt-2">
                                 {npc.image ? (
                                     <div className="flex justify-center mb-3 relative">
-                                        <img src={npc.image} alt={npc.name} className="w-32 h-32 rounded-lg object-cover shadow border border-gray-700" />
+                                        <img src={npc.image} alt={npc.name} className="w-32 h-32 rounded-lg object-cover shadow border border-gray-700" loading="lazy" decoding="async" fetchpriority="low" />
                                         {npc.imagePending && (
                                             <span className="absolute bottom-2 right-2 text-[10px] bg-cyan-900/60 text-cyan-200 px-2 py-1 rounded animate-pulse">
                                                 Memperindah potret…

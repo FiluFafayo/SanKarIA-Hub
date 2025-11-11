@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { GameEvent, Character, ThinkingState, Skill } from '../../types';
 import { ChatLog } from './ChatLog';
 import { VoicePTTButton } from './VoicePTTButton';
+import { useGameStore } from '../../store/gameStore';
 
 interface ChatSheetProps {
   events: GameEvent[];
@@ -26,6 +27,7 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
 }) => {
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 
   const handleVoiceFinal = (t: string) => {
     if (!text.trim()) setText(t.trim());
@@ -60,7 +62,9 @@ export const ChatSheet: React.FC<ChatSheetProps> = ({
           disabled={disabled}
           className="flex-grow bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
         />
-        <VoicePTTButton lang={'id-ID'} onFinal={handleVoiceFinal} />
+        {runtimeSettings.voicePttEnabled && (
+          <VoicePTTButton lang={runtimeSettings.sttLang} onFinal={handleVoiceFinal} />
+        )}
         <button type="submit" disabled={disabled || !text.trim()} className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-4 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
           {pendingSkill ? 'Skill' : 'Kirim'}
         </button>
