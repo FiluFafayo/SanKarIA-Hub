@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Skill } from '../../types';
+import { VoicePTTButton } from './VoicePTTButton';
 
 interface ActionBarProps {
     disabled: boolean;
@@ -33,6 +34,17 @@ export const ActionBar: React.FC<ActionBarProps> = ({ disabled, onActionSubmit, 
     const [text, setText] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
     const lastSkillRef = useRef<Skill | null>(null);
+
+    const handleVoiceFinal = useCallback((t: string) => {
+        // Prefill text from STT if input is empty or looks like prefill
+        if (!text.trim() || text.startsWith('Aku mencoba ')) {
+            setText(t.trim());
+            if (!disabled) inputRef.current?.focus();
+        } else {
+            // Append transcript if user already typing
+            setText(prev => `${prev} ${t.trim()}`);
+        }
+    }, [text, disabled]);
 
     useEffect(() => {
         if (pendingSkill) {
@@ -73,6 +85,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({ disabled, onActionSubmit, 
                     disabled={disabled}
                     className="flex-grow bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-purple-500"
                 />
+                <VoicePTTButton lang={'id-ID'} onFinal={handleVoiceFinal} />
                 <button type="submit" disabled={disabled || !text.trim()} className="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
                     {pendingSkill ? 'Lakukan Skill Check' : 'Kirim'}
                 </button>

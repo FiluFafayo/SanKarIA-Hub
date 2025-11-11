@@ -36,11 +36,14 @@ import { ModalWrapper } from "./ModalWrapper";
 import { Die } from "./Die";
 import { xpToNextLevel, rollHitDice, getAbilityModifier } from "../utils";
 import { findClass } from "../data/registry";
+import { MobileAppShell } from "./mobile/MobileAppShell";
+import { ChatSheet } from "./game/ChatSheet";
 
 // Import store (tidak berubah)
 import { useDataStore } from "../store/dataStore";
 import { useAppStore } from "../store/appStore";
 import { useGameStore } from "../store/gameStore";
+import { speak } from "../services/voiceService";
 
 interface GameScreenProps {
 	initialCampaign: CampaignState;
@@ -75,6 +78,7 @@ const { characterToLevel, triggerLevelUp, closeLevelUp } = useAppStore((s) => ({
 
 // Ambil aksi runtime dari gameStore (bukan appStore)
 const { _setRuntimeCampaignState, _setRuntimeCharacterState } = useGameStore((s) => s.actions);
+const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 	const { updateCharacter } = useDataStore((s) => s.actions);
 	const ssotCharacters = useDataStore((s) => s.state.characters);
 	const dataStore = useDataStore.getState();
@@ -115,6 +119,26 @@ const { _setRuntimeCampaignState, _setRuntimeCharacterState } = useGameStore((s)
 	useEffect(() => {
 		_setRuntimeCampaignState(campaign);
 	}, [campaign, _setRuntimeCampaignState]);
+
+    // Otomatiskan TTS narasi DM saat event baru muncul (bilingual)
+    const lastNarratedIdRef = useRef<string | null>(null);
+    const detectLang = useCallback((text: string): 'id-ID' | 'en-US' => {
+        const idHints = [/\baku\b/i, /\bkamu\b/i, /\bdan\b/i, /\bdengan\b/i, /\buntuk\b/i, /\byang\b/i, /\bitu\b/i, /\bper\w+/i];
+        const isIndo = idHints.some((r) => r.test(text));
+        return isIndo ? 'id-ID' : 'en-US';
+    }, []);
+
+    useEffect(() => {
+        if (!runtimeSettings.dmNarrationVoiceEnabled) return;
+        const last = [...campaign.eventLog].reverse().find((e) => e.type === 'dm_narration');
+        if (!last) return;
+        if (lastNarratedIdRef.current === last.id) return;
+        // Hindari bicara saat AI masih berpikir atau ada roll aktif
+        if (campaign.thinkingState !== 'idle' || !!campaign.activeRollRequest) return;
+        lastNarratedIdRef.current = last.id;
+        const lang = runtimeSettings.narrationLang || detectLang(last.text);
+        speak(last.text, lang);
+    }, [campaign.eventLog, campaign.thinkingState, campaign.activeRollRequest, runtimeSettings.dmNarrationVoiceEnabled, runtimeSettings.narrationLang, detectLang]);
 
 	// FASE 0: State UI baru untuk tab ergonomis
 	const [activeTab, setActiveTab] = useState<GameTab>("chat");
@@ -188,6 +212,19 @@ const { _setRuntimeCampaignState, _setRuntimeCharacterState } = useGameStore((s)
 		setContextMenu(null);
 		setActiveTab("chat"); // FASE 0: Otomatis kembali ke chat setelah aksi
 	};
+
+	// Auto-post voice actions from store queue when allowed
+	const dequeueVoiceAction = useGameStore((s) => s.actions.dequeueVoiceAction);
+	const voiceQueueLen = useGameStore((s) => s.runtime.voice.actionQueue.length);
+	useEffect(() => {
+		if (disabled) return;
+		if (voiceQueueLen > 0) {
+			const text = dequeueVoiceAction();
+			if (text && text.trim()) {
+				handleActionSubmit(text.trim());
+			}
+		}
+	}, [disabled, voiceQueueLen]);
 
 	// FASE 0: handleSkillSelect sekarang mengganti tab
 	const handleSkillSelect = (skill: Skill) => {
@@ -282,12 +319,26 @@ const { _setRuntimeCampaignState, _setRuntimeCharacterState } = useGameStore((s)
 		}
 	};
 
-	return (
-		// FASE 0: Layout flex-col murni (mobile-first)
-		<div
-			className="w-screen h-screen bg-gray-900 text-gray-200 flex flex-col font-sans"
-			onClick={() => setContextMenu(null)}
-		>
+    return (
+        <MobileAppShell
+            chatSheet={
+                <ChatSheet
+                    events={campaign.eventLog}
+                    players={campaign.players}
+                    characterId={character.id}
+                    thinkingState={campaign.thinkingState}
+                    onObjectClick={handleObjectClick}
+                    disabled={isDisabled}
+                    onActionSubmit={handleActionSubmit}
+                    pendingSkill={pendingSkill}
+                />
+            }
+        >
+        {/* FASE 0: Layout flex-col murni (mobile-first) */}
+        <div
+            className="w-screen h-screen bg-gray-900 text-gray-200 flex flex-col font-sans"
+            onClick={() => setContextMenu(null)}
+        >
 			{/* FASE 0: Header Baru (Sederhana) */}
 			<GameHeader
 				title={campaign.title}
@@ -441,8 +492,9 @@ const { _setRuntimeCampaignState, _setRuntimeCharacterState } = useGameStore((s)
 					</button>
 				</div>
 			)}
-		</div>
-	);
+        </div>
+        </MobileAppShell>
+    );
 };
 
 // (Komponen LevelUpModal tidak berubah)

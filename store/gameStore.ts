@@ -19,6 +19,15 @@ interface RuntimeState {
     sessionAbortController: AbortController | null;
     runtimeSettings: {
         autoNpcPortraits: boolean;
+        dmNarrationVoiceEnabled: boolean;
+        narrationLang: 'id-ID' | 'en-US';
+    };
+    voice: {
+        micRecording: boolean;
+        sttPartial: string;
+        sttFinal: string | null;
+        error?: string;
+        actionQueue: string[];
     };
 }
 const initialRuntimeState: RuntimeState = {
@@ -28,6 +37,15 @@ const initialRuntimeState: RuntimeState = {
     sessionAbortController: null,
     runtimeSettings: {
         autoNpcPortraits: true,
+        dmNarrationVoiceEnabled: true,
+        narrationLang: 'id-ID',
+    },
+    voice: {
+        micRecording: false,
+        sttPartial: '',
+        sttFinal: null,
+        error: undefined,
+        actionQueue: [],
     },
 };
 interface RuntimeActions {
@@ -41,6 +59,15 @@ interface RuntimeActions {
     // Pembatalan level sesi
     cancelAllInFlight: () => void;
     setAutoNpcPortraits: (enabled: boolean) => void;
+    setDmNarrationVoiceEnabled: (enabled: boolean) => void;
+    setNarrationLang: (lang: 'id-ID' | 'en-US') => void;
+    // Voice runtime
+    setMicRecording: (recording: boolean) => void;
+    setVoicePartial: (text: string) => void;
+    setVoiceFinal: (text: string | null) => void;
+    setVoiceError: (err?: string) => void;
+    enqueueVoiceAction: (text: string) => void;
+    dequeueVoiceAction: () => string | null;
 }
 
 // --- Gabungan Store ---
@@ -178,5 +205,53 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 },
             }));
         },
- 	},
+        setDmNarrationVoiceEnabled: (enabled) => {
+            set((state) => ({
+                runtime: {
+                    ...state.runtime,
+                    runtimeSettings: { ...state.runtime.runtimeSettings, dmNarrationVoiceEnabled: enabled },
+                },
+            }));
+        },
+        setNarrationLang: (lang) => {
+            set((state) => ({
+                runtime: {
+                    ...state.runtime,
+                    runtimeSettings: { ...state.runtime.runtimeSettings, narrationLang: lang },
+                },
+            }));
+        },
+        setMicRecording: (recording) => {
+            set((state) => ({
+                runtime: { ...state.runtime, voice: { ...state.runtime.voice, micRecording: recording } },
+            }));
+        },
+        setVoicePartial: (text) => {
+            set((state) => ({
+                runtime: { ...state.runtime, voice: { ...state.runtime.voice, sttPartial: text || '' } },
+            }));
+        },
+        setVoiceFinal: (text) => {
+            set((state) => ({
+                runtime: { ...state.runtime, voice: { ...state.runtime.voice, sttFinal: text } },
+            }));
+        },
+        setVoiceError: (err) => {
+            set((state) => ({
+                runtime: { ...state.runtime, voice: { ...state.runtime.voice, error: err } },
+            }));
+        },
+        enqueueVoiceAction: (text) => {
+            set((state) => ({
+                runtime: { ...state.runtime, voice: { ...state.runtime.voice, actionQueue: [...state.runtime.voice.actionQueue, text] } },
+            }));
+        },
+        dequeueVoiceAction: () => {
+            const q = get().runtime.voice.actionQueue;
+            if (!q.length) return null;
+            const [first, ...rest] = q;
+            set((state) => ({ runtime: { ...state.runtime, voice: { ...state.runtime.voice, actionQueue: rest } } }));
+            return first;
+        },
+   	},
 }));
