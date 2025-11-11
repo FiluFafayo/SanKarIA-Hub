@@ -77,6 +77,56 @@ interface ProfileWizardProps {
     onUpdateCharacter: (character: Character) => Promise<void>;
 }
 
+// PATCH 4: Konstanta editor (bahasa & proficiency)
+const ALL_LANGUAGES: string[] = [
+    "Common",
+    "Dwarvish",
+    "Elvish",
+    "Halfling",
+    "Infernal",
+    "Orc",
+    "Gnomish",
+    "Draconic",
+    "Goblin",
+    "Sylvan",
+    "Celestial",
+    "Undercommon",
+];
+const TOOL_OPTIONS: string[] = [
+    "Thieves' Tools",
+    "Artisan's Tools",
+    "Navigator's Tools",
+    "Herbalism Kit",
+    "Musical Instrument",
+];
+const WEAPON_OPTIONS: string[] = [
+    "Simple Weapons",
+    "Martial Weapons",
+];
+const ARMOR_OPTIONS: string[] = [
+    "Light Armor",
+    "Medium Armor",
+    "Heavy Armor",
+    "Shields",
+];
+
+// PATCH 4: Utility perhitungan batas prepared spells
+function getPreparedSpellsMax(character: Character): number {
+    const cls = character.class?.toLowerCase() || "";
+    const lvl = character.level || 1;
+    const intMod = getAbilityModifier(character.abilityScores.intelligence);
+    const wisMod = getAbilityModifier(character.abilityScores.wisdom);
+    const chaMod = getAbilityModifier(character.abilityScores.charisma);
+    let base = 0;
+    if (cls.includes("wizard")) base = intMod + lvl;
+    else if (cls.includes("cleric")) base = wisMod + lvl;
+    else if (cls.includes("druid")) base = wisMod + lvl;
+    else if (cls.includes("paladin")) base = chaMod + Math.floor(lvl / 2);
+    // Catatan: kelas lain umumnya tidak "prepare" (bard/sorcerer/ranger/warlock: known spells)
+    if (base > 0) return Math.max(1, base);
+    return 0;
+}
+
 // =================================================================
 // Sub-Komponen: AbilityRoller (Tidak Berubah)
 // =================================================================
@@ -987,20 +1037,75 @@ const CreateCharacterWizard: React.FC<{
 // =================================================================
 // FASE 1: Ganti nama komponen
 export const ProfileWizard: React.FC<ProfileWizardProps> = ({
-	onClose,
-	characters,
-	// setCharacters DIHAPUS
-	userId,
-	onSaveNewCharacter,
-	// FASE 2: Tambah props pre-fill
-	templateToPreFill,
-	clearTemplateToPreFill,
+    onClose,
+    characters,
+    // setCharacters DIHAPUS
+    userId,
+    onSaveNewCharacter,
+    // FASE 2: Tambah props pre-fill
+    templateToPreFill,
+    clearTemplateToPreFill,
+    onUpdateCharacter,
 }) => {
 	// REFAKTOR G-4: myCharacters sekarang adalah prop 'characters'
 	const myCharacters = characters;
 	const [selectedChar, setSelectedChar] = useState<Character | null>(null);
 	// FASE 2: isCreating sekarang adalah state lokal
-	const [isCreating, setIsCreating] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+
+    // PATCH 4: State editor (bahasa/proficiency/prepared)
+    const [editLanguages, setEditLanguages] = useState<string[]>([]);
+    const [editTools, setEditTools] = useState<string[]>([]);
+    const [editWeapons, setEditWeapons] = useState<string[]>([]);
+    const [editArmors, setEditArmors] = useState<string[]>([]);
+    const [editPrepared, setEditPrepared] = useState<string[]>([]);
+    const preparedMax = useMemo(() => (selectedChar ? getPreparedSpellsMax(selectedChar) : 0), [selectedChar]);
+
+    useEffect(() => {
+        if (selectedChar) {
+            setEditLanguages(selectedChar.languages || []);
+            setEditTools(selectedChar.toolProficiencies || []);
+            setEditWeapons(selectedChar.weaponProficiencies || []);
+            setEditArmors(selectedChar.armorProficiencies || []);
+            setEditPrepared(selectedChar.preparedSpells || []);
+        }
+    }, [selectedChar]);
+
+    const backgroundLangInfo = useMemo(() => {
+        if (!selectedChar?.background) return { allowance: 0, label: "—" };
+        const bg = findBackground(selectedChar.background);
+        if (!bg) return { allowance: 0, label: "—" };
+        let allowance = 0;
+        if (Array.isArray(bg.languages)) allowance = bg.languages.length;
+        else if (bg.languages === 'any_one') allowance = 1;
+        else if (bg.languages === 'any_two') allowance = 2;
+        const label = bg.languages === 'any_one' ? 'Latar belakang memberi 1 bahasa' : bg.languages === 'any_two' ? 'Latar belakang memberi 2 bahasa' : Array.isArray(bg.languages) && bg.languages.length > 0 ? `Bahasa dari latar: ${bg.languages.join(', ')}` : 'Tidak ada bonus bahasa dari latar';
+        return { allowance, label };
+    }, [selectedChar]);
+
+    const persistLanguagesAndProficiencies = async () => {
+        if (!selectedChar) return;
+        const updated: Character = {
+            ...selectedChar,
+            languages: [...editLanguages],
+            toolProficiencies: [...editTools],
+            weaponProficiencies: [...editWeapons],
+            armorProficiencies: [...editArmors],
+        } as Character;
+        await onUpdateCharacter(updated);
+        setSelectedChar(updated);
+    };
+
+    const persistPreparedSpells = async () => {
+        if (!selectedChar) return;
+        const capped = preparedMax > 0 ? editPrepared.slice(0, preparedMax) : [];
+        const updated: Character = {
+            ...selectedChar,
+            preparedSpells: capped,
+        } as Character;
+        await onUpdateCharacter(updated);
+        setSelectedChar(updated);
+    };
 
 	useEffect(() => {
 		if (!isCreating && !selectedChar && myCharacters.length > 0) {
@@ -1163,24 +1268,27 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 							</div>
 							<div className="flex-grow mt-4 overflow-y-auto pr-2 grid grid-cols-2 gap-4">
 								<div>
-									<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">
-										Spells
-									</h4>
-									{selectedChar.knownSpells.length > 0 ? (
-										<>
-											{selectedChar.spellSlots.map((slot) => (
-												<p key={slot.level} className="text-sm">
-													Lvl {slot.level} Slots: {slot.max - slot.spent}/
-													{slot.max}
-												</p>
-											))}
-											<ul className="text-xs list-disc list-inside mt-2">
-												{selectedChar.knownSpells.map((spell) => (
-													<li key={spell.name}>
-														{spell.name} (Lvl {spell.level})
-													</li>
-												))}
-											</ul>
+                                    <h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">
+                                        Spells
+                                    </h4>
+                                    {selectedChar.knownSpells.length > 0 ? (
+                                        <>
+                                            {preparedMax > 0 && (
+                                                <p className="text-sm text-amber-300">Maksimum Prepared: {preparedMax}</p>
+                                            )}
+                                            {selectedChar.spellSlots.map((slot) => (
+                                                <p key={slot.level} className="text-sm">
+                                                    Lvl {slot.level} Slots: {slot.max - slot.spent}/
+                                                    {slot.max}
+                                                </p>
+                                            ))}
+                                            <ul className="text-xs list-disc list-inside mt-2">
+                                                {selectedChar.knownSpells.map((spell) => (
+                                                    <li key={spell.name}>
+                                                        {spell.name} (Lvl {spell.level})
+                                                    </li>
+                                                ))}
+                                            </ul>
                                             {/* PATCH 3: Prepared Spells ringkas */}
                                             {selectedChar.preparedSpells && selectedChar.preparedSpells.length > 0 && (
                                                 <div className="mt-2">
@@ -1192,13 +1300,60 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
                                                     </ul>
                                                 </div>
                                             )}
-										</>
-									) : (
-										<p className="text-xs text-gray-400">
-											Tidak memiliki kemampuan sihir.
-										</p>
-									)}
-								</div>
+                                            {preparedMax > 0 && (
+                                                <div className="mt-3 border border-blue-500/30 rounded p-2 bg-black/20">
+                                                    <p className="text-sm font-cinzel text-blue-200">Kelola Prepared Spells</p>
+                                                    <p className="text-xs text-gray-300">Pilih hingga {preparedMax} spell berlevel (cantrip tidak perlu disiapkan).</p>
+                                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2 max-h-44 overflow-y-auto">
+                                                        {selectedChar.knownSpells.filter(s => (s.level ?? 0) > 0).map((spell) => {
+                                                            const checked = editPrepared.includes(spell.name);
+                                                            const disableCheck = !checked && editPrepared.length >= preparedMax;
+                                                            return (
+                                                                <label key={spell.name} className={`flex items-center gap-2 text-xs ${disableCheck ? 'opacity-50' : ''}`}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={checked}
+                                                                        disabled={disableCheck}
+                                                                        onChange={(e) => {
+                                                                            const isOn = e.target.checked;
+                                                                            setEditPrepared((prev) => {
+                                                                                if (isOn) {
+                                                                                    if (prev.includes(spell.name) || prev.length >= preparedMax) return prev;
+                                                                                    return [...prev, spell.name];
+                                                                                } else {
+                                                                                    return prev.filter(n => n !== spell.name);
+                                                                                }
+                                                                            });
+                                                                        }}
+                                                                    />
+                                                                    <span>{spell.name} (Lvl {spell.level})</span>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <div className="mt-2 flex items-center justify-between">
+                                                        <span className="text-xs text-gray-300">Dipilih: {editPrepared.length}/{preparedMax}</span>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                className="text-xs px-2 py-1 rounded bg-gray-700/60 hover:bg-gray-600/60"
+                                                                onClick={() => setEditPrepared([])}
+                                                            >Reset</button>
+                                                            <button
+                                                                className="text-xs px-2 py-1 rounded bg-blue-700/60 hover:bg-blue-600/60 disabled:bg-gray-600"
+                                                                disabled={editPrepared.length === (selectedChar.preparedSpells?.length || 0) && editPrepared.every(n => selectedChar.preparedSpells?.includes(n))}
+                                                                onClick={persistPreparedSpells}
+                                                            >Simpan</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="text-xs text-gray-400">
+                                            Tidak memiliki kemampuan sihir.
+                                        </p>
+                                    )}
+                                </div>
 								<div>
 									<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">
 										Inventory
@@ -1241,6 +1396,39 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
                                         <strong>Persepsi Pasif:</strong>{' '}
                                         {selectedChar.passivePerception ?? (10 + getAbilityModifier(selectedChar.abilityScores.wisdom) + (selectedChar.proficientSkills.includes(Skill.Perception) ? getProficiencyBonus(selectedChar.level) : 0))}
                                     </p>
+                                    {/* PATCH 4: Editor Bahasa (checkbox) + aturan latar belakang */}
+                                    <div className="mt-2 border border-blue-500/30 rounded p-2 bg-black/20">
+                                        <p className="text-xs text-amber-300">{backgroundLangInfo.label}</p>
+                                        <p className="text-xs text-gray-300">Disarankan tambahan dari latar: maks {backgroundLangInfo.allowance} bahasa</p>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2 max-h-40 overflow-y-auto">
+                                            {ALL_LANGUAGES.map((lang) => {
+                                                const checked = editLanguages.includes(lang);
+                                                return (
+                                                    <label key={lang} className="flex items-center gap-2 text-xs">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={(e) => {
+                                                                const isOn = e.target.checked;
+                                                                setEditLanguages((prev) => {
+                                                                    if (isOn) return prev.includes(lang) ? prev : [...prev, lang];
+                                                                    return prev.filter(l => l !== lang);
+                                                                });
+                                                            }}
+                                                        />
+                                                        <span>{lang}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                        <div className="mt-2 flex items-center justify-between">
+                                            <span className="text-xs text-gray-300">Dipilih: {editLanguages.length}</span>
+                                            <button
+                                                className="text-xs px-2 py-1 rounded bg-blue-700/60 hover:bg-blue-600/60"
+                                                onClick={persistLanguagesAndProficiencies}
+                                            >Simpan Bahasa/Proficiency</button>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div>
                                     <h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">Proficiency</h4>
@@ -1253,6 +1441,78 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
                                     <p className="text-sm mt-1">
                                         <strong>Armor:</strong> {selectedChar.armorProficiencies && selectedChar.armorProficiencies.length > 0 ? selectedChar.armorProficiencies.join(', ') : '—'}
                                     </p>
+                                    {/* PATCH 4: Editor Proficiency (alat/senjata/armor) */}
+                                    <div className="mt-2 grid grid-cols-1 gap-2">
+                                        <div className="border border-blue-500/30 rounded p-2 bg-black/20">
+                                            <p className="text-xs text-blue-200">Alat</p>
+                                            <div className="grid grid-cols-2 gap-2 mt-1">
+                                                {TOOL_OPTIONS.map((tool) => {
+                                                    const checked = editTools.includes(tool);
+                                                    return (
+                                                        <label key={tool} className="flex items-center gap-2 text-xs">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={checked}
+                                                                onChange={(e) => {
+                                                                    const isOn = e.target.checked;
+                                                                    setEditTools((prev) => isOn ? (prev.includes(tool) ? prev : [...prev, tool]) : prev.filter(t => t !== tool));
+                                                                }}
+                                                            />
+                                                            <span>{tool}</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="border border-blue-500/30 rounded p-2 bg-black/20">
+                                            <p className="text-xs text-blue-200">Senjata</p>
+                                            <div className="grid grid-cols-2 gap-2 mt-1">
+                                                {WEAPON_OPTIONS.map((wp) => {
+                                                    const checked = editWeapons.includes(wp);
+                                                    return (
+                                                        <label key={wp} className="flex items-center gap-2 text-xs">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={checked}
+                                                                onChange={(e) => {
+                                                                    const isOn = e.target.checked;
+                                                                    setEditWeapons((prev) => isOn ? (prev.includes(wp) ? prev : [...prev, wp]) : prev.filter(t => t !== wp));
+                                                                }}
+                                                            />
+                                                            <span>{wp}</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="border border-blue-500/30 rounded p-2 bg-black/20">
+                                            <p className="text-xs text-blue-200">Armor</p>
+                                            <div className="grid grid-cols-2 gap-2 mt-1">
+                                                {ARMOR_OPTIONS.map((ap) => {
+                                                    const checked = editArmors.includes(ap);
+                                                    return (
+                                                        <label key={ap} className="flex items-center gap-2 text-xs">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={checked}
+                                                                onChange={(e) => {
+                                                                    const isOn = e.target.checked;
+                                                                    setEditArmors((prev) => isOn ? (prev.includes(ap) ? prev : [...prev, ap]) : prev.filter(t => t !== ap));
+                                                                }}
+                                                            />
+                                                            <span>{ap}</span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end">
+                                            <button
+                                                className="text-xs px-2 py-1 rounded bg-blue-700/60 hover:bg-blue-600/60"
+                                                onClick={persistLanguagesAndProficiencies}
+                                            >Simpan Perubahan</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 							</>
