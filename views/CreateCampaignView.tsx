@@ -1,10 +1,12 @@
 import React, { useState, ChangeEvent, useEffect } from 'react'; // Import ChangeEvent, useEffect
 import { ViewWrapper } from '../components/ViewWrapper';
-import { Campaign, Quest, NPC, MapMarker, TerrainType, GridCell } from '../types'; // BARU
+import { Campaign, Quest, NPC, MapMarker } from '../types'; // BARU
 import { generateId, generateJoinCode } from '../utils';
 import { generationService } from '../services/ai/generationService';
 import { renderMapLayout } from '../services/pixelRenderer';
 import { InteractiveMap } from '../components/game/InteractiveMap';
+import { SelectionCard } from '../components/SelectionCard';
+import { DEFAULT_CAMPAIGNS } from '../data/defaultCampaigns';
 // FASE 0: Hapus appStore (kecuali untuk onClose)
 // import { useAppStore } from '../store/appStore'; 
 
@@ -46,6 +48,7 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
     const [pillars, setPillars] = useState<CampaignCreationPillars>(initialPillars);
     const [framework, setFramework] = useState<CampaignFramework | null>(null);
     const [mapData, setMapData] = useState<MapData>(null);
+    const templates = DEFAULT_CAMPAIGNS;
 
     // FASE 0: Buat fungsi reset lokal
     const resetCampaignCreation = () => {
@@ -99,6 +102,20 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
             setLoadingMessage(`ERROR: Gagal membuat kerangka. ${e.message || 'Coba lagi.'}`);
             // FASE 4: Hapus alert()
             // console.error("Gagal berkomunikasi dengan AI untuk membuat kerangka. Coba lagi."); // Redundan
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Buat kampanye langsung dari template statis (tanpa AI/generasi peta)
+    const handleCreateFromTemplate = async (template: typeof templates[number]) => {
+        setIsLoading(true);
+        setLoadingMessage("Mewujudkan dunia dari template...");
+        try {
+            await onCreateCampaign(template);
+            handleClose();
+        } catch (e) {
+            console.error("Gagal membuat kampanye dari template:", e);
         } finally {
             setIsLoading(false);
         }
@@ -214,21 +231,16 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                 isNSFW: false,
                 maxPlayers: 4,
                 theme: 'Fantasi',
+                isPublished: true,
                 // (Poin 10) Hardcode baseline baru
                 dmPersonality: "DM yang suportif namun menantang, fokus pada cerita.",
                 dmNarrationStyle: 'Langsung & Percakapan',
                 responseLength: 'Standar',
-                eventLog: [],
-                turnId: null,
                 longTermMemory: `Premis: ${pillars.premise}. Elemen Kunci: ${pillars.keyElements}. Tujuan Akhir: ${pillars.endGoal}. Misi Utama: ${framework.proposedMainQuest.title}.`,
                 image: `https://picsum.photos/seed/${generateId('img')}/400/300`,
-                playerIds: [],
                 currentPlayerId: null,
                 joinCode: generateJoinCode(),
                 gameState: 'exploration',
-                monsters: [],
-                initiativeOrder: [],
-                choices: [],
                 quests: initialQuests,
                 npcs: initialNpcs,
                 currentTime: 43200, // (Poin 5) 12:00 PM
@@ -287,6 +299,25 @@ export const CreateCampaignView: React.FC<CreateCampaignViewProps> = ({ onClose,
                         <input name="endGoal" value={pillars.endGoal} onChange={handlePillarChange} className="bg-transparent border-b-2 border-yellow-800/30 focus:outline-none focus:border-yellow-800 text-base p-1" placeholder="Contoh: Mengembalikan artefak dan mengakhiri musim dingin." />
 
                         <div className="flex-grow"></div>
+
+                        {/* Pilihan Template Kampanye (statis) */}
+                        <div className="mt-6">
+                            <h3 className="font-cinzel text-2xl text-yellow-900 mb-2">Atau pilih dari Template</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {templates.map((tpl) => (
+                                    <div key={tpl.title} className="relative">
+                                        <SelectionCard
+                                            key={tpl.title}
+                                            title={tpl.title}
+                                            description={tpl.description}
+                                            imageUrl={tpl.image}
+                                            isSelected={false}
+                                            onClick={() => !isLoading && handleCreateFromTemplate(tpl)}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
 
                         {/* FASE 3: Tampilkan pesan error/status */}
                         {loadingMessage && !isLoading && (
