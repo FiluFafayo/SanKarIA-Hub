@@ -278,9 +278,9 @@ export const useCombatSystem = ({
 					"ownerId" in target
 						? target.armorClass
 						: target.definition.armorClass;
-				const successText = roll.success
-					? `mengenai (Total ${roll.total} vs AC ${targetAC})`
-					: `gagal mengenai (Total ${roll.total} vs AC ${targetAC})`;
+                let successText = roll.success
+                    ? `mengenai (Total ${roll.total} vs AC ${targetAC})`
+                    : `gagal mengenai (Total ${roll.total} vs AC ${targetAC})`;
 
 				const attacker = [...players, ...campaign.monsters].find(
 					(c) => ("ownerId" in c ? c.id : c.instanceId) === request.characterId
