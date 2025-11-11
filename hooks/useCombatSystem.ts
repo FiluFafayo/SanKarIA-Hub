@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import { CampaignState, CampaignActions } from "./useCampaign";
+import type { CampaignState, CampaignActions } from "../types";
 // FASE 0: Hapus dependensi UI store dari hook logika
 // import { useAppStore } from "../store/appStore"; 
 import {

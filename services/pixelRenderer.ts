@@ -4,7 +4,7 @@
 // canvas off-screen, berdasarkan data P1 dan logika P2.
 // Service ini TIDAK BOLEH mengimpor React.
 
-import { Character, Tile } from "../types";
+import { Character, Tile, GridCell } from "../types";
 import { SPRITE_PARTS } from "../data/spriteParts";
 import { BATTLE_TILESET, EXPLORATION_TILESET } from "../data/tileset";
 
@@ -136,7 +136,7 @@ export const renderCharacterLayout = (character: Character): string => {
  * @returns string data URL base64 (image/png)
  */
 export const renderMapLayout = (
-    grid: number[][],
+    grid: number[][] | GridCell[][],
     isBattleMap: boolean = true
 ): string => {
 
@@ -154,7 +154,8 @@ export const renderMapLayout = (
 
     for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
-            const tileId = grid[y][x];
+            const cell = grid[y][x] as any;
+            const tileId = typeof cell === 'number' ? (cell as number) : (cell.terrain as number);
             const tile = tileset[tileId as keyof typeof tileset];
 
             // Logika P2
