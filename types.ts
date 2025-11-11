@@ -310,9 +310,20 @@ export interface Character {
     classFeatures: CharacterFeature[];
     proficientSkills: Skill[];
     proficientSavingThrows: Ability[];
-    
+
     // Resource (Data Persisten per Mandat 3.4)
     spellSlots: CharacterSpellSlot[]; // STATE PERSISTEN
+
+    // PATCH 1: Kepatuhan data tambahan (disimpan di DB)
+    languages?: string[];
+    toolProficiencies?: string[];
+    weaponProficiencies?: string[];
+    armorProficiencies?: string[];
+    senses?: { darkvision?: number; tremorsense?: number; truesight?: number };
+    passivePerception?: number;
+    inspiration?: boolean;
+    preparedSpells?: string[]; // daftar ID/nama spell yang sedang dipersiapkan
+    featureUses?: Record<string, { max: number; spent: number; resetOn: 'short_rest' | 'long_rest' }>;
 
     // Data Relasional (digabungkan saat loading)
     inventory: CharacterInventoryItem[]; // STATE PERSISTEN

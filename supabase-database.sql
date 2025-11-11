@@ -157,7 +157,17 @@ CREATE TABLE "public"."characters" (
     "class_features" "jsonb" DEFAULT '[]'::jsonb,
     "proficient_skills" "text"[] DEFAULT '{}',
     "proficient_saving_throws" "text"[] DEFAULT '{}',
-    "spell_slots" "jsonb" DEFAULT '{}'
+    "spell_slots" "jsonb" DEFAULT '{}',
+    -- PATCH 1: Bidang kepatuhan aturan inti D&D
+    "languages" "text"[] DEFAULT '{}',
+    "tool_proficiencies" "text"[] DEFAULT '{}',
+    "weapon_proficiencies" "text"[] DEFAULT '{}',
+    "armor_proficiencies" "text"[] DEFAULT '{}',
+    "senses" "jsonb" DEFAULT '{}'::jsonb,
+    "passive_perception" integer DEFAULT 10,
+    "inspiration" bool DEFAULT false,
+    "prepared_spells" "jsonb" DEFAULT '[]'::jsonb,
+    "feature_uses" "jsonb" DEFAULT '{}'::jsonb
 );
 ALTER TABLE "public"."characters" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Characters are viewable by everyone." ON "public"."characters"

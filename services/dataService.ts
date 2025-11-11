@@ -60,6 +60,16 @@ type DbCharacter = {
     proficient_skills: Skill[];
     proficient_saving_throws: Ability[];
     spell_slots: CharacterSpellSlot[];
+    // PATCH 1: Kolom tambahan
+    languages?: string[];
+    tool_proficiencies?: string[];
+    weapon_proficiencies?: string[];
+    armor_proficiencies?: string[];
+    senses?: { darkvision?: number; passivePerception?: number; tremorsense?: number; truesight?: number };
+    passive_perception?: number;
+    inspiration?: boolean;
+    prepared_spells?: string[];
+    feature_uses?: Record<string, { max: number; spent: number; resetOn: 'short_rest' | 'long_rest' }>;
 };
 
 type DbItemDefinition = {
@@ -481,6 +491,16 @@ class DataService {
             proficientSkills: dbChar.proficient_skills || [],
             proficientSavingThrows: dbChar.proficient_saving_throws || [],
             spellSlots: dbChar.spell_slots || [],
+            // PATCH 1: bidang baru
+            languages: dbChar.languages || [],
+            toolProficiencies: dbChar.tool_proficiencies || [],
+            weaponProficiencies: dbChar.weapon_proficiencies || [],
+            armorProficiencies: dbChar.armor_proficiencies || [],
+            senses: dbChar.senses || {},
+            passivePerception: dbChar.passive_perception ?? (dbChar.senses?.passivePerception ?? undefined),
+            inspiration: dbChar.inspiration ?? false,
+            preparedSpells: dbChar.prepared_spells || [],
+            featureUses: dbChar.feature_uses || undefined,
             inventory,
             knownSpells,
         };
@@ -570,6 +590,16 @@ class DataService {
             proficient_skills: coreData.proficientSkills,
             proficient_saving_throws: coreData.proficientSavingThrows,
             spell_slots: coreData.spellSlots,
+            // PATCH 1: bidang baru (opsional)
+            languages: coreData.languages,
+            tool_proficiencies: coreData.toolProficiencies,
+            weapon_proficiencies: coreData.weaponProficiencies,
+            armor_proficiencies: coreData.armorProficiencies,
+            senses: coreData.senses,
+            passive_perception: coreData.passivePerception,
+            inspiration: coreData.inspiration,
+            prepared_spells: coreData.preparedSpells,
+            feature_uses: coreData.featureUses,
         };
 
         const { data, error } = await supabase
@@ -671,6 +701,16 @@ class DataService {
             proficient_skills: charData.proficientSkills,
             proficient_saving_throws: charData.proficientSavingThrows,
             spell_slots: charData.spellSlots,
+            // PATCH 1: bidang baru (opsional)
+            languages: charData.languages,
+            tool_proficiencies: charData.toolProficiencies,
+            weapon_proficiencies: charData.weaponProficiencies,
+            armor_proficiencies: charData.armorProficiencies,
+            senses: charData.senses,
+            passive_perception: charData.passivePerception,
+            inspiration: charData.inspiration,
+            prepared_spells: charData.preparedSpells,
+            feature_uses: charData.featureUses,
         };
 
         const { data: newDbCharacter, error: charError } = await supabase
