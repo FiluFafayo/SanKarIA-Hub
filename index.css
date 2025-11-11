@@ -8,4 +8,22 @@
   .animate-fade-in { animation: fade-in 0.5s ease-in-out; }
   .animate-fade-in-fast { animation: fade-in 0.2s ease-in-out; }
   .text-shadow-lg { text-shadow: 0 0 15px rgba(255,223,186,0.8); }
+
+  /* Container Query helpers for desktop layout */
+  .cq-root { container-type: inline-size; container-name: layout; }
+  .desktop-grid { display: grid; grid-template-columns: 280px 1fr 340px; }
+  .desktop-left { overflow: auto; }
+  .desktop-center { overflow: hidden; }
+  .desktop-right { overflow: auto; }
+
+  /* Expand columns when container is wider */
+  @container layout (min-width: 1200px) {
+    .desktop-grid { grid-template-columns: 320px 1fr 384px; }
+  }
+
+  /* Compress or hide sidebars when container is tight */
+  @container layout (max-width: 900px) {
+    .desktop-grid { grid-template-columns: 1fr; }
+    .desktop-left, .desktop-right { display: none; }
+  }
 }

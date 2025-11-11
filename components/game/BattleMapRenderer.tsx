@@ -37,6 +37,25 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
   const isPanningRef = useRef<boolean>(false);
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   const activePointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const rafIdRef = useRef<number | null>(null);
+  const queuedPanRef = useRef<{ dx: number; dy: number } | null>(null);
+
+  const queuePan = useCallback((dx: number, dy: number) => {
+    queuedPanRef.current = {
+      dx: (queuedPanRef.current?.dx || 0) + dx,
+      dy: (queuedPanRef.current?.dy || 0) + dy,
+    };
+    if (rafIdRef.current == null) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        const q = queuedPanRef.current;
+        queuedPanRef.current = null;
+        rafIdRef.current = null;
+        if (q) {
+          setOffset(o => ({ x: o.x + q.dx, y: o.y + q.dy }));
+        }
+      });
+    }
+  }, []);
 
   // Cek apakah unit yang terpilih adalah milik kita
   const isMyUnitSelected = useMemo(() => {
@@ -84,7 +103,7 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
       const dx = e.clientX - lastPointerRef.current.x;
       const dy = e.clientY - lastPointerRef.current.y;
       lastPointerRef.current = { x: e.clientX, y: e.clientY };
-      setOffset(o => ({ x: o.x + dx, y: o.y + dy }));
+      queuePan(dx, dy);
     } else if (pts.length === 2) {
       // Pinch zoom
       const [p1, p2] = pts;
@@ -111,6 +130,48 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
       setOffset(o => ({ x: clamp(o.x, rect.width * -1, rect.width * 1), y: clamp(o.y, rect.height * -1, rect.height * 1) }));
     }
   }, [handleContainerPointerMove]);
+
+  // Desktop: wheel zoom and keyboard pan/center/roll
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const factor = e.deltaY > 0 ? 0.95 : 1.05;
+    setScale(s => clamp(s * factor, 1, 3.5));
+    setOffset(o => ({
+      x: mx - (mx - o.x) * factor,
+      y: my - (my - o.y) * factor,
+    }));
+  }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowLeft') queuePan(-20, 0);
+    else if (e.key === 'ArrowRight') queuePan(20, 0);
+    else if (e.key === 'ArrowUp') queuePan(0, -20);
+    else if (e.key === 'ArrowDown') queuePan(0, 20);
+    else if (e.key.toLowerCase() === 'r') {
+      onRollD20 && onRollD20();
+    } else if (e.key === 'Escape') {
+      setQuickWheel(null);
+    } else if (e.key.toLowerCase() === 'c' || e.key === ' ') {
+      // center to active unit
+      const container = containerRef.current;
+      const unitIdToFocus = selectedUnitId || battleState.activeUnitId;
+      const u = battleState.units.find(uu => uu.id === unitIdToFocus);
+      if (!container || !u) return;
+      const rect = container.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      const xPercent = (u.gridPosition.x / BATTLE_GRID_WIDTH) * 100;
+      const yPercent = (u.gridPosition.y / BATTLE_GRID_HEIGHT) * 100;
+      const targetX = (xPercent / 100) * rect.width * scale;
+      const targetY = (yPercent / 100) * rect.height * scale;
+      setOffset({ x: centerX - targetX, y: centerY - targetY });
+    }
+  }, [queuePan, onRollD20, selectedUnitId, battleState.activeUnitId, battleState.units, scale]);
 
   // Kalkulasi jangkauan gerak (diadaptasi dari P2)
   const movementOptions = useMemo(() => {
@@ -171,6 +232,9 @@ export const BattleMapRenderer: React.FC<BattleMapRendererProps> = ({ battleStat
             onPointerDown={handleContainerPointerDown}
             onPointerMove={handleContainerPointerMove}
             onPointerUp={handleContainerPointerUp}
+            onWheel={handleWheel}
+            onKeyDown={handleKeyDown}
+            tabIndex={0}
         >
             {/* Transform container for pinch/pan/zoom */}
             <div className="absolute inset-0" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`, transformOrigin: '0 0' }}>

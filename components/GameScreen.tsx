@@ -27,6 +27,8 @@ import { GameTabs, GameTab } from "./game/GameTabs";
 import { GameChatPanel } from "./game/panels/GameChatPanel";
 import { GameCharacterPanel } from "./game/panels/GameCharacterPanel";
 import { GameInfoPanel } from "./game/panels/GameInfoPanel";
+import { ChatLog } from "./game/ChatLog";
+import { ExplorationMap } from "./game/ExplorationMap";
 
 // Import komponen UI (tidak berubah)
 import { ChoiceButtons } from "./game/ChoiceButtons";
@@ -411,28 +413,18 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 				// (Tombol toggle panel dihapus)
 			/>
 
-			{/* FASE 0: Layout Grid Responsif (Desktop) / Flex (Mobile) */}
-			<div className="flex-grow overflow-hidden flex lg:grid lg:grid-cols-[320px_1fr_384px]">
-				{/* Kolom 1: Info (HANYA Desktop) */}
-				<aside className="hidden lg:flex flex-col h-full bg-gray-800 border-r-2 border-gray-700 overflow-y-auto">
-					<GameInfoPanel
-						// FASE 3: Kirim props yang di-slice
-						campaignSlice={{
-							title: campaign.title,
-							description: campaign.description,
-							joinCode: campaign.joinCode,
-							mapImageUrl: campaign.mapImageUrl,
-							explorationGrid: campaign.explorationGrid,
-							fogOfWar: campaign.fogOfWar,
-							playerGridPosition: campaign.playerGridPosition,
-							currentTime: campaign.currentTime,
-							currentWeather: campaign.currentWeather,
-							quests: campaign.quests,
-							npcs: campaign.npcs,
-						}}
-						players={campaign.players}
-					/>
-				</aside>
+            {/* FASE 4: Desktop pakai Container Queries; Mobile tetap flex */}
+            <div className="flex-grow overflow-hidden flex lg:grid cq-root desktop-grid">
+                {/* Kolom 1 (Desktop): Chat / Log */}
+                <aside className="hidden lg:flex desktop-left flex-col h-full bg-gray-800 border-r-2 border-gray-700">
+                    <ChatLog
+                        events={campaign.eventLog}
+                        players={campaign.players}
+                        characterId={character.id}
+                        thinkingState={campaign.thinkingState}
+                        onObjectClick={handleObjectClick}
+                    />
+                </aside>
 
 				{/* Kolom 2: Main Content (Chat/Map) + Input */}
 				<main className="flex-grow flex flex-col h-full overflow-hidden lg:border-r-2 lg:border-gray-700">
@@ -440,25 +432,33 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 					<div className="flex-grow overflow-hidden lg:hidden">
 						{renderMobileTabContent()}
 					</div>
-			<div className="flex-grow overflow-hidden hidden lg:flex">
-				{/* Desktop selalu menampilkan chat/map */}
-				<GameChatPanel
-							// FASE 3: Kirim props yang di-slice
-							eventLog={campaign.eventLog}
-							thinkingState={campaign.thinkingState}
-							gameState={campaign.gameState}
-							battleState={campaign.battleState}
-							// Props lain
-							players={campaign.players}
-							characterId={character.id}
-							onObjectClick={handleObjectClick}
-							campaignActions={campaignActions}
-					onMoveUnit={combatSystem.handleMovementWithOA}
-					onTargetTap={handleTargetTap}
-					onQuickAction={handleQuickAction}
-					onRollD20={handleRollD20}
-				/>
-			</div>
+            <div className="flex-grow overflow-hidden hidden lg:flex desktop-center">
+                {/* Desktop: render peta di tengah */}
+                {isCombat ? (
+                    <GameChatPanel
+                        eventLog={campaign.eventLog}
+                        thinkingState={campaign.thinkingState}
+                        gameState={campaign.gameState}
+                        battleState={campaign.battleState}
+                        players={campaign.players}
+                        characterId={character.id}
+                        onObjectClick={handleObjectClick}
+                        campaignActions={campaignActions}
+                        onMoveUnit={combatSystem.handleMovementWithOA}
+                        onTargetTap={handleTargetTap}
+                        onQuickAction={handleQuickAction}
+                        onRollD20={handleRollD20}
+                    />
+                ) : (
+                    <div className="w-full h-full p-2">
+                        <ExplorationMap
+                            grid={campaign.explorationGrid}
+                            fog={campaign.fogOfWar}
+                            playerPos={campaign.playerGridPosition}
+                        />
+                    </div>
+                )}
+            </div>
 
 					{/* Area Input (Selalu di atas tab mobile, atau di bawah chat desktop) */}
 					<div className="flex-shrink-0 z-10">
@@ -501,23 +501,43 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 					</div>
 				</main>
 
-				{/* Kolom 3: Karakter (HANYA Desktop) */}
-				<aside className="hidden lg:flex flex-col h-full bg-gray-800 overflow-y-auto">
-					<GameCharacterPanel
-						character={character}
-						// FASE 3: Kirim props yang di-slice
-						players={campaign.players}
-						monsters={campaign.monsters}
-						initiativeOrder={campaign.initiativeOrder}
-						currentPlayerId={campaign.currentPlayerId}
-						gameState={campaign.gameState}
-						// Props lain
-						combatSystem={combatSystem}
-						onSkillSelect={handleSkillSelect}
-						isMyTurn={isMyTurn}
-					/>
-				</aside>
-			</div>
+                {/* Kolom 3 (Desktop): Status / Detail */}
+                <aside className="hidden lg:flex desktop-right flex-col h-full bg-gray-800 border-l-2 border-gray-700">
+                    <div className="flex-shrink-0 border-b border-gray-700 p-2 text-sm text-gray-300">Status Karakter</div>
+                    <div className="flex-1 overflow-y-auto">
+                        <GameCharacterPanel
+                            character={character}
+                            players={campaign.players}
+                            monsters={campaign.monsters}
+                            initiativeOrder={campaign.initiativeOrder}
+                            currentPlayerId={campaign.currentPlayerId}
+                            gameState={campaign.gameState}
+                            combatSystem={combatSystem}
+                            onSkillSelect={handleSkillSelect}
+                            isMyTurn={isMyTurn}
+                        />
+                    </div>
+                    <div className="flex-shrink-0 border-t border-gray-700 p-2 text-sm text-gray-300">Detail Kampanye</div>
+                    <div className="flex-1 overflow-y-auto">
+                        <GameInfoPanel
+                            campaignSlice={{
+                                title: campaign.title,
+                                description: campaign.description,
+                                joinCode: campaign.joinCode,
+                                mapImageUrl: campaign.mapImageUrl,
+                                explorationGrid: campaign.explorationGrid,
+                                fogOfWar: campaign.fogOfWar,
+                                playerGridPosition: campaign.playerGridPosition,
+                                currentTime: campaign.currentTime,
+                                currentWeather: campaign.currentWeather,
+                                quests: campaign.quests,
+                                npcs: campaign.npcs,
+                            }}
+                            players={campaign.players}
+                        />
+                    </div>
+                </aside>
+            </div>
 			{/* FASE 0: Akhir layout flex/grid */}
 
 			{/* FASE 0: Tab Ergonomis Baru (HANYA Mobile) */}
