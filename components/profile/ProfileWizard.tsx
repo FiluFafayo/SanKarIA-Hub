@@ -62,17 +62,19 @@ const createInvItem = (
 
 // FASE 1: Ganti nama interface
 interface ProfileWizardProps {
-	onClose: () => void;
-	characters: Character[]; // SSoT Karakter milikku
-	userId: string;
-	onSaveNewCharacter: (
-		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
-		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
-		spellData: SpellDefinition[]
-	) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
-	// FASE 2: Tambah props pre-fill
-	templateToPreFill: RawCharacterData | null;
-	clearTemplateToPreFill: () => void;
+    onClose: () => void;
+    characters: Character[]; // SSoT Karakter milikku
+    userId: string;
+    onSaveNewCharacter: (
+        charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+        inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+        spellData: SpellDefinition[]
+    ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
+    // FASE 2: Tambah props pre-fill
+    templateToPreFill: RawCharacterData | null;
+    clearTemplateToPreFill: () => void;
+    // PATCH 3: Tambah aksi update karakter untuk edit terarah (inspiration, dll)
+    onUpdateCharacter: (character: Character) => Promise<void>;
 }
 
 // =================================================================
@@ -1097,6 +1099,25 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 											<div className="text-xs">Speed</div>
 										</div>
 									</div>
+                                        {/* PATCH 3: Inspiration toggle */}
+                                        <div className="mt-3 text-center">
+                                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-400/50 bg-black/30">
+                                                <span className={`text-xs ${selectedChar.inspiration ? 'text-amber-300' : 'text-gray-400'}`}>
+                                                    {selectedChar.inspiration ? 'Inspirasi Aktif' : 'Tidak Ada Inspirasi'}
+                                                </span>
+                                                <button
+                                                    className="text-xs bg-amber-600/60 hover:bg-amber-500/70 px-2 py-0.5 rounded"
+                                                    onClick={async () => {
+                                                        const updated = { ...selectedChar, inspiration: !selectedChar.inspiration };
+                                                        await onUpdateCharacter(updated);
+                                                        // Sinkronkan state lokal agar UI langsung mencerminkan perubahan
+                                                        setSelectedChar(updated);
+                                                    }}
+                                                >
+                                                    {selectedChar.inspiration ? 'Matikan' : 'Aktifkan'}
+                                                </button>
+                                            </div>
+                                        </div>
 								</div>
 								<div className="w-2/3 pl-6">
 									<h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">
@@ -1160,6 +1181,17 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 													</li>
 												))}
 											</ul>
+                                            {/* PATCH 3: Prepared Spells ringkas */}
+                                            {selectedChar.preparedSpells && selectedChar.preparedSpells.length > 0 && (
+                                                <div className="mt-2">
+                                                    <p className="text-sm text-blue-200">Disiapkan:</p>
+                                                    <ul className="text-xs list-disc list-inside">
+                                                        {selectedChar.preparedSpells.map((sp) => (
+                                                            <li key={sp}>{sp}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
 										</>
 									) : (
 										<p className="text-xs text-gray-400">
@@ -1187,8 +1219,44 @@ export const ProfileWizard: React.FC<ProfileWizardProps> = ({
 									)}
 								</div>
 							</div>
-						</>
-					) : (
+                            {/* PATCH 3: Seksi tambahan informasi */}
+                            <div className="mt-4 grid grid-cols-2 gap-4">
+                                <div>
+                                    <h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">Bahasa & Indra</h4>
+                                    <p className="text-sm">
+                                        <strong>Bahasa:</strong> {selectedChar.languages && selectedChar.languages.length > 0 ? selectedChar.languages.join(', ') : '—'}
+                                    </p>
+                                    <div className="text-sm mt-1">
+                                        <strong>Indra:</strong>{' '}
+                                        {(() => {
+                                            const senses = selectedChar.senses || {};
+                                            const parts: string[] = [];
+                                            if (senses.darkvision) parts.push(`Darkvision ${senses.darkvision}ft`);
+                                            if (senses.tremorsense) parts.push(`Tremorsense ${senses.tremorsense}ft`);
+                                            if (senses.truesight) parts.push(`Truesight ${senses.truesight}ft`);
+                                            return parts.length > 0 ? parts.join(', ') : '—';
+                                        })()}
+                                    </div>
+                                    <p className="text-sm mt-1">
+                                        <strong>Persepsi Pasif:</strong>{' '}
+                                        {selectedChar.passivePerception ?? (10 + getAbilityModifier(selectedChar.abilityScores.wisdom) + (selectedChar.proficientSkills.includes(Skill.Perception) ? getProficiencyBonus(selectedChar.level) : 0))}
+                                    </p>
+                                </div>
+                                <div>
+                                    <h4 className="font-cinzel text-xl text-blue-200 border-b border-blue-500/30 pb-1 mb-2">Proficiency</h4>
+                                    <p className="text-sm">
+                                        <strong>Alat:</strong> {selectedChar.toolProficiencies && selectedChar.toolProficiencies.length > 0 ? selectedChar.toolProficiencies.join(', ') : '—'}
+                                    </p>
+                                    <p className="text-sm mt-1">
+                                        <strong>Senjata:</strong> {selectedChar.weaponProficiencies && selectedChar.weaponProficiencies.length > 0 ? selectedChar.weaponProficiencies.join(', ') : '—'}
+                                    </p>
+                                    <p className="text-sm mt-1">
+                                        <strong>Armor:</strong> {selectedChar.armorProficiencies && selectedChar.armorProficiencies.length > 0 ? selectedChar.armorProficiencies.join(', ') : '—'}
+                                    </p>
+                                </div>
+                            </div>
+							</>
+						) : (
 						<div className="w-full h-full flex flex-col justify-center items-center">
 							<p className="text-gray-400">Paksa ke mode 'create'...</p>
 						</div>

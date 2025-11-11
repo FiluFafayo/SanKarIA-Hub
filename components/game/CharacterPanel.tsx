@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Character, MonsterInstance, CharacterInventoryItem, SpellDefinition, Skill, SKILL_ABILITY_MAP } from '../../types';
+import { Character, MonsterInstance, CharacterInventoryItem, SpellDefinition, Skill, SKILL_ABILITY_MAP, Ability } from '../../types';
 import { useCombatSystem } from '../../hooks/useCombatSystem';
 import { DeathSaveTracker } from './DeathSaveTracker';
 import { getAbilityModifier, getProficiencyBonus, xpToNextLevel } from '../../utils';
@@ -80,6 +80,28 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
                     <span>HP: {character.currentHp} / {character.maxHp}</span>
                     <span>AC: {character.armorClass}</span>
                     <span>Speed: {character.speed}ft</span>
+                </div>
+                {/* PATCH 3: Badge Inspiration dan info ringkas */}
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                    <span className={`px-2 py-0.5 rounded-full border ${character.inspiration ? 'border-amber-400 text-amber-300' : 'border-gray-600 text-gray-400'}`}>
+                        {character.inspiration ? 'Inspirasi' : 'Tanpa Inspirasi'}
+                    </span>
+                    <span className="text-gray-300">
+                        PP {character.passivePerception ?? (10 + getAbilityModifier(character.abilityScores[Ability.Wisdom]) + (character.proficientSkills.includes(Skill.Perception) ? getProficiencyBonus(character.level) : 0))}
+                    </span>
+                    <span className="text-gray-400">
+                        Bahasa: {character.languages && character.languages.length > 0 ? character.languages.join(', ') : '—'}
+                    </span>
+                    <span className="text-gray-400">
+                        {(() => {
+                            const s = character.senses || {};
+                            const parts: string[] = [];
+                            if (s.darkvision) parts.push(`DV ${s.darkvision}ft`);
+                            if (s.tremorsense) parts.push(`TS ${s.tremorsense}ft`);
+                            if (s.truesight) parts.push(`TT ${s.truesight}ft`);
+                            return parts.length > 0 ? parts.join(' • ') : 'Indra: —';
+                        })()}
+                    </span>
                 </div>
                 {character.currentHp <= 0 && <DeathSaveTracker successes={character.deathSaves.successes} failures={character.deathSaves.failures} />}
                 {/* (Poin 7) Tampilkan XP Bar */}
@@ -229,7 +251,7 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
                                  isDisabled = spell.castingTime === 'bonus_action' || spell.castingTime === 'reaction';
                              }
 
-                             return (
+                            return (
                                 <div key={spell.id} className="flex justify-between items-center bg-gray-800/50 p-2 rounded">
                                      <span>{spell.name} (Lvl {spell.level})</span>
                                      <button 
@@ -240,8 +262,19 @@ export const CharacterPanel: React.FC<CharacterPanelProps> = ({ character, monst
                                         Lontar
                                      </button>
                                 </div>
-                             );
+                            );
                         })}
+                        {/* PATCH 3: Tampilkan Prepared Spells jika ada */}
+                        {character.preparedSpells && character.preparedSpells.length > 0 && (
+                            <div className="mt-2">
+                                <p className="text-xs text-blue-200">Disiapkan:</p>
+                                <ul className="text-xs list-disc list-inside">
+                                    {character.preparedSpells.map((name) => (
+                                        <li key={name}>{name}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

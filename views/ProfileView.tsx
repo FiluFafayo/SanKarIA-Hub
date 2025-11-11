@@ -22,9 +22,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 }) => {
 	// Ambil SSoT data dari dataStore
 	const { characters } = useDataStore((s) => s.state);
-	const { saveNewCharacter, addPlayerToCampaign } = useDataStore(
-		(s) => s.actions
-	);
+    const { saveNewCharacter, addPlayerToCampaign, updateCharacter } = useDataStore(
+        (s) => s.actions
+    );
 
 	// Ambil aksi navigasi dari appStore
 	// FASE 2: Ambil state pre-fill
@@ -78,17 +78,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 			{/* FASE 1: Ganti nama komponen */}
 			{/* FASE 0: ProfileWizard sekarang mengatur layout internalnya sendiri (flex)
          dan akan mengisi parent (ViewWrapper main area) */}
-			<ProfileWizard
-				onClose={handleClose} // onClose tetap di-pass untuk tombol Batal/Selesai di Wizard
-				characters={characters.filter((c) => c.ownerId === userId)} // Kirim SSoT karakter milikku
-				userId={userId} // Tetap kirim userId untuk UI wizard
-				// Aksi saveNewCharacter sekarang di-resolve DI SINI,
-				// bukan di App.tsx
-				onSaveNewCharacter={handleSaveNewCharacter} // FASE 2 FIX: Gunakan handler baru
-				// FASE 2: Teruskan data pre-fill
-				templateToPreFill={templateToPreFill}
-				clearTemplateToPreFill={clearTemplateToPreFill}
-			/>
+            <ProfileWizard
+                onClose={handleClose} // onClose tetap di-pass untuk tombol Batal/Selesai di Wizard
+                characters={characters.filter((c) => c.ownerId === userId)} // Kirim SSoT karakter milikku
+                userId={userId} // Tetap kirim userId untuk UI wizard
+                // Aksi saveNewCharacter sekarang di-resolve DI SINI,
+                // bukan di App.tsx
+                onSaveNewCharacter={handleSaveNewCharacter} // FASE 2 FIX: Gunakan handler baru
+                onUpdateCharacter={updateCharacter}
+                // FASE 2: Teruskan data pre-fill
+                templateToPreFill={templateToPreFill}
+                clearTemplateToPreFill={clearTemplateToPreFill}
+            />
 		</ViewWrapper>
 	);
 };
