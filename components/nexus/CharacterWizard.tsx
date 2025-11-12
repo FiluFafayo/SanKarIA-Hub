@@ -80,7 +80,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         {step === 'RACE' && (
           <div className="flex flex-col gap-4">
              <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-2">
-                {Object.values(RACES).map((race) => (
+                {RACES.map((race) => (
                   <div 
                     key={race.id}
                     onClick={() => setFormData({ ...formData, raceId: race.id })}
