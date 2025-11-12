@@ -1,55 +1,41 @@
+/* File: index.css */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Utility tambahan yang dipakai komponen */
-@layer utilities {
-  @keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
-  .animate-fade-in { animation: fade-in 0.5s ease-in-out; }
-  .animate-fade-in-fast { animation: fade-in 0.2s ease-in-out; }
-  .text-shadow-lg { text-shadow: 0 0 15px rgba(255,223,186,0.8); }
-
-  /* Container Query helpers for desktop layout */
-  .cq-root { container-type: inline-size; container-name: layout; }
-  .desktop-grid { display: grid; grid-template-columns: 280px 1fr 340px; }
-  .desktop-left { overflow: auto; }
-  .desktop-center { overflow: hidden; }
-  .desktop-right { overflow: auto; }
-
-  /* Expand columns when container is wider */
-  @container layout (min-width: 1200px) {
-    .desktop-grid { grid-template-columns: 320px 1fr 384px; }
-  }
-
-  /* Compress or hide sidebars when container is tight */
-  @container layout (max-width: 900px) {
-    .desktop-grid { grid-template-columns: 1fr; }
-    .desktop-left, .desktop-right { display: none; }
-  }
-}
-
-/* Design tokens: comfortable theme */
 :root {
-  --space-comfortable: 0.75rem; /* 12px */
-  --radius-comfortable: 0.75rem;
-  --color-surface-1: #1f2937; /* gray-800 */
-  --color-surface-2: #111827; /* gray-900 */
-  --color-text-strong: #f3f4f6; /* gray-100 */
-  --color-accent: #a78bfa; /* purple-400 */
+  font-family: 'VT323', monospace; /* Default font is readable retro */
+  background-color: #0f0e13; /* Void color */
+  color: #e3d5ca; /* Parchment color */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: none; /* Pixel art butuh ketajaman, bukan smoothing */
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.bg-surface { background-color: var(--color-surface-1); }
-.text-strong { color: var(--color-text-strong); }
-.rounded-comfortable { border-radius: var(--radius-comfortable); }
-.p-comfortable { padding: var(--space-comfortable); }
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* DILARANG SCROLL NATIVE */
+  margin: 0;
+  padding: 0;
+  touch-action: manipulation; /* Mencegah zoom double tap di mobile */
+  user-select: none; /* Biar teks ga ke-highlight biru-biru ga jelas */
+}
 
-/* Safe area utilities */
-.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-.pt-safe { padding-top: env(safe-area-inset-top); }
-.pl-safe { padding-left: env(safe-area-inset-left); }
-.pr-safe { padding-right: env(safe-area-inset-right); }
-
-/* Reduce motion accessibility */
-@media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+/* Scrollbar custom buat konten internal (Chat/Inv) */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1921; 
+}
+::-webkit-scrollbar-thumb {
+  background: #4a3c31; 
+  border: 1px solid #0f0e13;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #d4af37; 
 }

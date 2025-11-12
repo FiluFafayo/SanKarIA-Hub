@@ -1,120 +1,48 @@
-// REFAKTOR G-4: App.tsx (God Object) dibongkar.
-// Tanggung jawabnya sekarang HANYA:
-// 1. Inisialisasi service (Gemini, Supabase)
-// 2. Manajemen Autentikasi (Session)
-// 3. Memicu loading SSoT (via dataStore)
-// 4. Me-render AppLayout (yang akan menangani semua logika view)
+// File: App.tsx
+import React, { useState, useEffect } from 'react';
+import { GameLayout } from './components/layout/GameLayout';
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { Session } from '@supabase/supabase-js';
-import { useLocalStorage } from './hooks/useLocalStorage';
-import { geminiService } from './services/geminiService';
-import { dataService } from './services/dataService';
-import { LoginView } from './views/LoginView';
-import { useDataStore } from './store/dataStore'; // G-4
-import { AppLayout } from './components/AppLayout'; // G-4
-
-// REFAKTOR G-5: (Fase 1.E Hotfix) Dihapus.
-// Data statis sekarang diakses melalui data/registry.ts,
-// bukan di-load ke (window).
-// (Impor dan penetapan window dihapus)
+// Placeholder Screens (Nanti kita pisah file)
+const BootScreen = () => (
+  <div className="flex flex-col items-center justify-center h-full text-center p-8 animate-pulse">
+    <h1 className="text-2xl text-gold font-pixel mb-4">GRIMOIRE_OS</h1>
+    <p className="text-parchment text-xl">Initializing Mana Streams...</p>
+    <div className="mt-8 w-full h-4 border-2 border-wood p-1">
+        <div className="h-full bg-blood w-[60%] animate-[ping_1s_ease-in-out_infinite]"></div>
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
-  const [theme, setTheme] = useLocalStorage<string>('sankaria-hub-theme', 'theme-sanc');
-  
-  // State Otentikasi
-  const [session, setSession] = useState<Session | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const userId = session?.user?.id;
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Ambil state SSoT dari store G-4
-  const fetchInitialData = useDataStore(s => s.actions.fetchInitialData);
-  const SSoT_hasLoaded = useDataStore(s => s.state.hasLoaded);
-
-  // Efek Inisialisasi Layanan (Tidak berubah)
   useEffect(() => {
-    const geminiKeysString = import.meta.env.VITE_GEMINI_API_KEYS || '';
-    const geminiKeys = geminiKeysString.split(',')
-      .map(key => key.trim())
-      .filter(key => key);
-
-    if (geminiKeys.length === 0) {
-      console.warn("⚠️ VITE_GEMINI_API_KEYS environment variable tidak disetel atau kosong.");
-    }
-    geminiService.updateKeys(geminiKeys);
-
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-    if (!supabaseUrl || !supabaseKey) {
-      console.error("❌ VITE_SUPABASE_URL atau VITE_SUPABASE_ANON_KEY environment variable belum disetel!");
-      // FASE 4: Hapus alert()
-      console.error("Konfigurasi database belum lengkap. Aplikasi mungkin tidak berfungsi dengan benar.");
-    }
-    dataService.init(supabaseUrl, supabaseKey);
-  }, []);
-  
-  // Efek Otentikasi (Tidak berubah)
-  useEffect(() => {
-    setIsAuthLoading(true);
-    dataService.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        setIsAuthLoading(false);
-    });
-
-    const { data: { subscription } } = dataService.onAuthStateChange((_event, session) => {
-        setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
+    // Simulasi loading assets/koneksi awal
+    const timer = setTimeout(() => setIsLoading(false), 2000);
+    return () => clearTimeout(timer);
   }, []);
 
-  // REFAKTOR G-4: Data Loading
-  // Efek ini sekarang HANYA memicu fetch, tidak menyimpan state secara lokal.
-  useEffect(() => {
-    if (session && userId && !SSoT_hasLoaded) {
-        fetchInitialData(userId);
-    }
-  }, [session, userId, fetchInitialData, SSoT_hasLoaded]);
-
-  // =================================================================
-  // FUNGSI HANDLER (DIHAPUS SEMUA)
-  // (Semua logika dipindah ke dataStore.ts atau appStore.ts)
-  // =================================================================
-  
-  // =================================================================
-  // RENDER LOGIC (DISEDERHANAKAN)
-  // =================================================================
-  
-  const LoadingScreen = () => (
-     <div className={`w-screen h-screen bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme}`}>
-        <h1 className="font-cinzel text-5xl animate-pulse">SanKarIA Hub</h1>
-        <p className="mt-2">Memuat semesta...</p>
-    </div>
-  );
-
-  // 1. Tampilkan loading jika Auth belum selesai
-  if (isAuthLoading) {
-    return <LoadingScreen />;
-  }
-  
-  // 2. Tampilkan login jika tidak ada sesi
-  if (!session) {
-    return <div className={theme}><LoginView /></div>;
-  }
-  
-  // 3. Tampilkan AppLayout.
-  // AppLayout akan menangani apakah harus render LoadingScreen (data),
-  // GameScreen (runtime), atau ViewManager (modal/view).
   return (
-    <div className={`w-screen h-screen bg-black overflow-hidden ${theme}`}>
-      <AppLayout 
-        userId={userId} 
-        userEmail={session.user.email} 
-        theme={theme} 
-        setTheme={setTheme}
-      />
-    </div>
+    <GameLayout>
+      {isLoading ? (
+        <BootScreen />
+      ) : (
+        // Nanti di sini adalah 'SceneManager' kita
+        <div className="flex flex-col items-center justify-center h-full p-4">
+             <h2 className="text-4xl font-pixel text-gold mb-4 text-shadow-sm">NEXUS</h2>
+             <p className="text-center mb-8 text-xl">
+               "Selamat datang kembali, Traveler."
+             </p>
+             
+             {/* Tombol Sementara gaya Grimoire */}
+             <button className="bg-wood text-parchment font-pixel py-4 px-6 
+                                border-b-4 border-black active:border-b-0 active:translate-y-1 
+                                shadow-pixel-md hover:bg-opacity-90 transition-all w-full max-w-xs">
+               > MASUK GERBANG
+             </button>
+        </div>
+      )}
+    </GameLayout>
   );
 };
 
