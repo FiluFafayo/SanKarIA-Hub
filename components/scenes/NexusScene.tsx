@@ -17,7 +17,11 @@ const BackgroundLayer = () => (
   </div>
 );
 
-export const NexusScene: React.FC = () => {
+interface NexusSceneProps {
+  onStartGame: () => void;
+}
+
+export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   const [viewMode, setViewMode] = useState<'IDLE' | 'CAMPFIRE' | 'GATE'>('IDLE');
   const [activeChar, setActiveChar] = useState<string | null>(null);
 
@@ -75,7 +79,12 @@ export const NexusScene: React.FC = () => {
       {viewMode === 'GATE' && (
         <DungeonGate 
           onBack={() => setViewMode('IDLE')}
-          onEnterWorld={(code) => alert(`Menghubungkan ke Rune ${code}...`)} 
+          onEnterWorld={(code) => {
+            // Di sini logika validasi room code nanti
+            console.log(`Connecting to World: ${code}`);
+            // Panggil fungsi untuk memulai game
+            onStartGame();
+          }} 
         />
       )}
 
