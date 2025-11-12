@@ -21,11 +21,6 @@ interface RuntimeState {
         autoNpcPortraits: boolean;
         dmNarrationVoiceEnabled: boolean;
         narrationLang: 'id-ID' | 'en-US';
-        hapticsEnabled: boolean;
-        voicePttEnabled: boolean;
-        sttLang: 'id-ID' | 'en-US';
-        uiFontScale: number; // 0.8 - 1.4
-        colorBlindMode: 'none' | 'highContrast';
     };
     voice: {
         micRecording: boolean;
@@ -44,11 +39,6 @@ const initialRuntimeState: RuntimeState = {
         autoNpcPortraits: true,
         dmNarrationVoiceEnabled: true,
         narrationLang: 'id-ID',
-        hapticsEnabled: true,
-        voicePttEnabled: true,
-        sttLang: 'id-ID',
-        uiFontScale: 1.0,
-        colorBlindMode: 'none',
     },
     voice: {
         micRecording: false,
@@ -71,11 +61,6 @@ interface RuntimeActions {
     setAutoNpcPortraits: (enabled: boolean) => void;
     setDmNarrationVoiceEnabled: (enabled: boolean) => void;
     setNarrationLang: (lang: 'id-ID' | 'en-US') => void;
-    setHapticsEnabled: (enabled: boolean) => void;
-    setVoicePttEnabled: (enabled: boolean) => void;
-    setSttLang: (lang: 'id-ID' | 'en-US') => void;
-    setUiFontScale: (scale: number) => void;
-    setColorBlindMode: (mode: 'none' | 'highContrast') => void;
     // Voice runtime
     setMicRecording: (recording: boolean) => void;
     setVoicePartial: (text: string) => void;
@@ -233,48 +218,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 runtime: {
                     ...state.runtime,
                     runtimeSettings: { ...state.runtime.runtimeSettings, narrationLang: lang },
-                },
-            }));
-        },
-        setHapticsEnabled: (enabled) => {
-            set((state) => ({
-                runtime: {
-                    ...state.runtime,
-                    runtimeSettings: { ...state.runtime.runtimeSettings, hapticsEnabled: enabled },
-                },
-            }));
-        },
-        setVoicePttEnabled: (enabled) => {
-            set((state) => ({
-                runtime: {
-                    ...state.runtime,
-                    runtimeSettings: { ...state.runtime.runtimeSettings, voicePttEnabled: enabled },
-                },
-            }));
-        },
-        setSttLang: (lang) => {
-            set((state) => ({
-                runtime: {
-                    ...state.runtime,
-                    runtimeSettings: { ...state.runtime.runtimeSettings, sttLang: lang },
-                },
-            }));
-        },
-        setUiFontScale: (scale) => {
-            // Clamp antara 0.8 dan 1.4
-            const clamped = Math.max(0.8, Math.min(1.4, scale));
-            set((state) => ({
-                runtime: {
-                    ...state.runtime,
-                    runtimeSettings: { ...state.runtime.runtimeSettings, uiFontScale: clamped },
-                },
-            }));
-        },
-        setColorBlindMode: (mode) => {
-            set((state) => ({
-                runtime: {
-                    ...state.runtime,
-                    runtimeSettings: { ...state.runtime.runtimeSettings, colorBlindMode: mode },
                 },
             }));
         },

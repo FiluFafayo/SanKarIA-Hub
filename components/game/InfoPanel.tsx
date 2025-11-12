@@ -95,7 +95,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ campaign, players }) => {
             <ul className="space-y-3">
                     {players.map(player => (
                         <li key={player.id} className="flex items-center gap-3">
-                            <img src={player.image} alt={player.name} className="w-12 h-12 rounded-full border-2 border-gray-500" loading="lazy" decoding="async" fetchpriority="low" />
+                            <img src={player.image} alt={player.name} className="w-12 h-12 rounded-full border-2 border-gray-500" />
                             <div>
                                 <p className="font-bold">{player.name}</p>
                                 <p className="text-xs text-gray-400">{player.race} {player.class} - Level {player.level}</p>

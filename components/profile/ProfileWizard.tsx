@@ -24,7 +24,6 @@ import {
 import { SPRITE_PARTS } from "../../data/spriteParts"; // BARU
 import { Die } from "../Die";
 import { SelectionCard } from "../SelectionCard"; // Import SelectionCard
-import { Stepper } from "../ui/Stepper";
 // FASE 2: Hapus useDataStore (tidak dipakai di sini)
 // import { useDataStore } from "../../store/dataStore"; // Impor baru
 
@@ -297,16 +296,7 @@ const CreateCharacterWizard: React.FC<{
 		);
 
 		// FASE 2: State sekarang lokal menggunakan useState, bukan zustand
-        const [step, setStep] = useState(1); // MULAI DARI LANGKAH 1 (PILIH METODE)
-        const [abilityMode, setAbilityMode] = useState<'roll' | 'pointbuy'>("roll");
-        const [pointBuyScores, setPointBuyScores] = useState<Record<Ability, number>>({
-            strength: 8,
-            dexterity: 8,
-            constitution: 8,
-            intelligence: 8,
-            wisdom: 8,
-            charisma: 8,
-        } as Record<Ability, number>);
+		const [step, setStep] = useState(1); // MULAI DARI LANGKAH 1 (PILIH METODE)
 		const [statusMessage, setStatusMessage] = useState('');
 		const [name, setName] = useState('');
 		const [gender, setGender] = useState<'Pria' | 'Wanita'>('Pria');
@@ -349,43 +339,16 @@ const CreateCharacterWizard: React.FC<{
 			setSelectedEquipment(getDefaultEquipment(newClass)); // Reset equipment pilihan
 		};
 
-        const abilitiesToRoll = useMemo(() => ALL_ABILITIES, []);
-        const currentAbilityIndex = Object.keys(abilityScores).length;
+		const abilitiesToRoll = useMemo(() => ALL_ABILITIES, []);
+		const currentAbilityIndex = Object.keys(abilityScores).length;
 
 		// FASE 2: Event handler sekarang memanggil state lokal
-        const handleAbilityRollComplete = (ability: Ability, score: number) => {
-            setAbilityScore(ability, score);
-            if (currentAbilityIndex === abilitiesToRoll.length - 1) {
-                setCharacterStep(4); // Lanjut ke Background
-            }
-        };
-
-        // Point Buy helpers
-        const pointBuyCost = (score: number): number => {
-            if (score <= 13) return score - 8; // 8->0, 13->5
-            if (score === 14) return 7;
-            if (score === 15) return 9;
-            return 0;
-        };
-        const totalPointBuyCost = (scores: Record<Ability, number>): number => {
-            return (ALL_ABILITIES as Ability[]).reduce((sum, ab) => sum + pointBuyCost(scores[ab] || 8), 0);
-        };
-        const setPointBuyValue = (ab: Ability, val: number) => {
-            setPointBuyScores(prev => {
-                const next = { ...prev, [ab]: val } as Record<Ability, number>;
-                const cost = totalPointBuyCost(next);
-                if (cost > 27) return prev; // batasi 27 poin
-                return next;
-            });
-        };
-        const commitPointBuyToScores = () => {
-            const cost = totalPointBuyCost(pointBuyScores);
-            if (cost <= 27) {
-                const next: Partial<AbilityScores> = {};
-                (ALL_ABILITIES as Ability[]).forEach(ab => { next[ab] = pointBuyScores[ab]; });
-                setAbilityScores(next);
-            }
-        };
+		const handleAbilityRollComplete = (ability: Ability, score: number) => {
+			setAbilityScore(ability, score);
+			if (currentAbilityIndex === abilitiesToRoll.length - 1) {
+				setCharacterStep(4); // Lanjut ke Background
+			}
+		};
 
 		// FASE 2: Fungsi ini (preFillData) adalah inti dari refaktor DRY.
 		// Ia mengambil template mentah dan mengisi semua state React.
@@ -628,31 +591,12 @@ const CreateCharacterWizard: React.FC<{
 		};
 
 		// ================== RENDER WIZARD ==================
-        return (
-        	// FASE 0: Hapus padding, biarkan parent (panel kiri) yang mengelola
-        	<div className="w-full h-full flex flex-col">
-    		<h3 className="font-cinzel text-2xl text-blue-200 mb-2 text-center pt-4">
-    			Wizard Karakter
-    		</h3>
-            {/* Stepper 4 langkah */}
-            <div className="px-4">
-                <Stepper
-                    steps={["Metode", "Dasar", "Pilihan", "Tinjau"]}
-                    activeIndex={step === 1 ? 0 : step === 2 ? 1 : (step >= 3 && step <= 6) ? 2 : 3}
-                />
-            </div>
-
-            {/* Preview Card */}
-            <div className="px-4 mt-2">
-                <div className="bg-black/30 border border-blue-400/40 rounded-lg p-3 flex items-center gap-3">
-                    <img src={selectedRace.img} alt={selectedRace.name} className="w-12 h-12 rounded" />
-                    <div className="flex-1">
-                        <div className="font-cinzel text-sm text-blue-100">{name || 'Tanpa Nama'}</div>
-                        <div className="text-xs text-gray-300">{selectedRace.name} {selectedClass.name}</div>
-                    </div>
-                    <div className="text-xs text-amber-300">Langkah {step}/7</div>
-                </div>
-            </div>
+		return (
+   		// FASE 0: Hapus padding, biarkan parent (panel kiri) yang mengelola
+   		<div className="w-full h-full flex flex-col">
+   			<h3 className="font-cinzel text-2xl text-blue-200 mb-4 text-center pt-4">
+   				Menciptakan Jiwa Baru (Langkah {step}/7)
+   			</h3>
 
    			{step > 1 && (
 					<button
@@ -859,68 +803,17 @@ const CreateCharacterWizard: React.FC<{
 					</div>
 				)}
 
-                {/* === STEP 3: Ability Scores (Dulu Step 2) === */}
-                {step === 3 && (
-                    <div className="flex flex-col flex-grow animate-fade-in-fast p-4">
-                        <div className="flex justify-center gap-2 mb-4">
-                            <button
-                                onClick={() => setAbilityMode('roll')}
-                                className={`font-cinzel px-3 py-1 rounded ${abilityMode === 'roll' ? 'bg-blue-600' : 'bg-black/40 border border-blue-400/40'}`}
-                            >Lempar Dadu</button>
-                            <button
-                                onClick={() => setAbilityMode('pointbuy')}
-                                className={`font-cinzel px-3 py-1 rounded ${abilityMode === 'pointbuy' ? 'bg-blue-600' : 'bg-black/40 border border-blue-400/40'}`}
-                            >Slider Point Buy</button>
-                        </div>
-
-                        {abilityMode === 'roll' ? (
-                            currentAbilityIndex < abilitiesToRoll.length ? (
-                                <AbilityRoller
-                                    key={abilitiesToRoll[currentAbilityIndex]}
-                                    ability={abilitiesToRoll[currentAbilityIndex]}
-                                    onRoll={handleAbilityRollComplete}
-                                    currentScore={abilityScores[abilitiesToRoll[currentAbilityIndex]] || null}
-                                />
-                            ) : (
-                                <div className="text-center text-sm text-amber-300">Semua kemampuan telah ditentukan.</div>
-                            )
-                        ) : (
-                            <div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    {(ALL_ABILITIES as Ability[]).map((ab) => (
-                                        <div key={ab} className="bg-black/20 p-3 rounded">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="font-cinzel text-sm capitalize">{ab}</span>
-                                                <span className="font-bold text-xl text-amber-300">{pointBuyScores[ab]}</span>
-                                            </div>
-                                            <input
-                                                type="range"
-                                                min={8}
-                                                max={15}
-                                                value={pointBuyScores[ab]}
-                                                onChange={(e) => setPointBuyValue(ab, parseInt(e.target.value, 10))}
-                                                className="w-full h-2 accent-amber-500"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="mt-3 text-sm">
-                                    <span className={`${totalPointBuyCost(pointBuyScores) > 27 ? 'text-red-400' : 'text-amber-300'}`}>
-                                        Poin terpakai: {totalPointBuyCost(pointBuyScores)} / 27
-                                    </span>
-                                </div>
-                                <div className="flex justify-between mt-4">
-                                    <button onClick={() => setAbilityMode('roll')} className="font-cinzel text-gray-300 hover:text-white">&larr; Kembali ke Lempar</button>
-                                    <button
-                                        onClick={() => { commitPointBuyToScores(); setCharacterStep(4); }}
-                                        disabled={totalPointBuyCost(pointBuyScores) > 27}
-                                        className="font-cinzel bg-blue-600 hover:bg-blue-500 px-4 py-1 rounded disabled:bg-gray-500"
-                                    >Lanjutkan</button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
+				{/* === STEP 3: Ability Scores (Dulu Step 2) === */}
+				{step === 3 && currentAbilityIndex < abilitiesToRoll.length && (
+					<AbilityRoller
+						key={abilitiesToRoll[currentAbilityIndex]}
+						ability={abilitiesToRoll[currentAbilityIndex]}
+						onRoll={handleAbilityRollComplete}
+						currentScore={
+							abilityScores[abilitiesToRoll[currentAbilityIndex]] || null
+						}
+					/>
+				)}
 
 				{/* === STEP 4: Background (Dulu Step 3) === */}
 				{step === 4 && (

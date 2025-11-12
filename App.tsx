@@ -13,7 +13,6 @@ import { dataService } from './services/dataService';
 import { LoginView } from './views/LoginView';
 import { useDataStore } from './store/dataStore'; // G-4
 import { AppLayout } from './components/AppLayout'; // G-4
-import { useGameStore } from './store/gameStore';
 
 // REFAKTOR G-5: (Fase 1.E Hotfix) Dihapus.
 // Data statis sekarang diakses melalui data/registry.ts,
@@ -31,7 +30,6 @@ const App: React.FC = () => {
   // Ambil state SSoT dari store G-4
   const fetchInitialData = useDataStore(s => s.actions.fetchInitialData);
   const SSoT_hasLoaded = useDataStore(s => s.state.hasLoaded);
-  const runtimeSettings = useGameStore(s => s.runtime.runtimeSettings);
 
   // Efek Inisialisasi Layanan (Tidak berubah)
   useEffect(() => {
@@ -79,21 +77,6 @@ const App: React.FC = () => {
     }
   }, [session, userId, fetchInitialData, SSoT_hasLoaded]);
 
-  // Accessibility: apply font scale and high-contrast mode globally
-  useEffect(() => {
-    try {
-      const scale = runtimeSettings.uiFontScale || 1;
-      document.documentElement.style.setProperty('--font-scale', String(scale));
-    } catch {}
-  }, [runtimeSettings.uiFontScale]);
-
-  useEffect(() => {
-    try {
-      const isHighContrast = runtimeSettings.colorBlindMode === 'highContrast';
-      document.body.classList.toggle('high-contrast', isHighContrast);
-    } catch {}
-  }, [runtimeSettings.colorBlindMode]);
-
   // =================================================================
   // FUNGSI HANDLER (DIHAPUS SEMUA)
   // (Semua logika dipindah ke dataStore.ts atau appStore.ts)
@@ -104,7 +87,7 @@ const App: React.FC = () => {
   // =================================================================
   
   const LoadingScreen = () => (
-     <div className={`w-screen h-screen bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme} ${runtimeSettings.colorBlindMode === 'highContrast' ? 'high-contrast' : ''}`}>
+     <div className={`w-screen h-screen bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme}`}>
         <h1 className="font-cinzel text-5xl animate-pulse">SanKarIA Hub</h1>
         <p className="mt-2">Memuat semesta...</p>
     </div>
@@ -117,14 +100,14 @@ const App: React.FC = () => {
   
   // 2. Tampilkan login jika tidak ada sesi
   if (!session) {
-    return <div className={`${theme} ${runtimeSettings.colorBlindMode === 'highContrast' ? 'high-contrast' : ''}`}><LoginView /></div>;
+    return <div className={theme}><LoginView /></div>;
   }
   
   // 3. Tampilkan AppLayout.
   // AppLayout akan menangani apakah harus render LoadingScreen (data),
   // GameScreen (runtime), atau ViewManager (modal/view).
   return (
-    <div className={`w-screen h-screen bg-black overflow-hidden ${theme} ${runtimeSettings.colorBlindMode === 'highContrast' ? 'high-contrast' : ''}`}>
+    <div className={`w-screen h-screen bg-black overflow-hidden ${theme}`}>
       <AppLayout 
         userId={userId} 
         userEmail={session.user.email} 

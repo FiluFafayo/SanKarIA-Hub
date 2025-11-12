@@ -173,22 +173,3 @@ export const parseAndLogNarration = (
         }
     }
 };
-
-// Haptics helper: memicu getaran ringan untuk aksi penting
-import { useGameStore } from './store/gameStore';
-export type HapticType = 'roll' | 'confirm' | 'tap';
-export function triggerHaptic(type: HapticType) {
-  try {
-    const enabled = useGameStore.getState().runtime.runtimeSettings.hapticsEnabled;
-    if (!enabled) return;
-    // Pastikan API vibrate tersedia
-    const navAny: any = typeof navigator !== 'undefined' ? navigator : null;
-    if (!navAny || typeof navAny.vibrate !== 'function') return;
-    const pattern = type === 'roll'
-      ? [10, 20, 10]
-      : type === 'confirm'
-      ? [5, 15, 5]
-      : [8];
-    navAny.vibrate(pattern);
-  } catch {}
-}

@@ -17,7 +17,6 @@ import { HallOfEchoesView } from '../views/HallOfEchoesView';
 import { JoinCampaignView } from '../views/JoinCampaignView';
 import { MarketplaceView } from '../views/MarketplaceView';
 import { SettingsView } from '../views/SettingsView';
-import { WireframePreview } from '../views/WireframePreview';
 import { ProfileView } from '../views/ProfileView';
 import { CharacterSelectionView } from '../views/CharacterSelectionView';
 
@@ -64,9 +63,7 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
     // FASE 0: ViewManager sekarang menangani SEMUA view, termasuk 'nexus'
     switch (currentView) {
       case 'nexus':
-        return <NexusSanctum userEmail={userEmail} userId={userId} />;
-      case 'wireframe-preview':
-        return <WireframePreview />;
+        return <NexusSanctum userEmail={userEmail} />;
       case Location.StorytellersSpire:
         return <CreateCampaignView 
                     onClose={returnToNexus} 
@@ -110,6 +107,6 @@ export const ViewManager: React.FC<ViewManagerProps> = ({
                   userId={userId} 
                 />; // Disederhanakan, ProfileView akan ambil data dari store
       default:
-        return <NexusSanctum userEmail={userEmail} userId={userId} />; // Fallback aman
+        return <NexusSanctum userEmail={userEmail} />; // Fallback aman
     }
 };

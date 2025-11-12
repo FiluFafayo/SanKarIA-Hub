@@ -43,8 +43,6 @@ import { xpToNextLevel, rollHitDice, getAbilityModifier } from "../utils";
 import { findClass } from "../data/registry";
 import { MobileAppShell } from "./mobile/MobileAppShell";
 import { ChatSheet } from "./game/ChatSheet";
-import { QuickDock } from "./ui/QuickDock";
-import { triggerHaptic } from "../utils";
 
 // Import store (tidak berubah)
 import { useDataStore } from "../store/dataStore";
@@ -149,8 +147,6 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 
 	// FASE 0: State UI baru untuk tab ergonomis
 	const [activeTab, setActiveTab] = useState<GameTab>("chat");
-    const [dockActive, setDockActive] = useState<'explore' | 'combat' | 'chat'>('chat');
-    const [showModeBanner, setShowModeBanner] = useState<boolean>(true);
 
 	const [pendingSkill, setPendingSkill] = useState<Skill | null>(null);
 	const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
@@ -309,7 +305,6 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 			reason: 'Lempar cepat d20',
 		};
 		campaignActions.setActiveRollRequest(request);
-		triggerHaptic('roll');
 	}, [campaign.turnId, campaign.currentPlayerId, character.id, campaignActions]);
 
 	const handleObjectClick = (
@@ -358,11 +353,7 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 				return (
 					<GameCharacterPanel
 						character={character}
-						players={campaign.players}
-						monsters={campaign.monsters}
-						initiativeOrder={campaign.battleState?.initiativeOrder || []}
-						currentPlayerId={campaign.currentPlayerId}
-						gameState={campaign.gameState}
+						campaign={campaign}
 						combatSystem={combatSystem}
 						onSkillSelect={handleSkillSelect}
 						isMyTurn={isMyTurn}
@@ -395,7 +386,6 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 
     return (
         <MobileAppShell
-            showBottomNav={true}
             chatSheet={
                 <ChatSheet
                     events={campaign.eventLog}
@@ -423,7 +413,7 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 				// (Tombol toggle panel dihapus)
 			/>
 
-			{/* FASE 4: Desktop pakai Container Queries; Mobile tetap flex */}
+            {/* FASE 4: Desktop pakai Container Queries; Mobile tetap flex */}
             <div className="flex-grow overflow-hidden flex lg:grid cq-root desktop-grid">
                 {/* Kolom 1 (Desktop): Chat / Log */}
                 <aside className="hidden lg:flex desktop-left flex-col h-full bg-gray-800 border-r-2 border-gray-700">
@@ -440,46 +430,9 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 
 				{/* Kolom 2: Main Content (Chat/Map) + Input */}
 				<main className="flex-grow flex flex-col h-full overflow-hidden lg:border-r-2 lg:border-gray-700">
-					{/* Banner atas konten untuk mode permainan */}
-					{showModeBanner && (
-						<div className="fixed top-0 left-0 right-0 z-20 bg-gray-800/90 border-b border-gray-700 text-amber-100 px-3 py-2 flex items-center justify-between">
-							<span className="font-cinzel text-sm">{isCombat ? 'Mode Pertarungan' : 'Mode Eksplorasi'}</span>
-							<button className="text-xs text-amber-300" onClick={() => setShowModeBanner(false)}>Tutup</button>
-						</div>
-					)}
-
-					{/* Area Konten Utama (Mobile): memilih berdasarkan QuickDock */}
+					{/* Area Konten Utama (Mobile: render tab, Desktop: render chat) */}
 					<div className="flex-grow overflow-hidden lg:hidden">
-						{dockActive === 'chat' && renderMobileTabContent()}
-						{dockActive === 'explore' && !isCombat && (
-							<div className="w-full h-full p-2">
-								<React.Suspense fallback={<div className="p-4 text-gray-400">Memuat peta eksplorasi…</div>}>
-									<ExplorationMap
-										grid={campaign.explorationGrid}
-										fog={campaign.fogOfWar}
-										playerPos={campaign.playerGridPosition}
-									/>
-								</React.Suspense>
-							</div>
-						)}
-						{dockActive === 'combat' && isCombat && (
-							<React.Suspense fallback={<div className="p-4 text-gray-400">Memuat peta pertarungan…</div>}>
-								<GameChatPanel
-									eventLog={campaign.eventLog}
-									thinkingState={campaign.thinkingState}
-									gameState={campaign.gameState}
-									battleState={campaign.battleState}
-									players={campaign.players}
-									characterId={character.id}
-									onObjectClick={handleObjectClick}
-									campaignActions={campaignActions}
-									onMoveUnit={combatSystem.handleMovementWithOA}
-									onTargetTap={handleTargetTap}
-									onQuickAction={handleQuickAction}
-									onRollD20={handleRollD20}
-								/>
-							</React.Suspense>
-						)}
+						{renderMobileTabContent()}
 					</div>
             <div className="flex-grow overflow-hidden hidden lg:flex desktop-center">
                 {/* Desktop: render peta di tengah */}
@@ -513,30 +466,8 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
                 )}
             </div>
 
-				{/* Quick Dock in-game (inline, di atas area input) */}
-				<div className="px-2 pt-2 lg:hidden">
-					<QuickDock
-						fixed={false}
-						active={dockActive}
-						onChange={(item) => {
-							if (item === 'chat') {
-								setActiveTab('chat');
-								setDockActive('chat');
-							} else if (item === 'combat') {
-								if (isCombat) {
-									setDockActive('combat');
-								} else {
-									setDockActive('explore');
-								}
-							} else {
-								setDockActive('explore');
-							}
-						}}
-					/>
-				</div>
-
-				{/* Area Input (Selalu di atas tab mobile, atau di bawah chat desktop) */}
-				<div className="flex-shrink-0 z-10 pb-safe pt-safe">
+					{/* Area Input (Selalu di atas tab mobile, atau di bawah chat desktop) */}
+					<div className="flex-shrink-0 z-10 pb-safe pt-safe">
 						{shouldShowChoices && (
 							<ChoiceButtons
 								choices={campaign.choices}
@@ -573,8 +504,8 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
 							/>
 						</>
 					)}
-				</div>
-			</main>
+					</div>
+				</main>
 
                 {/* Kolom 3 (Desktop): Status / Detail */}
                 <aside className="hidden lg:flex desktop-right flex-col h-full bg-gray-800 border-l-2 border-gray-700">
@@ -619,29 +550,8 @@ const runtimeSettings = useGameStore((s) => s.runtime.runtimeSettings);
             </div>
 			{/* FASE 0: Akhir layout flex/grid */}
 
-			{/* Floating Quick Actions: Roll & End Turn */}
-			<div className="fixed bottom-16 right-3 z-30 flex flex-col gap-2">
-				<button
-					className="px-4 py-2 rounded-full bg-purple-600 text-white shadow-lg active:scale-95"
-					onClick={() => {
-						triggerHaptic('roll');
-						handleRollD20();
-					}}
-				>
-					Roll
-				</button>
-				<button
-					className={`px-4 py-2 rounded-full ${isMyCombatTurn ? 'bg-emerald-600 text-white' : 'bg-gray-700 text-gray-300'} shadow-lg active:scale-95`}
-					disabled={!isMyCombatTurn}
-					onClick={() => {
-						if (!isMyCombatTurn) return;
-						triggerHaptic('confirm');
-						campaignActions.endTurn();
-					}}
-				>
-					End Turn
-				</button>
-			</div>
+			{/* FASE 0: Tab Ergonomis Baru (HANYA Mobile) */}
+			<GameTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
 			{/* FASE 0: (SidePanel DIHAPUS) */}
 

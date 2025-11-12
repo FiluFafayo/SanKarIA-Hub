@@ -87,174 +87,88 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     )}
                     {activeStation === "Audio" && (
                         <div>
-                            <h3 className="text-2xl font-cinzel mb-2">Gramofon Ajaib</h3>
-                            <p className="text-sm text-amber-200/70 mb-6">
-                                Sesuaikan suasana pendengaran dari pengalaman Anda.
-                            </p>
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="block mb-1">Volume Utama</label>
-                                    <input
-                                        type="range"
-                                        className="w-full accent-amber-500"
-                                        value={masterVolume}
-                                        onChange={(e) =>
-                                            setMasterVolume(parseInt(e.target.value, 10))
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block mb-1">Volume Musik</label>
-                                    <input
-                                        type="range"
-                                        className="w-full accent-amber-500"
-                                        value={musicVolume}
-                                        onChange={(e) =>
-                                            setMusicVolume(parseInt(e.target.value, 10))
-                                        }
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block mb-1">Suara AI DM</label>
-                                    <select className="w-full bg-black/30 border border-amber-800 rounded px-3 py-2">
-                                        <option>Piringan Kristal - 'Sejarawan'</option>
-                                        <option>Piringan Obsidian - 'Pelawak'</option>
-                                    </select>
-                                </div>
-                                {/* Aksesibilitas: PTT & Bahasa STT */}
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <label className="block mb-1 font-cinzel">Tekan-Untuk-Bicara (PTT)</label>
-                                        <p className="text-xs text-amber-200/70">
-                                            Tampilkan tombol PTT untuk input suara di chat dan action bar.
-                                        </p>
-                                    </div>
-                                    <PttToggle />
-                                </div>
-                                <div>
-                                    <label className="block mb-1 font-cinzel">Bahasa Speech-to-Text</label>
-                                    <SttLanguageSelect />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    {activeStation === "Display" && (
-                        <div>
-                            <h3 className="text-2xl font-cinzel mb-2">Astrolab Optik</h3>
-                            <p className="text-sm text-amber-200/70 mb-6">
-                                Kalibrasi antarmuka visual Anda.
-                            </p>
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="block mb-1">Tema UI</label>
-                                    <select
-                                        value={currentTheme}
-                                        onChange={(e) => setTheme(e.target.value)}
-                                        className="w-full bg-black/30 border border-amber-800 rounded px-3 py-2"
-                                    >
-                                        <option value="theme-sanc">Nadi Suaka (Default)</option>
-                                        <option value="theme-oracle">Orakel Cahaya Bintang</option>
-                                        <option value="theme-sunstone">
-                                            Perpustakaan Batu Surya
-                                        </option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block mb-1 font-cinzel">Ukuran Font UI</label>
-                                    <FontScaleSlider />
-                                </div>
-                                <div>
-                                    <label className="block mb-1 font-cinzel">Mode Kebutaan Warna</label>
-                                    <ColorBlindModeSelect />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    {activeStation === "Gameplay" && (
-                        <div>
-                            <h3 className="text-2xl font-cinzel mb-2">Konduktor Permainan</h3>
-                            <p className="text-sm text-amber-200/70 mb-6">
-                                Pengaturan perilaku sistem selama sesi.
-                            </p>
-                            <div className="space-y-6">
-                                <AutoNpcPortraitToggle />
-                                <HapticsToggle />
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </ViewWrapper>
-    );
-};
-
-const PttToggle: React.FC = () => {
-    const enabled = useGameStore((s) => s.runtime.runtimeSettings.voicePttEnabled);
-    const setEnabled = useGameStore((s) => s.actions.setVoicePttEnabled);
-    return (
-        <label className="inline-flex items-center cursor-pointer">
-            <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
-            />
-            <div className="w-11 h-6 bg-amber-900 peer-focus:outline-none rounded-full peer peer-checked:bg-amber-600 transition-colors relative">
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-black/70 rounded-full transition-all ${enabled ? 'translate-x-5 bg-amber-950' : ''}`}></span>
-            </div>
-        </label>
-    );
-};
-
-const SttLanguageSelect: React.FC = () => {
-    const lang = useGameStore((s) => s.runtime.runtimeSettings.sttLang);
-    const setLang = useGameStore((s) => s.actions.setSttLang);
-    return (
-        <select
-            className="w-full bg-black/30 border border-amber-800 rounded px-3 py-2"
-            value={lang}
-            onChange={(e) => setLang(e.target.value as any)}
-        >
-            <option value="id-ID">Bahasa Indonesia (id-ID)</option>
-            <option value="en-US">English (US) (en-US)</option>
-            <option value="es-ES">Español (ES) (es-ES)</option>
-            <option value="fr-FR">Français (FR) (fr-FR)</option>
-        </select>
-    );
-};
-
-const FontScaleSlider: React.FC = () => {
-    const scale = useGameStore((s) => s.runtime.runtimeSettings.uiFontScale);
-    const setScale = useGameStore((s) => s.actions.setUiFontScale);
-    return (
-        <div>
-            <input
-                type="range"
-                min={0.85}
-                max={1.25}
-                step={0.05}
-                value={scale}
-                onChange={(e) => setScale(parseFloat(e.target.value))}
-                className="w-full accent-amber-500"
-            />
-            <div className="mt-1 text-xs text-amber-200/70">Skala: {scale.toFixed(2)}x</div>
-        </div>
-    );
-};
-
-const ColorBlindModeSelect: React.FC = () => {
-    const mode = useGameStore((s) => s.runtime.runtimeSettings.colorBlindMode);
-    const setMode = useGameStore((s) => s.actions.setColorBlindMode);
-    return (
-        <select
-            className="w-full bg-black/30 border border-amber-800 rounded px-3 py-2"
-            value={mode}
-            onChange={(e) => setMode(e.target.value as any)}
-        >
-            <option value="none">Normal</option>
-            <option value="highContrast">Kontras Tinggi</option>
-        </select>
-    );
+							<h3 className="text-2xl font-cinzel mb-2">Gramofon Ajaib</h3>
+							<p className="text-sm text-amber-200/70 mb-6">
+								Sesuaikan suasana pendengaran dari pengalaman Anda.
+							</p>
+							<div className="space-y-6">
+								<div>
+									<label className="block mb-1">Volume Utama</label>
+									<input
+										type="range"
+										className="w-full accent-amber-500"
+										value={masterVolume}
+										onChange={(e) =>
+											setMasterVolume(parseInt(e.target.value, 10))
+										}
+									/>
+								</div>
+								<div>
+									<label className="block mb-1">Volume Musik</label>
+									<input
+										type="range"
+										className="w-full accent-amber-500"
+										value={musicVolume}
+										onChange={(e) =>
+											setMusicVolume(parseInt(e.target.value, 10))
+										}
+									/>
+								</div>
+								<div>
+									<label className="block mb-1">Suara AI DM</label>
+									<select className="w-full bg-black/30 border border-amber-800 rounded px-3 py-2">
+										<option>Piringan Kristal - 'Sejarawan'</option>
+										<option>Piringan Obsidian - 'Pelawak'</option>
+									</select>
+								</div>
+							</div>
+						</div>
+					)}
+					{activeStation === "Display" && (
+						<div>
+							<h3 className="text-2xl font-cinzel mb-2">Astrolab Optik</h3>
+							<p className="text-sm text-amber-200/70 mb-6">
+								Kalibrasi antarmuka visual Anda.
+							</p>
+							<div className="space-y-6">
+								<div>
+									<label className="block mb-1">Tema UI</label>
+									<select
+										value={currentTheme}
+										onChange={(e) => setTheme(e.target.value)}
+										className="w-full bg-black/30 border border-amber-800 rounded px-3 py-2"
+									>
+										<option value="theme-sanc">Nadi Suaka (Default)</option>
+										<option value="theme-oracle">Orakel Cahaya Bintang</option>
+										<option value="theme-sunstone">
+											Perpustakaan Batu Surya
+										</option>
+									</select>
+								</div>
+								<div>
+									<label className="block mb-1 text-gray-500">
+										Ukuran Font (Segera Hadir)
+									</label>
+									<input type="range" className="w-full" disabled />
+								</div>
+							</div>
+						</div>
+					)}
+					{activeStation === "Gameplay" && (
+						<div>
+							<h3 className="text-2xl font-cinzel mb-2">Konduktor Permainan</h3>
+							<p className="text-sm text-amber-200/70 mb-6">
+								Pengaturan perilaku sistem selama sesi.
+							</p>
+							<div className="space-y-6">
+								<AutoNpcPortraitToggle />
+							</div>
+						</div>
+					)}
+				</div>
+			</div>
+		</ViewWrapper>
+	);
 };
 
 const AutoNpcPortraitToggle: React.FC = () => {
@@ -277,32 +191,6 @@ const AutoNpcPortraitToggle: React.FC = () => {
                 />
                 <div className="w-11 h-6 bg-amber-900 peer-focus:outline-none rounded-full peer peer-checked:bg-amber-600 transition-colors relative">
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-black/70 rounded-full transition-all ${autoEnabled ? 'translate-x-5 bg-amber-950' : ''}`}></span>
-                </div>
-            </label>
-        </div>
-    );
-};
-
-const HapticsToggle: React.FC = () => {
-    const enabled = useGameStore((s) => s.runtime.runtimeSettings.hapticsEnabled);
-    const setEnabled = useGameStore((s) => s.actions.setHapticsEnabled);
-    return (
-        <div className="flex items-center justify-between">
-            <div>
-                <label className="block mb-1 font-cinzel">Getar saat roll/konfirmasi</label>
-                <p className="text-xs text-amber-200/70">
-                    Saat aktif, perangkat bergetar singkat ketika Anda melempar dadu atau mengkonfirmasi aksi.
-                </p>
-            </div>
-            <label className="inline-flex items-center cursor-pointer">
-                <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={enabled}
-                    onChange={(e) => setEnabled(e.target.checked)}
-                />
-                <div className="w-11 h-6 bg-amber-900 peer-focus:outline-none rounded-full peer peer-checked:bg-amber-600 transition-colors relative">
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-black/70 rounded-full transition-all ${enabled ? 'translate-x-5 bg-amber-950' : ''}`}></span>
                 </div>
             </label>
         </div>
