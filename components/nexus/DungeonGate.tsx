@@ -48,7 +48,8 @@ export const DungeonGate: React.FC<DungeonGateProps> = ({ onEnterWorld, onBack }
             label="CIPTAKAN DUNIA BARU" 
             variant="secondary" 
             fullWidth 
-            onClick={() => console.log("Create Campaign Logic")}
+            // Kita gunakan kode khusus 'NEW_CAMPAIGN_TRIGGER' yang nanti ditangkap NexusScene
+            onClick={() => onEnterWorld('NEW_CAMPAIGN_TRIGGER')}
           />
 
           <button onClick={onBack} className="w-full text-center text-red-500 font-pixel text-[10px] mt-4 hover:brightness-125">
