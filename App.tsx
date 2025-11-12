@@ -38,7 +38,7 @@ const App: React.FC = () => {
              <button className="bg-wood text-parchment font-pixel py-4 px-6 
                                 border-b-4 border-black active:border-b-0 active:translate-y-1 
                                 shadow-pixel-md hover:bg-opacity-90 transition-all w-full max-w-xs">
-               > MASUK GERBANG
+              MASUK GERBANG
              </button>
         </div>
       )}
