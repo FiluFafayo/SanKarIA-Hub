@@ -435,23 +435,39 @@ class GenerationService {
         return geminiService.makeApiCall(call);
     }
 
-    // FASE 3: Strict Pixel Art Generator
+    // FASE GRATIS: Pollinations.ai Bridge
     async generateCharacterPortrait(visualDescription: string, race: string, gender: string): Promise<string> {
-        // 1. Generate Base Layout (Sprite Kasar)
-        // Kita gunakan kombinasi Race + Gender untuk basis bentuk tubuh
-        const baseSummary = `${gender} ${race}`;
-        const base64Mini = renderNpcMiniSprite(baseSummary);
+        console.log("[FREE-GEN] Mengalihkan request gambar ke Pollinations (Hemat Kuota)...");
 
-        // 2. Stylize dengan Prompt Retro Ketat
-        const stylePrompt = `
-        (Strict Retro Style): 16-bit pixel art character portrait, SNES RPG style, detailed pixel shading.
-        Character description: ${visualDescription}.
-        Background: Simple dark fantasy gradient.
-        Restrictions: NO photorealism, NO 3D render, NO HD digital painting, NO anti-aliasing, crisp pixels only.
-        `;
+        // 1. Susun Prompt Spesifik untuk External Generator
+        const finalPrompt = `pixel art style, 16-bit retro rpg character portrait, ${gender} ${race}, ${visualDescription}, pixelated, snes graphics, dark fantasy background, crisp pixels, no anti-aliasing, high contrast, full body display`;
         
-        // Kita bypass cache untuk karakter pemain agar selalu unik
-        return this.stylizePixelLayout(base64Mini, stylePrompt, 'Sprite');
+        // 2. Parameter URL (Portrait Ratio ~3:4)
+        const seed = Math.floor(Math.random() * 1000000);
+        const width = 480;
+        const height = 640; // Rasio 3:4
+        const encodedPrompt = encodeURIComponent(finalPrompt);
+        
+        // 3. Panggil API Publik (Tanpa Key)
+        const url = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&model=flux`;
+
+        try {
+            // 4. Fetch dan Konversi ke Base64 agar kompatibel dengan UI kita
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("Gagal menghubungi layanan gambar eksternal");
+            
+            const blob = await response.blob();
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch (e) {
+            console.error("[FREE-GEN] Gagal generate gambar:", e);
+            // Fallback ke avatar statis jika internet putus
+            return ""; // UI akan otomatis pakai fallback statis jika string kosong/null
+        }
     }
 
     async autoCreateNpcPortrait(summary: string): Promise<string> {
