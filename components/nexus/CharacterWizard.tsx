@@ -9,27 +9,61 @@ import { useAppStore } from '../../store/appStore';
 import { characterRepository } from '../../services/repository/characterRepository';
 import { Character, Ability, ALL_ABILITIES, AbilityScores } from '../../types';
 import { calculateNewCharacterFromWizard } from '../../services/rulesEngine';
-import { getStaticAvatar } from '../../utils';
+import { getStaticAvatar, getAbilityModifier } from '../../utils';
+import { Skill, SpellDefinition, CharacterInventoryItem, EquipmentChoice } from '../../types';
+import { findClass, findSpell, getItemDef, getAllClasses } from '../../data/registry';
+
+// Helper untuk Inventory
+const createInvItem = (name: string, qty = 1, equipped = false) => {
+  try {
+    const def = getItemDef(name);
+    return { item: def, quantity: qty, isEquipped: equipped };
+  } catch (e) { return null; }
+};
 
 interface CharacterWizardProps {
   onComplete: () => void;
   onCancel: () => void;
 }
 
-type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'STATS';
+type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'EQUIPMENT' | 'STATS';
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
 
 export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, onCancel }) => {
   const [step, setStep] = useState<WizardStep>('NAME');
   const [selectedRaceData, setSelectedRaceData] = useState<RaceData | null>(null);
+  
+  // State Baru untuk Logika 5e
+  const [selectedSkills, setSelectedSkills] = useState<Skill[]>([]);
+  const [selectedSpells, setSelectedSpells] = useState<string[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<Record<number, EquipmentChoice['options'][0]>>({});
+  
   const [formData, setFormData] = useState({
     name: '',
-    gender: 'Pria', // Default gender
+    gender: 'Pria',
     raceId: '',
     classId: '',
     backgroundName: '',
     abilityScores: {} as Partial<AbilityScores>,
   });
+
+  // Helper: Toggle Skill
+  const toggleSkill = (skill: Skill, max: number) => {
+    if (selectedSkills.includes(skill)) {
+      setSelectedSkills(prev => prev.filter(s => s !== skill));
+    } else {
+      if (selectedSkills.length < max) setSelectedSkills(prev => [...prev, skill]);
+    }
+  };
+
+  // Helper: Toggle Spell
+  const toggleSpell = (spellName: string, max: number) => {
+    if (selectedSpells.includes(spellName)) {
+      setSelectedSpells(prev => prev.filter(s => s !== spellName));
+    } else {
+      if (selectedSpells.length < max) setSelectedSpells(prev => [...prev, spellName]);
+    }
+  };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAppStore();
 
@@ -46,6 +80,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
 
     setIsSubmitting(true);
     try {
+      // 1. Hitung Data Dasar
       const characterData = calculateNewCharacterFromWizard(
         formData.name,
         raceName,
@@ -54,8 +89,42 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         formData.abilityScores as AbilityScores
       );
 
-      // TODO: Implement starting equipment and spells based on choices
-      await characterRepository.saveNewCharacter(characterData, [], [], user.id);
+      // 2. Inject Data Tambahan (Manual Override)
+      characterData.proficientSkills = [...characterData.proficientSkills, ...selectedSkills];
+      characterData.image = getStaticAvatar(raceName, formData.gender); // Pakai static avatar
+      characterData.gender = formData.gender as "Pria" | "Wanita";
+      
+      // 3. Susun Inventory
+      const inventory: Omit<CharacterInventoryItem, "instanceId">[] = [];
+      const cls = findClass(className);
+      
+      // a. Fixed Equipment
+      cls?.startingEquipment.fixed.forEach(fix => {
+        const item = createInvItem(fix.itemName, fix.quantity);
+        if (item) inventory.push(item);
+      });
+      
+      // b. Chosen Equipment
+      Object.values(selectedEquipment).forEach(opt => {
+        opt.itemNames.forEach(name => {
+           const item = createInvItem(name);
+           if (item) inventory.push(item);
+        });
+      });
+
+      // 4. Susun Spells
+      const spells: SpellDefinition[] = [];
+      selectedSpells.forEach(name => {
+        const sp = findSpell(name);
+        if (sp) spells.push(sp);
+      });
+      // Tambah default known spells dari kelas
+      cls?.spellcasting?.knownSpells?.forEach(name => {
+         const sp = findSpell(name);
+         if (sp && !selectedSpells.includes(name)) spells.push(sp);
+      });
+
+      await characterRepository.saveNewCharacter(characterData, inventory, spells, user.id);
       onComplete();
     } catch (e) {
       console.error("Failed to summon soul:", e);
@@ -211,18 +280,69 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         )}
 
         {step === 'CLASS' && (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-2">
-              {Object.values(CLASSES).map((cls) => (
-                <div key={cls.name} onClick={() => setFormData({ ...formData, classId: cls.name })} className={`p-2 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.classId === cls.name ? 'border-gold bg-gold/10' : 'border-wood'}`}>
-                  <div className="font-pixel text-[10px] text-gold">{cls.name}</div>
-                  <div className="font-retro text-[10px] text-faded leading-tight mt-1">{cls.description.substring(0, 30)}...</div>
-                </div>
-              ))}
+          <div className="flex flex-col h-full">
+            <div className="flex gap-4 h-[350px]">
+               {/* Kolom Kiri: Daftar Kelas */}
+               <div className="w-1/2 flex flex-col gap-2 overflow-y-auto pr-1 border-r border-wood/30">
+                  {Object.values(CLASSES).map((cls) => (
+                    <div key={cls.name} onClick={() => {
+                        setFormData({ ...formData, classId: cls.name });
+                        setSelectedSkills([]); // Reset skill saat ganti kelas
+                        setSelectedSpells([]); 
+                    }} className={`p-2 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.classId === cls.name ? 'border-gold bg-gold/10' : 'border-wood'}`}>
+                      <div className="font-pixel text-[10px] text-gold">{cls.name}</div>
+                    </div>
+                  ))}
+               </div>
+
+               {/* Kolom Kanan: Detail & Pilihan */}
+               <div className="w-1/2 flex flex-col gap-2 overflow-y-auto pr-1">
+                  {formData.classId ? (
+                    <>
+                      <p className="text-[10px] text-faded italic">{CLASSES[formData.classId].description}</p>
+                      
+                      {/* Skill Selection */}
+                      <div className="border-t border-wood/30 pt-2">
+                        <p className="font-pixel text-[10px] text-gold mb-1">
+                            PILIH {CLASSES[formData.classId].proficiencies.skills.choices} SKILL
+                        </p>
+                        <div className="grid grid-cols-1 gap-1">
+                            {CLASSES[formData.classId].proficiencies.skills.options.map(skill => (
+                                <div key={skill} onClick={() => toggleSkill(skill, CLASSES[formData.classId].proficiencies.skills.choices)}
+                                     className={`text-[9px] px-2 py-1 border cursor-pointer ${selectedSkills.includes(skill) ? 'bg-blue-900/50 border-blue-400 text-white' : 'border-wood/50 text-faded'}`}>
+                                    {skill}
+                                </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* Spell Selection (Jika ada) */}
+                      {CLASSES[formData.classId].spellcasting && (
+                          <div className="border-t border-wood/30 pt-2 mt-2">
+                             <p className="font-pixel text-[10px] text-gold mb-1">CANTRIPS (LEVEL 0)</p>
+                             <div className="grid grid-cols-1 gap-1">
+                                {CLASSES[formData.classId].spellcasting?.knownCantrips?.map(spell => (
+                                    <div key={spell} 
+                                         className={`text-[9px] px-2 py-1 border border-wood/30 text-faded opacity-70 cursor-not-allowed`}>
+                                        {spell} (Otomatis)
+                                    </div>
+                                ))}
+                             </div>
+                          </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-center text-faded text-xs mt-10">Pilih takdirmu...</p>
+                  )}
+               </div>
             </div>
-            <div className="flex gap-2 mt-2">
+            
+            <div className="flex gap-2 mt-4">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('RACE')} fullWidth />
-              <RuneButton label="LANJUT" fullWidth disabled={!formData.classId} onClick={() => setStep('BACKGROUND')} />
+              <RuneButton label="LANJUT" fullWidth 
+                disabled={!formData.classId || selectedSkills.length < (CLASSES[formData.classId]?.proficiencies.skills.choices || 0)} 
+                onClick={() => setStep('BACKGROUND')} 
+              />
             </div>
           </div>
         )}
@@ -239,7 +359,35 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
             </div>
             <div className="flex gap-2 mt-2">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('CLASS')} fullWidth />
-              <RuneButton label="LANJUT" fullWidth disabled={!formData.backgroundName} onClick={() => setStep('STATS')} />
+              <RuneButton label="LANJUT" fullWidth disabled={!formData.backgroundName} onClick={() => setStep('EQUIPMENT')} />
+            </div>
+          </div>
+        )}
+
+        {step === 'EQUIPMENT' && (
+          <div className="flex flex-col gap-4">
+             <p className="text-parchment font-retro text-center text-xs mb-2">
+                Pilih perlengkapan awalmu berdasarkan kelas.
+             </p>
+             <div className="flex flex-col gap-4 overflow-y-auto max-h-[300px] pr-2">
+                {formData.classId && CLASSES[formData.classId].startingEquipment.choices.map((choice, idx) => (
+                    <div key={idx} className="border border-wood p-2 bg-black/30">
+                        <p className="font-pixel text-[10px] text-gold mb-2">PILIHAN {idx + 1}</p>
+                        <div className="flex flex-col gap-2">
+                            {choice.options.map((opt, optIdx) => (
+                                <div key={opt.name} 
+                                     onClick={() => setSelectedEquipment(prev => ({...prev, [idx]: opt}))}
+                                     className={`p-2 border cursor-pointer text-[10px] ${selectedEquipment[idx]?.name === opt.name ? 'border-gold bg-gold/10 text-parchment' : 'border-wood/50 text-faded'}`}>
+                                    {opt.name}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+             </div>
+             <div className="flex gap-2 mt-2">
+              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('BACKGROUND')} fullWidth />
+              <RuneButton label="LANJUT" fullWidth onClick={() => setStep('STATS')} />
             </div>
           </div>
         )}
@@ -270,7 +418,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
               })}
             </div>
             <div className="flex gap-2 mt-4">
-              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('BACKGROUND')} fullWidth />
+              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('EQUIPMENT')} fullWidth />
               <RuneButton label={isSubmitting ? "MEMANGGIL..." : "BANGKITKAN"} variant="danger" fullWidth disabled={!isAllScoresAssigned || isSubmitting} onClick={handleCreate} />
             </div>
           </div>
