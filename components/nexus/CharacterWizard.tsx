@@ -64,6 +64,19 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
       if (selectedSpells.length < max) setSelectedSpells(prev => [...prev, spellName]);
     }
   };
+
+  // Helper: Get Item Details for UI
+  const getItemDetails = (name: string) => {
+    try {
+      const def = getItemDef(name);
+      if (!def) return "";
+      const parts = [];
+      if (def.type === 'armor') parts.push(`AC ${def.baseAc}`);
+      if (def.type === 'weapon') parts.push(`${def.damageDice} ${def.damageType}`);
+      if (def.description) parts.push(def.description.substring(0, 20) + (def.description.length > 20 ? '...' : '')); 
+      return parts.length > 0 ? `(${parts.join(', ')})` : "";
+    } catch (e) { return ""; }
+  };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAppStore();
 
@@ -416,27 +429,52 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         )}
 
         {step === 'EQUIPMENT' && (
-          <div className="flex flex-col gap-4">
-             <p className="text-parchment font-retro text-center text-xs mb-2">
-                Pilih perlengkapan awalmu berdasarkan kelas.
-             </p>
-             <div className="flex flex-col gap-4 overflow-y-auto max-h-[300px] pr-2">
+          <div className="flex flex-col gap-4 animate-fade-in">
+             <div className="text-center border-b border-wood/30 pb-2">
+                 <h3 className="font-pixel text-lg text-gold mb-1">PERLENGKAPAN (EQUIPMENT)</h3>
+                 <p className="text-parchment font-retro text-xs">
+                    Pilih paket perlengkapan awalmu.
+                 </p>
+             </div>
+             
+             <div className="flex flex-col gap-3 overflow-y-auto max-h-[350px] pr-2">
                 {formData.classId && CLASS_DEFINITIONS[formData.classId].startingEquipment.choices.map((choice, idx) => (
-                    <div key={idx} className="border border-wood p-2 bg-black/30">
-                        <p className="font-pixel text-[10px] text-gold mb-2">PILIHAN {idx + 1}</p>
+                    <div key={idx} className="border border-wood p-3 bg-black/40">
+                        <p className="font-pixel text-xs text-gold mb-2 uppercase border-b border-wood/30 pb-1">
+                            OPSI {idx + 1}
+                        </p>
                         <div className="flex flex-col gap-2">
-                            {choice.options.map((opt, optIdx) => (
-                                <div key={opt.name} 
-                                     onClick={() => setSelectedEquipment(prev => ({...prev, [idx]: opt}))}
-                                     className={`p-2 border cursor-pointer text-[10px] ${selectedEquipment[idx]?.name === opt.name ? 'border-gold bg-gold/10 text-parchment' : 'border-wood/50 text-faded'}`}>
-                                    {opt.name}
-                                </div>
-                            ))}
+                            {choice.options.map((opt, optIdx) => {
+                                const isSelected = selectedEquipment[idx]?.name === opt.name;
+                                return (
+                                    <div key={optIdx} 
+                                         onClick={() => setSelectedEquipment(prev => ({...prev, [idx]: opt}))}
+                                         className={`p-2 border transition-all cursor-pointer ${isSelected ? 'border-gold bg-gold/10' : 'border-wood/40 hover:bg-white/5'}`}>
+                                        
+                                        <div className={`font-pixel text-xs ${isSelected ? 'text-parchment' : 'text-faded'}`}>
+                                            {opt.name}
+                                        </div>
+
+                                        {/* Detail Item dalam Paket */}
+                                        <div className="mt-1 pl-2 border-l-2 border-wood/20 space-y-1">
+                                            {opt.itemNames.map((itemName, iItem) => {
+                                                const details = getItemDetails(itemName);
+                                                return (
+                                                    <div key={iItem} className="text-[10px] text-faded flex justify-between items-center">
+                                                        <span>• {itemName}</span>
+                                                        {details && <span className="text-gold/60 text-[9px] ml-2">{details}</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 ))}
              </div>
-             <div className="flex gap-2 mt-2">
+             <div className="flex gap-2 mt-2 relative z-20">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('BACKGROUND')} fullWidth />
               <RuneButton label="LANJUT" fullWidth onClick={() => setStep('STATS')} />
             </div>
