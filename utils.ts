@@ -173,3 +173,13 @@ export const parseAndLogNarration = (
         }
     }
 };
+
+// [Fase 0] Static Avatar Helper
+// Pastikan file ada di /public/avatars/ dengan format: race_gender.png (lowercase, spasi jadi underscore)
+// Contoh: high_elf_male.png, mountain_dwarf_female.png
+export const getStaticAvatar = (raceName: string, gender: string): string => {
+  if (!raceName) return '';
+  const safeRace = raceName.toLowerCase().trim().replace(/\s+/g, '_');
+  const safeGender = gender.toLowerCase() === 'wanita' ? 'female' : 'male';
+  return `/avatars/${safeRace}_${safeGender}.png`;
+};

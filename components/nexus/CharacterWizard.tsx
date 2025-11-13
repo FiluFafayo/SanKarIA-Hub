@@ -9,6 +9,7 @@ import { useAppStore } from '../../store/appStore';
 import { characterRepository } from '../../services/repository/characterRepository';
 import { Character, Ability, ALL_ABILITIES, AbilityScores } from '../../types';
 import { calculateNewCharacterFromWizard } from '../../services/rulesEngine';
+import { getStaticAvatar } from '../../utils';
 
 interface CharacterWizardProps {
   onComplete: () => void;
@@ -23,6 +24,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const [selectedRaceData, setSelectedRaceData] = useState<RaceData | null>(null);
   const [formData, setFormData] = useState({
     name: '',
+    gender: 'Pria', // Default gender
     raceId: '',
     classId: '',
     backgroundName: '',
@@ -142,17 +144,30 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                   <h3 className="font-pixel text-lg text-gold text-center mb-4">{selectedRaceData.name}</h3>
                   <div className="grid grid-cols-2 gap-4 mb-3">
                     <div>
-                      <h4 className="font-pixel text-gold text-sm">VISUALISASI</h4>
-                      <div className="mt-1 grid grid-cols-2 gap-2">
+                      <h4 className="font-pixel text-gold text-sm mb-2">VISUALISASI</h4>
+                      
+                      {/* Gender Selector */}
+                      <div className="flex gap-2 mb-2 justify-center">
+                         {['Pria', 'Wanita'].map(g => (
+                           <div 
+                             key={g}
+                             onClick={() => setFormData({ ...formData, gender: g })}
+                             className={`px-2 py-1 text-[10px] cursor-pointer border ${formData.gender === g ? 'bg-gold text-black border-gold' : 'bg-black text-faded border-wood'}`}
+                           >
+                             {g.toUpperCase()}
+                           </div>
+                         ))}
+                      </div>
+
+                      <div className="mt-1 flex justify-center">
                         <img 
-                          src={`https://placehold.co/200x300/1a1a1a/ffffff/png?text=Male%0A${selectedRaceData.name}`} 
-                          alt={`Male ${selectedRaceData.name}`}
-                          className="border border-faded/50"
-                        />
-                        <img 
-                          src={`https://placehold.co/200x300/1a1a1a/ffffff/png?text=Female%0A${selectedRaceData.name}`} 
-                          alt={`Female ${selectedRaceData.name}`}
-                          className="border border-faded/50"
+                          src={getStaticAvatar(selectedRaceData.name, formData.gender)} 
+                          onError={(e) => {
+                            // Fallback aman jika gambar belum digenerate
+                            e.currentTarget.src = `https://placehold.co/200x300/1a1a1a/ffffff/png?text=${formData.gender === 'Pria' ? 'Male' : 'Female'}%0A${selectedRaceData.name}`;
+                          }}
+                          alt={`${formData.gender} ${selectedRaceData.name}`}
+                          className="border-2 border-wood h-[200px] w-full object-cover bg-black"
                         />
                       </div>
                     </div>
@@ -180,9 +195,17 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                 <RuneButton label="Pilih Ras Lain" variant="secondary" onClick={() => setSelectedRaceData(null)} fullWidth />
               </div>
             )}
-            <div className="flex gap-2 mt-4">
+            <div className="flex gap-2 mt-4 relative z-20">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('NAME')} fullWidth />
-              <RuneButton label="LANJUT" fullWidth disabled={!formData.raceId} onClick={() => setStep('CLASS')} />
+              <RuneButton 
+                label="LANJUT" 
+                fullWidth 
+                disabled={!formData.raceId} 
+                onClick={(e) => {
+                  e.stopPropagation(); // Fix: Mencegah click event tertelan oleh container
+                  setStep('CLASS');
+                }} 
+              />
             </div>
           </>
         )}
