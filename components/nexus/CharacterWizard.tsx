@@ -104,20 +104,40 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
     if (!formData.raceId || !formData.classId) return;
     setIsGeneratingImage(true);
     try {
-        const summary = `Fantasy RPG Character Portrait: ${formData.gender} ${formData.raceId} ${formData.classId}, ${formData.backgroundName} background, high fantasy style, detailed face`;
-        // Gunakan layanan AI yang sudah ada (auto-cache & stylize)
-        const url = await generationService.autoCreateNpcPortrait(summary);
+        // 1. Kumpulkan Data Konteks
+        const equipList = Object.values(selectedEquipment).flatMap(e => e.itemNames);
+        const contextData = {
+            race: formData.raceId,
+            gender: formData.gender,
+            class: formData.classId,
+            background: formData.backgroundName,
+            skills: selectedSkills,
+            equipment: equipList
+        };
+
+        // 2. Terjemahkan ke Visual Prompt (Smart Interpreter)
+        const visualPrompt = await generationService.generateVisualDescription(contextData);
+        console.log("🎨 [SMART PROMPT] AI Visual Interpretation:", visualPrompt); // LOG UTAMA
+
+        // 3. Generate Gambar dengan Prompt Tersebut
+        const url = await generationService.generateCharacterPortrait(visualPrompt, formData.raceId, formData.gender);
         setGeneratedAvatarUrl(url);
     } catch (e) {
         console.error("Avatar Gen Error:", e);
-        alert("Gagal memvisualisasikan jiwa. Coba lagi.");
+        alert(`Gagal memvisualisasikan jiwa: ${e instanceof Error ? e.message : 'Error misterius'}`);
     } finally {
         setIsGeneratingImage(false);
     }
   };
 
   const handleCreate = async () => {
-    if (!user) return;
+    console.log("🔥 Tombol Bangkitkan Ditekan!"); // DEBUG LOG
+    
+    if (!user) {
+        console.error("❌ User session tidak ditemukan!");
+        alert("Sesi Anda habis atau tidak valid. Silakan refresh halaman.");
+        return;
+    }
 
     // Fix: Gunakan properti 'name' untuk pencarian karena 'id' tidak eksis di definisi Race
     const raceName = RACES.find(r => r.name === formData.raceId)?.name;
@@ -654,7 +674,20 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                     <div><span className="text-parchment">Ras:</span> {formData.raceId} ({formData.gender})</div>
                     <div><span className="text-parchment">Kelas:</span> {formData.classId}</div>
                     <div><span className="text-parchment">Latar:</span> {formData.backgroundName}</div>
-                    <div className="mt-1"><span className="text-parchment">Atribut Utama:</span></div>
+                    
+                    {/* New Context Info */}
+                    <div className="mt-1 border-t border-wood/30 pt-1">
+                        <span className="text-parchment">Skill Dominan:</span>
+                        <p className="italic text-[9px]">{selectedSkills.slice(0, 3).join(', ')}{selectedSkills.length > 3 ? '...' : ''}</p>
+                    </div>
+                    <div>
+                        <span className="text-parchment">Equipment:</span>
+                        <p className="italic text-[9px]">
+                            {Object.values(selectedEquipment).flatMap(e => e.itemNames).slice(0, 3).join(', ')}
+                        </p>
+                    </div>
+
+                    <div className="mt-1 border-t border-wood/30 pt-1"><span className="text-parchment">Atribut:</span></div>
                     <div className="grid grid-cols-3 gap-1 text-[9px]">
                         {Object.entries(formData.abilityScores).map(([k, v]) => (
                             <div key={k} className="bg-black/40 px-1 rounded">{k.substring(0,3).toUpperCase()}: {v}</div>

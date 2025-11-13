@@ -402,15 +402,66 @@ class GenerationService {
         return geminiService.makeApiCall(call);
     }
 
-    // BARU: Mini-pipeline otomatis untuk potret NPC dari ringkasan
+    // FASE 3: Smart Visual Interpreter
+    // Menerjemahkan data statistik game (Class, Skill, Equip) menjadi deskripsi visual konkret
+    async generateVisualDescription(data: { race: string; gender: string; class: string; background: string; skills: string[]; equipment: string[] }): Promise<string> {
+        const prompt = `
+        Peran kamu adalah Concept Artist untuk game Retro RPG 16-bit.
+        Terjemahkan data karakter berikut menjadi deskripsi visual singkat (maksimal 2 kalimat) yang fokus pada POSTUR, GESTUR, dan PENAMPILAN.
+        
+        Data Karakter:
+        - Ras/Gender: ${data.gender} ${data.race}
+        - Kelas: ${data.class}
+        - Background: ${data.background}
+        - Skill Utama: ${data.skills.join(', ')}
+        - Equipment Dominan: ${data.equipment.slice(0, 3).join(', ')}
+
+        Instruksi:
+        1. Jangan sebutkan angka statistik.
+        2. Fokus pada bagaimana skill mempengaruhi pose (misal: "Stealth" -> "membungkuk waspada", "Intimidation" -> "dada membusung garang").
+        3. Gambarkan equipment utama yang terlihat.
+        4. Gunakan Bahasa Inggris untuk hasil prompt gambar yang lebih baik.
+        
+        Output contoh: "A sturdy dwarf holding a warhammer high, wearing chain mail, with a stern expression and a shield ready to block."
+        `;
+
+        const call = async (client: any) => {
+            const response = await client.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+            });
+            return response.text.trim();
+        };
+        return geminiService.makeApiCall(call);
+    }
+
+    // FASE 3: Strict Pixel Art Generator
+    async generateCharacterPortrait(visualDescription: string, race: string, gender: string): Promise<string> {
+        // 1. Generate Base Layout (Sprite Kasar)
+        // Kita gunakan kombinasi Race + Gender untuk basis bentuk tubuh
+        const baseSummary = `${gender} ${race}`;
+        const base64Mini = renderNpcMiniSprite(baseSummary);
+
+        // 2. Stylize dengan Prompt Retro Ketat
+        const stylePrompt = `
+        (Strict Retro Style): 16-bit pixel art character portrait, SNES RPG style, detailed pixel shading.
+        Character description: ${visualDescription}.
+        Background: Simple dark fantasy gradient.
+        Restrictions: NO photorealism, NO 3D render, NO HD digital painting, NO anti-aliasing, crisp pixels only.
+        `;
+        
+        // Kita bypass cache untuk karakter pemain agar selalu unik
+        return this.stylizePixelLayout(base64Mini, stylePrompt, 'Sprite');
+    }
+
     async autoCreateNpcPortrait(summary: string): Promise<string> {
         const key = `npc:${summary.trim()}`.slice(0, 256);
         const cached = this.portraitCache.get(key);
         if (cached) return cached;
 
         const base64Mini = renderNpcMiniSprite(summary);
-        // Visual Style: Retro RPG Pixel Art
-        const stylePrompt = `Detailed pixel art full-body portrait, retro rpg style, 32bit, high definition, vibrant colors, character concept art`;
+        // Update style NPC juga agar konsisten (opsional, tapi disarankan)
+        const stylePrompt = `16-bit pixel art NPC portrait, retro RPG style, detailed face, distinctive features`;
         const result = await this.stylizePixelLayout(base64Mini, stylePrompt, 'Sprite');
         this.portraitCache.set(key, result);
         this.persistCacheToStorage();
