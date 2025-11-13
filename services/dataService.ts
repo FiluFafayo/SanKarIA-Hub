@@ -240,6 +240,29 @@ class DataService {
     private isLoadingCache = false;
     private hasLoadedCache = false;
 
+    // FIX: Auto-init saat instansiasi
+    constructor() {
+        const url = import.meta.env.VITE_SUPABASE_URL;
+        const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (url && key) {
+            this.init(url, key);
+            console.log("[DataService] Auto-initialized from Env Vars.");
+        } else {
+            console.warn("[DataService] Env Vars missing. Waiting for manual init.");
+        }
+    }
+
+    // FIX: Helper untuk mengambil user saat ini
+    public async getCurrentUser() {
+        const supabase = this.ensureSupabase();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+            console.error("[DataService] Error getting session:", error);
+            return null;
+        }
+        return session?.user ?? null;
+    }
+
     public init(url: string, anonKey: string) {
         if (url && anonKey && (!this.supabase || this.supabase.supabaseUrl !== url)) {
             try {
