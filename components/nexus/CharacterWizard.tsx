@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { PixelCard } from '../grimoire/PixelCard';
 import { RuneButton } from '../grimoire/RuneButton';
 import { CLASSES } from '../../data/classes';
-import { RACES } from '../../data/races';
+import { RACES, RaceData } from '../../data/races';
 import { BACKGROUNDS } from '../../data/backgrounds';
 import { useAppStore } from '../../store/appStore';
 import { characterRepository } from '../../services/repository/characterRepository';
@@ -20,6 +20,7 @@ const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
 
 export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, onCancel }) => {
   const [step, setStep] = useState<WizardStep>('NAME');
+  const [selectedRaceData, setSelectedRaceData] = useState<RaceData | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     raceId: '',
@@ -88,6 +89,11 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
     
     setFormData({ ...formData, abilityScores: newScores });
   };
+  
+  const handleRaceSelect = (race: RaceData) => {
+    setFormData({ ...formData, raceId: race.id });
+    setSelectedRaceData(race);
+  };
 
   const isAllScoresAssigned = Object.keys(formData.abilityScores).length === 6 && 
                               Object.values(formData.abilityScores).every(s => s && s > 0);
@@ -115,19 +121,64 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         )}
 
         {step === 'RACE' && (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-2">
-              {RACES.map((race) => (
-                <div key={race.id} onClick={() => setFormData({ ...formData, raceId: race.id })} className={`p-2 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.raceId === race.id ? 'border-gold bg-gold/10' : 'border-wood'}`}>
-                  <div className="font-pixel text-[10px] text-parchment">{race.name}</div>
+          <>
+            {!selectedRaceData ? (
+              <div className="flex flex-col gap-2 animate-fade-in">
+                <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
+                  {RACES.map((race) => (
+                    <div 
+                      key={race.id}
+                      onClick={() => handleRaceSelect(race)} 
+                      className={`p-3 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.raceId === race.id ? 'border-gold bg-gold/10' : 'border-wood'}`}
+                    >
+                      <div className="font-pixel text-lg text-parchment">{race.name}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div className="flex gap-2 mt-2">
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4 animate-fade-in">
+                <div className="p-3 bg-black/50 border-2 border-wood">
+                  <h3 className="font-pixel text-lg text-gold text-center mb-4">{selectedRaceData.name}</h3>
+                  <div className="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                      <h4 className="font-pixel text-gold text-sm">VISUALISASI</h4>
+                      <div className="mt-1 p-2 border border-dashed border-faded/50 text-center font-retro text-faded text-xs">
+                        [Visualisasi Karakter Pria]
+                      </div>
+                      <div className="mt-1 p-2 border border-dashed border-faded/50 text-center font-retro text-faded text-xs">
+                        [Visualisasi Karakter Wanita]
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-pixel text-gold text-sm">BONUS SKOR</h4>
+                      <ul className="list-disc list-inside font-retro text-parchment text-xs mt-1">
+                        {Object.entries(selectedRaceData.abilityScoreBonuses).map(([ability, bonus]) => (
+                          <li key={ability}>{ability}: +{bonus}</li>
+                        ))}
+                        <li>Speed: {selectedRaceData.speed}ft</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-pixel text-gold text-sm">CIRI KHAS</h4>
+                    <ul className="space-y-2 mt-1 max-h-[150px] overflow-y-auto pr-2">
+                      {selectedRaceData.traits.map(trait => (
+                        <li key={trait.name} className="font-retro text-parchment text-xs">
+                          <strong className="text-gold/80">{trait.name}:</strong> {trait.description}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+                <RuneButton label="Pilih Ras Lain" variant="secondary" onClick={() => setSelectedRaceData(null)} fullWidth />
+              </div>
+            )}
+            <div className="flex gap-2 mt-4">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('NAME')} fullWidth />
               <RuneButton label="LANJUT" fullWidth disabled={!formData.raceId} onClick={() => setStep('CLASS')} />
             </div>
-          </div>
+          </>
         )}
 
         {step === 'CLASS' && (
