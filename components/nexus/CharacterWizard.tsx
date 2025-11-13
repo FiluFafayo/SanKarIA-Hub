@@ -93,7 +93,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   };
   
   const handleRaceSelect = (race: RaceData) => {
-    setFormData({ ...formData, raceId: race.id });
+    setFormData({ ...formData, raceId: race.name }); // Fix: Gunakan name karena id tidak ada di data/races.ts
     setSelectedRaceData(race);
   };
 
@@ -129,9 +129,9 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                 <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
                   {RACES.map((race) => (
                     <div 
-                      key={race.id}
+                      key={race.name}
                       onClick={() => handleRaceSelect(race)} 
-                      className={`p-3 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.raceId === race.id ? 'border-gold bg-gold/10' : 'border-wood'}`}
+                      className={`p-3 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.raceId === race.name ? 'border-gold bg-gold/10' : 'border-wood'}`}
                     >
                       <div className="font-pixel text-lg text-parchment">{race.name}</div>
                     </div>
