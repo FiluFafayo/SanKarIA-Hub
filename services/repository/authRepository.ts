@@ -7,4 +7,8 @@ export const authRepository = {
   signOut: async (): Promise<void> => {
     await dataService.signOut();
   },
+  // Helper tambahan
+  getCurrentUser: async (): Promise<any> => {
+    return await dataService.getCurrentUser();
+  }
 };
