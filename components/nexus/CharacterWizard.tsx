@@ -664,7 +664,8 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
 
                 {/* Kanan: Avatar Generator */}
                 <div className="w-1/2 flex flex-col items-center justify-center gap-2">
-                    <div className="w-32 h-32 border-2 border-gold bg-black/50 flex items-center justify-center overflow-hidden relative shadow-pixel-glow">
+                    {/* Ubah ke rasio Portrait (~3:4) agar serasi dengan gambar Ras */}
+                    <div className="w-32 h-[170px] border-2 border-gold bg-black/50 flex items-center justify-center overflow-hidden relative shadow-pixel-glow">
                         {generatedAvatarUrl ? (
                             <img src={generatedAvatarUrl} alt="Generated Soul" className="w-full h-full object-cover animate-fade-in" />
                         ) : (

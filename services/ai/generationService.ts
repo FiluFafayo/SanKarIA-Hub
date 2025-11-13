@@ -409,7 +409,8 @@ class GenerationService {
         if (cached) return cached;
 
         const base64Mini = renderNpcMiniSprite(summary);
-        const stylePrompt = `Fantasy NPC portrait, head-and-shoulders, painterly, detailed, high quality, dramatic lighting, cohesive color palette, in-world believable character`;
+        // Visual Style: Retro RPG Pixel Art
+        const stylePrompt = `Detailed pixel art full-body portrait, retro rpg style, 32bit, high definition, vibrant colors, character concept art`;
         const result = await this.stylizePixelLayout(base64Mini, stylePrompt, 'Sprite');
         this.portraitCache.set(key, result);
         this.persistCacheToStorage();
