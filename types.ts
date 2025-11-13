@@ -279,7 +279,7 @@ export interface Character {
     race: string;
     level: number;
     xp: number;
-    image: string;
+    avatar_url: string;
     gender: 'Pria' | 'Wanita'; // (Penyederhanaan untuk Fase 2)
     bodyType: string; // (e.g., 'normal', 'missing_arm_right')
     scars: string[]; // (e.g., 'scar_eye_left')
@@ -454,7 +454,7 @@ export interface Campaign {
     ownerId: string;
     title: string;
     description: string;
-    image: string;
+    cover_url: string;
     joinCode: string;
     isPublished: boolean;
     maxPlayers: number; // Saya tambahkan ini dari file lama, penting

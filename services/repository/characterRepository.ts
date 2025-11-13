@@ -9,7 +9,7 @@ type DbCharacter = {
   race: string;
   level: number;
   xp: number;
-  image: string;
+  avatar_url: string;
   gender: string;
   body_type: string;
   scars: string[];
@@ -157,7 +157,7 @@ const mapDbCharacter = (
     race: dbChar.race,
     level: dbChar.level,
     xp: dbChar.xp,
-    image: dbChar.image,
+    avatar_url: dbChar.avatar_url,
     gender: dbChar.gender,
     bodyType: dbChar.body_type,
     scars: dbChar.scars,
@@ -245,7 +245,7 @@ export const characterRepository = {
       race: coreData.race,
       level: coreData.level,
       xp: coreData.xp,
-      image: coreData.image,
+      avatar_url: coreData.avatar_url,
       gender: coreData.gender,
       body_type: coreData.bodyType,
       scars: coreData.scars,
@@ -351,7 +351,7 @@ export const characterRepository = {
       race: charData.race,
       level: charData.level,
       xp: charData.xp,
-      image: charData.image,
+      avatar_url: charData.avatar_url,
       gender: charData.gender,
       body_type: charData.bodyType,
       scars: charData.scars,

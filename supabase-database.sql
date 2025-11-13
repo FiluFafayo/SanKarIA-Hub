@@ -130,7 +130,7 @@ CREATE TABLE "public"."characters" (
     "race" "text" NOT NULL,
     "level" integer NOT NULL DEFAULT 1,
     "xp" integer NOT NULL DEFAULT 0,
-    "image" "text",
+    "avatar_url" "text",
     -- FASE 0: TAMBAHAN KOLOM VISUAL
     "gender" "text" DEFAULT 'Pria',
     "body_type" "text" DEFAULT 'bt_normal',
@@ -228,7 +228,7 @@ CREATE TABLE "public"."campaigns" (
     "owner_id" "uuid" NOT NULL REFERENCES "auth"."users"("id") ON DELETE CASCADE,
     "title" "text" NOT NULL,
     "description" "text",
-    "image" "text",
+    "cover_url" "text",
     "join_code" "text" UNIQUE,
     "is_published" bool DEFAULT false,
     "dm_personality" "text",

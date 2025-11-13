@@ -1,5 +1,123 @@
 import { CampaignState } from "../hooks/useCampaign";
-import { Ability, Character, ConditionEffects, CONDITION_RULES, DamageType, MonsterInstance } from "../types";
+import { Ability, Character, ConditionEffects, CONDITION_RULES, DamageType, MonsterInstance, AbilityScores, Skill } from "../types";
+import { RACES, RaceData } from '../data/races';
+import { CLASSES, ClassData } from '../data/classes';
+import { BACKGROUNDS, BackgroundData } from '../data/backgrounds';
+
+// NEW: Helper function to calculate ability modifier
+export const getAbilityModifier = (score: number): number => {
+  return Math.floor((score - 10) / 2);
+};
+
+// NEW: Main function for character creation logic
+export const calculateNewCharacterFromWizard = (
+  name: string,
+  raceName: string,
+  className: string,
+  backgroundName: string,
+  baseScores: AbilityScores
+): Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> => {
+  
+  const race = RACES.find(r => r.name === raceName);
+  const charClass = Object.values(CLASSES).find(c => c.name === className);
+  const background = BACKGROUNDS.find(b => b.name === backgroundName);
+
+  if (!race || !charClass || !background) {
+    throw new Error("Invalid race, class, or background provided.");
+  }
+
+  // 1. Calculate final ability scores with racial bonuses
+  const finalScores = { ...baseScores };
+  for (const key in race.abilityScoreBonuses) {
+    const ability = key as Ability;
+    finalScores[ability] += race.abilityScoreBonuses[ability] || 0;
+  }
+
+  // 2. Calculate modifiers
+  const modifiers = {
+    str: getAbilityModifier(finalScores.strength),
+    dex: getAbilityModifier(finalScores.dexterity),
+    con: getAbilityModifier(finalScores.constitution),
+    int: getAbilityModifier(finalScores.intelligence),
+    wis: getAbilityModifier(finalScores.wisdom),
+    cha: getAbilityModifier(finalScores.charisma),
+  };
+
+  // 3. Calculate HP
+  const maxHp = charClass.hpAtLevel1(modifiers.con);
+
+  // 4. Aggregate Proficiencies
+  // For now, we'll ignore skill choices from class and just combine the fixed ones
+  const skillProficiencies: Skill[] = [
+    ...(background.skillProficiencies || []),
+    ...(race.proficiencies?.skills || [])
+  ];
+  
+  const toolProficiencies: string[] = [
+    ...(background.toolProficiencies || [])
+  ];
+
+  // 5. Starting Equipment
+  // This will be handled in the wizard by calling the repo, as it needs item IDs.
+  // For now, we prepare the list of item names.
+  const startingEquipmentNames: string[] = [
+    ...background.equipment,
+    ...charClass.startingEquipment.fixed.map(e => e.itemName)
+    // We will handle choices later. For now, take the first choice.
+  ];
+  charClass.startingEquipment.choices.forEach(choice => {
+    if (choice.options.length > 0) {
+      startingEquipmentNames.push(...choice.options[0].itemNames);
+    }
+  });
+
+
+  const newCharacter: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> = {
+    name,
+    race: raceName,
+    class: className,
+    background: backgroundName,
+    level: 1,
+    xp: 0,
+    abilityScores: finalScores,
+    maxHp: maxHp,
+    currentHp: maxHp,
+    tempHp: 0,
+    armorClass: 10 + modifiers.dex, // Base AC, will be updated by armor
+    speed: race.speed,
+    hitDice: { [charClass.hitDice]: { max: 1, spent: 0 } },
+    deathSaves: { successes: 0, failures: 0 },
+    conditions: [],
+    racialTraits: race.traits,
+    classFeatures: charClass.features,
+    proficientSkills: [...new Set(skillProficiencies)], // Remove duplicates
+    proficientSavingThrows: charClass.proficiencies.savingThrows,
+    spellSlots: charClass.spellcasting?.spellSlots || [],
+    languages: [], // To be implemented
+    toolProficiencies: [...new Set(toolProficiencies)],
+    weaponProficiencies: [], // To be implemented
+    armorProficiencies: [], // To be implemented
+    senses: race.senses || {},
+    passivePerception: 10 + modifiers.wis, // Simplified
+    inspiration: false,
+    preparedSpells: charClass.spellcasting?.knownSpells || [],
+    featureUses: {},
+    gender: 'Pria',
+    bodyType: 'bt_normal',
+    scars: [],
+    hair: 'h_short_blond',
+    facialHair: 'ff_none',
+    headAccessory: 'ha_none',
+    personalityTrait: '',
+    ideal: '',
+    bond: '',
+    flaw: '',
+    avatar_url: ''
+  };
+
+  return newCharacter;
+};
+
 
 type CheckResult = { ok: boolean; reason?: string };
 
