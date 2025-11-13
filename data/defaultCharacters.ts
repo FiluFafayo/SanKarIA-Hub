@@ -4,7 +4,7 @@ import { generateId } from '../utils';
 // REFAKTOR G-5: Hapus impor circular
 // import { ITEM_DEFINITIONS } from './items';
 // import { SPELL_DEFINITIONS } from './spells';
-import { CLASS_DEFINITIONS } from './classes';
+import { CLASSES } from './classes'; // Fix: Rename import
 import { RACES } from './races';
 
 // REFAKTOR: Helper sekarang HANYA mengembalikan data mentah yang dibutuhkan.
@@ -54,7 +54,7 @@ const VALERIUS_DATA: RawCharacterData = {
     proficientSkills: [Skill.Athletics, Skill.Intimidation],
     proficientSavingThrows: [Ability.Strength, Ability.Constitution],
     racialTraits: RACES.find(r => r.name === 'Human')?.traits || [],
-    classFeatures: CLASS_DEFINITIONS['Fighter'].features,
+    classFeatures: CLASSES['Fighter'].features, // Fix: Rename usage
     inventory: [
         invItem('Chain Mail', 1, true),
         invItem('Longsword', 1, true),
@@ -100,7 +100,7 @@ const ELARA_DATA: RawCharacterData = {
     proficientSkills: [Skill.Stealth, Skill.Survival, Skill.Perception, Skill.Acrobatics], // (Rogue dapat 4 skill)
     proficientSavingThrows: [Ability.Dexterity, Ability.Intelligence], // (Perbaikan: Rogue DEX/INT)
     racialTraits: RACES.find(r => r.name === 'Elf')?.traits || [],
-    classFeatures: CLASS_DEFINITIONS['Rogue'].features, // (Perbaikan: Ambil fitur Rogue)
+    classFeatures: CLASSES['Rogue'].features, // Fix: Rename usage
     inventory: [
         invItem('Leather Armor', 1, true),
         invItem('Shortbow', 1, true), // (Perbaikan: Rogue proficient Shortbow, bukan Longbow)
@@ -145,7 +145,7 @@ const BORIN_DATA: RawCharacterData = {
     proficientSkills: [Skill.Insight, Skill.Religion],
     proficientSavingThrows: [Ability.Wisdom, Ability.Charisma],
     racialTraits: RACES.find(r => r.name === 'Dwarf')?.traits || [],
-    classFeatures: CLASS_DEFINITIONS['Cleric'].features,
+    classFeatures: CLASSES['Cleric'].features, // Fix: Rename usage
     inventory: [
         invItem('Scale Mail', 1, true),
         invItem('Warhammer', 1, true),
