@@ -44,7 +44,7 @@ export interface ClassData {
     };
 }
 
-export const CLASSES: Record<string, ClassData> = {
+export const CLASS_DEFINITIONS: Record<string, ClassData> = {
     "Fighter": {
         name: 'Fighter',
         description: 'Ahli bela diri, terampil dengan beragam senjata dan armor.',

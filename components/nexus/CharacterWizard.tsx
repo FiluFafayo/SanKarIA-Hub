@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { PixelCard } from '../grimoire/PixelCard';
 import { RuneButton } from '../grimoire/RuneButton';
-import { CLASSES } from '../../data/classes';
+import { CLASS_DEFINITIONS } from '../../data/classes';
 import { RACES, RaceData } from '../../data/races';
 import { BACKGROUNDS } from '../../data/backgrounds';
 import { useAppStore } from '../../store/appStore';
@@ -284,7 +284,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
             <div className="flex gap-4 h-[350px]">
                {/* Kolom Kiri: Daftar Kelas */}
                <div className="w-1/2 flex flex-col gap-2 overflow-y-auto pr-1 border-r border-wood/30">
-                  {Object.values(CLASSES).map((cls) => (
+                  {Object.values(CLASS_DEFINITIONS).map((cls) => (
                     <div key={cls.name} onClick={() => {
                         setFormData({ ...formData, classId: cls.name });
                         setSelectedSkills([]); // Reset skill saat ganti kelas
@@ -299,16 +299,16 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                <div className="w-1/2 flex flex-col gap-2 overflow-y-auto pr-1">
                   {formData.classId ? (
                     <>
-                      <p className="text-[10px] text-faded italic">{CLASSES[formData.classId].description}</p>
+                      <p className="text-[10px] text-faded italic">{CLASS_DEFINITIONS[formData.classId].description}</p>
                       
                       {/* Skill Selection */}
                       <div className="border-t border-wood/30 pt-2">
                         <p className="font-pixel text-[10px] text-gold mb-1">
-                            PILIH {CLASSES[formData.classId].proficiencies.skills.choices} SKILL
+                            PILIH {CLASS_DEFINITIONS[formData.classId].proficiencies.skills.choices} SKILL
                         </p>
                         <div className="grid grid-cols-1 gap-1">
-                            {CLASSES[formData.classId].proficiencies.skills.options.map(skill => (
-                                <div key={skill} onClick={() => toggleSkill(skill, CLASSES[formData.classId].proficiencies.skills.choices)}
+                            {CLASS_DEFINITIONS[formData.classId].proficiencies.skills.options.map(skill => (
+                                <div key={skill} onClick={() => toggleSkill(skill, CLASS_DEFINITIONS[formData.classId].proficiencies.skills.choices)}
                                      className={`text-[9px] px-2 py-1 border cursor-pointer ${selectedSkills.includes(skill) ? 'bg-blue-900/50 border-blue-400 text-white' : 'border-wood/50 text-faded'}`}>
                                     {skill}
                                 </div>
@@ -317,11 +317,11 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                       </div>
 
                       {/* Spell Selection (Jika ada) */}
-                      {CLASSES[formData.classId].spellcasting && (
+                      {CLASS_DEFINITIONS[formData.classId].spellcasting && (
                           <div className="border-t border-wood/30 pt-2 mt-2">
                              <p className="font-pixel text-[10px] text-gold mb-1">CANTRIPS (LEVEL 0)</p>
                              <div className="grid grid-cols-1 gap-1">
-                                {CLASSES[formData.classId].spellcasting?.knownCantrips?.map(spell => (
+                                {CLASS_DEFINITIONS[formData.classId].spellcasting?.knownCantrips?.map(spell => (
                                     <div key={spell} 
                                          className={`text-[9px] px-2 py-1 border border-wood/30 text-faded opacity-70 cursor-not-allowed`}>
                                         {spell} (Otomatis)
@@ -340,7 +340,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
             <div className="flex gap-2 mt-4">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('RACE')} fullWidth />
               <RuneButton label="LANJUT" fullWidth 
-                disabled={!formData.classId || selectedSkills.length < (CLASSES[formData.classId]?.proficiencies.skills.choices || 0)} 
+                disabled={!formData.classId || selectedSkills.length < (CLASS_DEFINITIONS[formData.classId]?.proficiencies.skills.choices || 0)} 
                 onClick={() => setStep('BACKGROUND')} 
               />
             </div>
@@ -370,7 +370,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                 Pilih perlengkapan awalmu berdasarkan kelas.
              </p>
              <div className="flex flex-col gap-4 overflow-y-auto max-h-[300px] pr-2">
-                {formData.classId && CLASSES[formData.classId].startingEquipment.choices.map((choice, idx) => (
+                {formData.classId && CLASS_DEFINITIONS[formData.classId].startingEquipment.choices.map((choice, idx) => (
                     <div key={idx} className="border border-wood p-2 bg-black/30">
                         <p className="font-pixel text-[10px] text-gold mb-2">PILIHAN {idx + 1}</p>
                         <div className="flex flex-col gap-2">

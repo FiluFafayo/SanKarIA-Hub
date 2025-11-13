@@ -1,7 +1,7 @@
 import { CampaignState } from "../hooks/useCampaign";
 import { Ability, Character, ConditionEffects, CONDITION_RULES, DamageType, MonsterInstance, AbilityScores, Skill } from "../types";
 import { RACES, RaceData } from '../data/races';
-import { CLASSES, ClassData } from '../data/classes';
+import { CLASS_DEFINITIONS, ClassData } from '../data/classes';
 import { BACKGROUNDS, BackgroundData } from '../data/backgrounds';
 
 // NEW: Helper function to calculate ability modifier
@@ -19,7 +19,7 @@ export const calculateNewCharacterFromWizard = (
 ): Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'> => {
   
   const race = RACES.find(r => r.name === raceName);
-  const charClass = Object.values(CLASSES).find(c => c.name === className);
+  const charClass = Object.values(CLASS_DEFINITIONS).find(c => c.name === className);
   const background = BACKGROUNDS.find(b => b.name === backgroundName);
 
   if (!race || !charClass || !background) {
