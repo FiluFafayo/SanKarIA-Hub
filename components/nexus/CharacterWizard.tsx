@@ -70,7 +70,8 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const handleCreate = async () => {
     if (!user) return;
 
-    const raceName = RACES.find(r => r.id === formData.raceId)?.name;
+    // Fix: Gunakan properti 'name' untuk pencarian karena 'id' tidak eksis di definisi Race
+    const raceName = RACES.find(r => r.name === formData.raceId)?.name;
     const className = formData.classId; // classId is now the name itself
 
     if (!raceName || !className || !formData.backgroundName || Object.keys(formData.abilityScores).length !== 6) {
@@ -280,88 +281,138 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         )}
 
         {step === 'CLASS' && (
-          <div className="flex flex-col h-full">
-            <div className="flex gap-4 h-[350px]">
-               {/* Kolom Kiri: Daftar Kelas */}
-               <div className="w-1/2 flex flex-col gap-2 overflow-y-auto pr-1 border-r border-wood/30">
-                  {Object.values(CLASS_DEFINITIONS).map((cls) => (
-                    <div key={cls.name} onClick={() => {
-                        setFormData({ ...formData, classId: cls.name });
-                        setSelectedSkills([]); // Reset skill saat ganti kelas
-                        setSelectedSpells([]); 
-                    }} className={`p-2 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.classId === cls.name ? 'border-gold bg-gold/10' : 'border-wood'}`}>
-                      <div className="font-pixel text-[10px] text-gold">{cls.name}</div>
-                    </div>
-                  ))}
+          <>
+            {!formData.classId ? (
+               <div className="flex flex-col gap-2 animate-fade-in">
+                  <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
+                    {Object.values(CLASS_DEFINITIONS).map((cls) => (
+                      <div key={cls.name} onClick={() => {
+                          setFormData({ ...formData, classId: cls.name });
+                          setSelectedSkills([]);
+                          setSelectedSpells([]);
+                      }} className="p-3 border-2 border-wood cursor-pointer text-center hover:bg-white/5 transition-colors">
+                        <div className="font-pixel text-lg text-parchment">{cls.name}</div>
+                        <div className="text-xs text-faded italic">{cls.description.substring(0, 50)}...</div>
+                      </div>
+                    ))}
+                  </div>
                </div>
-
-               {/* Kolom Kanan: Detail & Pilihan */}
-               <div className="w-1/2 flex flex-col gap-2 overflow-y-auto pr-1">
-                  {formData.classId ? (
-                    <>
-                      <p className="text-[10px] text-faded italic">{CLASS_DEFINITIONS[formData.classId].description}</p>
-                      
-                      {/* Skill Selection */}
-                      <div className="border-t border-wood/30 pt-2">
-                        <p className="font-pixel text-[10px] text-gold mb-1">
+            ) : (
+               <div className="flex flex-col gap-4 animate-fade-in">
+                  <div className="p-3 bg-black/50 border-2 border-wood">
+                     <h3 className="font-pixel text-lg text-gold text-center mb-2">{formData.classId}</h3>
+                     <p className="text-xs text-faded italic text-center mb-4">{CLASS_DEFINITIONS[formData.classId].description}</p>
+                     
+                     {/* Skill Selection */}
+                     <div className="mb-3">
+                        <p className="font-pixel text-xs text-gold mb-2 text-center">
                             PILIH {CLASS_DEFINITIONS[formData.classId].proficiencies.skills.choices} SKILL
                         </p>
-                        <div className="grid grid-cols-1 gap-1">
+                        <div className="grid grid-cols-2 gap-2">
                             {CLASS_DEFINITIONS[formData.classId].proficiencies.skills.options.map(skill => (
                                 <div key={skill} onClick={() => toggleSkill(skill, CLASS_DEFINITIONS[formData.classId].proficiencies.skills.choices)}
-                                     className={`text-[9px] px-2 py-1 border cursor-pointer ${selectedSkills.includes(skill) ? 'bg-blue-900/50 border-blue-400 text-white' : 'border-wood/50 text-faded'}`}>
+                                     className={`text-[10px] px-2 py-1 border cursor-pointer text-center ${selectedSkills.includes(skill) ? 'bg-gold text-black border-gold' : 'border-wood text-faded hover:bg-white/5'}`}>
                                     {skill}
                                 </div>
                             ))}
                         </div>
-                      </div>
+                        <p className="text-[10px] text-center mt-1 text-faded">
+                           Terpilih: {selectedSkills.length} / {CLASS_DEFINITIONS[formData.classId].proficiencies.skills.choices}
+                        </p>
+                     </div>
 
-                      {/* Spell Selection (Jika ada) */}
-                      {CLASS_DEFINITIONS[formData.classId].spellcasting && (
-                          <div className="border-t border-wood/30 pt-2 mt-2">
-                             <p className="font-pixel text-[10px] text-gold mb-1">CANTRIPS (LEVEL 0)</p>
-                             <div className="grid grid-cols-1 gap-1">
+                     {/* Spells if any */}
+                     {CLASS_DEFINITIONS[formData.classId].spellcasting && (
+                        <div className="border-t border-wood/30 pt-2">
+                            <p className="font-pixel text-xs text-gold mb-1 text-center">CANTRIPS (OTOMATIS)</p>
+                            <div className="flex flex-wrap gap-2 justify-center">
                                 {CLASS_DEFINITIONS[formData.classId].spellcasting?.knownCantrips?.map(spell => (
-                                    <div key={spell} 
-                                         className={`text-[9px] px-2 py-1 border border-wood/30 text-faded opacity-70 cursor-not-allowed`}>
-                                        {spell} (Otomatis)
-                                    </div>
+                                    <span key={spell} className="text-[10px] px-2 py-1 border border-wood/30 text-faded rounded">
+                                        {spell}
+                                    </span>
                                 ))}
-                             </div>
-                          </div>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-center text-faded text-xs mt-10">Pilih takdirmu...</p>
-                  )}
+                            </div>
+                        </div>
+                     )}
+                  </div>
+                  <RuneButton label="Pilih Kelas Lain" variant="secondary" onClick={() => {
+                      setFormData({ ...formData, classId: '' });
+                      setSelectedSkills([]);
+                      setSelectedSpells([]);
+                  }} fullWidth />
                </div>
-            </div>
-            
-            <div className="flex gap-2 mt-4">
+            )}
+            <div className="flex gap-2 mt-4 relative z-20">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('RACE')} fullWidth />
               <RuneButton label="LANJUT" fullWidth 
                 disabled={!formData.classId || selectedSkills.length < (CLASS_DEFINITIONS[formData.classId]?.proficiencies.skills.choices || 0)} 
                 onClick={() => setStep('BACKGROUND')} 
               />
             </div>
-          </div>
+          </>
         )}
 
         {step === 'BACKGROUND' && (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-2">
-              {BACKGROUNDS.map((bg) => (
-                <div key={bg.name} onClick={() => setFormData({ ...formData, backgroundName: bg.name })} className={`p-2 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.backgroundName === bg.name ? 'border-gold bg-gold/10' : 'border-wood'}`}>
-                  <div className="font-pixel text-[10px] text-gold">{bg.name}</div>
-                  <div className="font-retro text-[10px] text-faded leading-tight mt-1">{bg.description.substring(0, 30)}...</div>
+          <>
+            {!formData.backgroundName ? (
+               <div className="flex flex-col gap-2 animate-fade-in">
+                  <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
+                    {BACKGROUNDS.map((bg) => (
+                        <div key={bg.name} onClick={() => setFormData({ ...formData, backgroundName: bg.name })} 
+                             className="p-3 border-2 border-wood cursor-pointer text-center hover:bg-white/5 transition-colors">
+                          <div className="font-pixel text-lg text-parchment">{bg.name}</div>
+                          <div className="font-retro text-xs text-faded mt-1">{bg.description.substring(0, 40)}...</div>
+                        </div>
+                    ))}
+                  </div>
+               </div>
+            ) : (
+                <div className="flex flex-col gap-4 animate-fade-in">
+                   {(() => {
+                      const bg = BACKGROUNDS.find(b => b.name === formData.backgroundName);
+                      if (!bg) return null;
+                      return (
+                        <div className="p-3 bg-black/50 border-2 border-wood">
+                           <h3 className="font-pixel text-lg text-gold text-center mb-2">{bg.name}</h3>
+                           <p className="text-xs text-parchment font-retro text-center mb-4">"{bg.description}"</p>
+                           
+                           <div className="space-y-3">
+                              <div>
+                                 <h4 className="font-pixel text-gold text-xs border-b border-wood/30 pb-1 mb-1">FEATURE: {bg.feature.name}</h4>
+                                 <p className="text-[10px] text-faded">{bg.feature.description}</p>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                 <div>
+                                    <h4 className="font-pixel text-gold text-xs mb-1">SKILLS</h4>
+                                    <ul className="list-disc list-inside text-[10px] text-faded">
+                                       {bg.skillProficiencies.map(s => <li key={s}>{s}</li>)}
+                                    </ul>
+                                 </div>
+                                 <div>
+                                    <h4 className="font-pixel text-gold text-xs mb-1">TOOLS/LANGS</h4>
+                                    <p className="text-[10px] text-faded">
+                                       {bg.toolProficiencies.length > 0 ? bg.toolProficiencies.join(', ') : '-'}
+                                       <br/>
+                                       {Array.isArray(bg.languages) ? bg.languages.join(', ') : (bg.languages === 'any_one' ? '1 Bahasa Bebas' : '2 Bahasa Bebas')}
+                                    </p>
+                                 </div>
+                              </div>
+                              <div>
+                                 <h4 className="font-pixel text-gold text-xs mb-1">EQUIPMENT</h4>
+                                 <p className="text-[10px] text-faded italic">{bg.equipment.join(', ')}</p>
+                              </div>
+                           </div>
+                        </div>
+                      );
+                   })()}
+                   <RuneButton label="Pilih Latar Belakang Lain" variant="secondary" onClick={() => setFormData({ ...formData, backgroundName: '' })} fullWidth />
                 </div>
-              ))}
-            </div>
-            <div className="flex gap-2 mt-2">
+            )}
+            <div className="flex gap-2 mt-4 relative z-20">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('CLASS')} fullWidth />
               <RuneButton label="LANJUT" fullWidth disabled={!formData.backgroundName} onClick={() => setStep('EQUIPMENT')} />
             </div>
-          </div>
+          </>
         )}
 
         {step === 'EQUIPMENT' && (
