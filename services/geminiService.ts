@@ -14,8 +14,8 @@ class GeminiService {
 
     // Helper untuk membaca Env Var (Support comma-separated untuk rotasi)
     private loadKeysFromEnv(): string[] {
-        // Coba baca VITE_GEMINI_API_KEY (standar Vite)
-        const envKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+        // Coba baca VITE_GEMINI_API_KEYS (standar Vite)
+        const envKey = import.meta.env.VITE_GEMINI_API_KEYS || '';
         
         if (envKey) {
             console.log("[GeminiService] API Key ditemukan di Environment Variables.");
@@ -23,7 +23,7 @@ class GeminiService {
             return envKey.split(',').map(k => k.trim()).filter(k => k !== '');
         }
         
-        console.warn("[GeminiService] Tidak ada API Key di Environment Variables (VITE_GEMINI_API_KEY). Menunggu input manual.");
+        console.warn("[GeminiService] Tidak ada API Key di Environment Variables (VITE_GEMINI_API_KEYS). Menunggu input manual.");
         return ['']; // Fallback agar tidak crash saat akses indeks 0
     }
 
