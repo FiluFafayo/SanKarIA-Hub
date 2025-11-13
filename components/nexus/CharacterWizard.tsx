@@ -35,7 +35,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
     if (!user) return;
 
     const raceName = RACES.find(r => r.id === formData.raceId)?.name;
-    const className = Object.values(CLASSES).find(c => c.id === formData.classId)?.name;
+    const className = formData.classId; // classId is now the name itself
 
     if (!raceName || !className || !formData.backgroundName || Object.keys(formData.abilityScores).length !== 6) {
       alert("Harap lengkapi semua data termasuk Ability Scores.");
@@ -143,11 +143,17 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                   <div className="grid grid-cols-2 gap-4 mb-3">
                     <div>
                       <h4 className="font-pixel text-gold text-sm">VISUALISASI</h4>
-                      <div className="mt-1 p-2 border border-dashed border-faded/50 text-center font-retro text-faded text-xs">
-                        [Visualisasi Karakter Pria]
-                      </div>
-                      <div className="mt-1 p-2 border border-dashed border-faded/50 text-center font-retro text-faded text-xs">
-                        [Visualisasi Karakter Wanita]
+                      <div className="mt-1 grid grid-cols-2 gap-2">
+                        <img 
+                          src={`https://placehold.co/200x300/1a1a1a/ffffff/png?text=Male%0A${selectedRaceData.name}`} 
+                          alt={`Male ${selectedRaceData.name}`}
+                          className="border border-faded/50"
+                        />
+                        <img 
+                          src={`https://placehold.co/200x300/1a1a1a/ffffff/png?text=Female%0A${selectedRaceData.name}`} 
+                          alt={`Female ${selectedRaceData.name}`}
+                          className="border border-faded/50"
+                        />
                       </div>
                     </div>
                     <div>
@@ -185,7 +191,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-2">
               {Object.values(CLASSES).map((cls) => (
-                <div key={cls.id} onClick={() => setFormData({ ...formData, classId: cls.id })} className={`p-2 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.classId === cls.id ? 'border-gold bg-gold/10' : 'border-wood'}`}>
+                <div key={cls.name} onClick={() => setFormData({ ...formData, classId: cls.name })} className={`p-2 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.classId === cls.name ? 'border-gold bg-gold/10' : 'border-wood'}`}>
                   <div className="font-pixel text-[10px] text-gold">{cls.name}</div>
                   <div className="font-retro text-[10px] text-faded leading-tight mt-1">{cls.description.substring(0, 30)}...</div>
                 </div>
