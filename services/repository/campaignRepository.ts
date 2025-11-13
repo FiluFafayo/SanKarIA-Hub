@@ -53,6 +53,13 @@ function mapDbCampaign(dbCampaign: any): Campaign {
     fogOfWar: dbCampaign.fog_of_war || [],
     battleState: dbCampaign.battle_state || null,
     playerGridPosition: dbCampaign.player_grid_position || { x: 50, y: 50 },
+    rulesConfig: dbCampaign.rules_config || { 
+        startingLevel: 1, 
+        advancementType: 'milestone', 
+        rollPrivacy: 'public', 
+        allowHomebrew: false, 
+        maxPartySize: 4 
+    },
     playerIds,
     eventLog: [],
     monsters: [],
@@ -161,6 +168,7 @@ export const campaignRepository = {
       fog_of_war: campaignData.fogOfWar,
       battle_state: campaignData.battleState,
       player_grid_position: campaignData.playerGridPosition,
+      rules_config: campaignData.rulesConfig, // Mapping baru
     };
 
     const { data, error } = await supabase

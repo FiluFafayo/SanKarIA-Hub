@@ -448,6 +448,14 @@ export interface RollResultEvent extends BaseEvent {
 
 export type GameEvent = PlayerActionEvent | DmNarrationEvent | SystemMessageEvent | RollResultEvent | DmReactionEvent | DmDialogueEvent;
 
+export interface CampaignRules {
+    startingLevel: number;
+    advancementType: 'xp' | 'milestone';
+    rollPrivacy: 'public' | 'private_to_dm';
+    allowHomebrew: boolean;
+    maxPartySize: number;
+}
+
 // Ini adalah objek Campaign DEFINISI (yang kita dapat dari list)
 export interface Campaign {
     id: string;
@@ -493,6 +501,9 @@ export interface Campaign {
     monsters: MonsterInstance[];
     eventLog: GameEvent[];
     playerIds: string[]; // Daftar ID Karakter yang ada di campaign ini
+
+    // Config Mekanik (Disimpan di DB sebagai rules_config)
+    rulesConfig: CampaignRules;
 
     // Runtime-only state (Tidak disimpan di DB 'campaigns')
     choices: string[];
