@@ -150,7 +150,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
@@ -176,7 +176,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 contents: prompt,
                 config: {
                     tools: [{ functionDeclarations: SETUP_TOOLS }],
@@ -215,7 +215,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 contents: prompt,
             });
             return response.text.trim();
@@ -239,7 +239,7 @@ class GenerationService {
         `;
 
         const call = async (client: any) => {
-            const response = await client.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+            const response = await client.models.generateContent({ model: 'gemini-1.5-flash', contents: prompt });
             try {
                 const parsed = JSON.parse(response.text);
                 const minutesToAdd = parsed.timePassedInMinutes || 60; // Fallback 1 jam
@@ -427,7 +427,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 contents: prompt,
             });
             return response.text.trim();
@@ -505,7 +505,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 contents: prompt,
                 config: {
                     responseMimeType: 'application/json',

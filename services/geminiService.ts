@@ -125,7 +125,7 @@ class GeminiService {
             // Buat klien tes terisolasi
             const testClient = new GoogleGenAI({ apiKey: key });
             const response = await testClient.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-1.5-flash',
                 contents: 'Test'
             });
 

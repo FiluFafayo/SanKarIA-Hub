@@ -284,7 +284,7 @@ class GameService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.5-flash', // Cukup untuk respons terstruktur
+                model: 'gemini-1.5-flash', // Cukup untuk respons terstruktur
                 contents: prompt,
                 config: {
                     systemInstruction,
