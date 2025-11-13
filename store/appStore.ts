@@ -145,24 +145,40 @@ export const useAppStore = create<AppStore>((set, get) => ({
             navigation: { ...state.navigation, templateToPreFill: null }
         })),
 
-        // --- Authentication (FIXED) ---
+        // --- Authentication (REAL-TIME) ---
         initialize: async () => {
             set(state => ({ auth: { ...state.auth, isAuthLoading: true } }));
             try {
-                // Cek sesi yang ada
-                const user = await dataService.getCurrentUser();
-                if (user) {
-                    console.log("[Auth] Session restored:", user.email);
+                // 1. Cek sesi instan (untuk mempercepat UI jika sudah ada di storage)
+                const currentUser = await dataService.getCurrentUser();
+                if (currentUser) {
+                    console.log("[Auth] Initial Check Found:", currentUser.email);
+                    set(state => ({ auth: { ...state.auth, user: currentUser } }));
                 }
-                set(state => ({ auth: { ...state.auth, user, isAuthLoading: false } }));
-                
-                // Setup listener untuk perubahan auth (login/logout di tab lain atau via provider)
-                // Note: Kita asumsikan dataService punya metode untuk subscribe, 
-                // jika tidak, ini cukup untuk inisialisasi awal.
+
+                // 2. PASANG PENDENGAR (LISTENER) - Ini kunci perbaikannya!
+                // Ini akan menangkap momen redirect dari Google saat token diproses
+                dataService.onAuthStateChange((event, session) => {
+                    console.log(`[Auth] Event Triggered: ${event}`, session?.user?.email);
+                    
+                    const user = session?.user ?? null;
+                    set(state => ({ 
+                        auth: { 
+                            ...state.auth, 
+                            user, 
+                            isAuthLoading: false // Stop loading setelah kita dapat sinyal pasti
+                        } 
+                    }));
+
+                    // Jika user logout atau sesi habis, paksa kembali ke Nexus/Login
+                    if (event === 'SIGNED_OUT') {
+                        get().actions.returnToNexus();
+                    }
+                });
                 
             } catch (error) {
-                console.error("[Auth] Initialization failed:", error);
-                set(state => ({ auth: { ...state.auth, user: null, isAuthLoading: false } }));
+                console.error("[Auth] Error setting up auth:", error);
+                set(state => ({ auth: { ...state.auth, isAuthLoading: false } }));
             }
         },
         login: async () => {
