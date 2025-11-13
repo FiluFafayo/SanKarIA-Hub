@@ -6,19 +6,39 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-class GeminiService {
-    private apiKeys: string[] = [''];
+// FIX: Auto-load dari Env Var saat inisialisasi
+    private apiKeys: string[] = this.loadKeysFromEnv();
     private currentKeyIndex = 0;
     private genAI: GoogleGenAI | null = null;
 
-    public updateKeys(keys: string[]) {
-        this.apiKeys = keys.filter(k => k.trim() !== '');
-        if (this.apiKeys.length === 0) {
-            console.warn("⚠️ Tidak ada Kunci API Gemini yang valid. Menggunakan fallback (jika ada).");
-            this.apiKeys = ['']; // Fallback ke kunci kosong untuk mencegah crash
+    // Helper untuk membaca Env Var (Support comma-separated untuk rotasi)
+    private loadKeysFromEnv(): string[] {
+        // Coba baca VITE_GEMINI_API_KEY (standar Vite)
+        const envKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+        
+        if (envKey) {
+            console.log("[GeminiService] API Key ditemukan di Environment Variables.");
+            // Support multiple keys dipisah koma
+            return envKey.split(',').map(k => k.trim()).filter(k => k !== '');
         }
-        this.currentKeyIndex = 0;
-        this.genAI = null; // Paksa re-inisialisasi
+        
+        console.warn("[GeminiService] Tidak ada API Key di Environment Variables (VITE_GEMINI_API_KEY). Menunggu input manual.");
+        return ['']; // Fallback agar tidak crash saat akses indeks 0
+    }
+
+    public updateKeys(keys: string[]) {
+        const validKeys = keys.filter(k => k.trim() !== '');
+        if (validKeys.length === 0) {
+            console.warn("⚠️ Percobaan updateKeys dengan array kosong diabaikan. Mempertahankan keys lama jika ada.");
+            if (this.apiKeys.length === 0 || (this.apiKeys.length === 1 && this.apiKeys[0] === '')) {
+                 this.apiKeys = ['']; // Tetap kosong jika memang belum ada
+            }
+        } else {
+            this.apiKeys = validKeys;
+            this.currentKeyIndex = 0;
+            this.genAI = null; // Paksa re-inisialisasi
+            console.log(`[GeminiService] Keys diperbarui. Total: ${this.apiKeys.length}`);
+        }
     }
 
     public getClient(): GoogleGenAI {
