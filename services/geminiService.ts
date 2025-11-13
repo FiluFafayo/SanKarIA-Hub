@@ -6,7 +6,8 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-// FIX: Auto-load dari Env Var saat inisialisasi
+class GeminiService {
+    // FIX: Auto-load dari Env Var saat inisialisasi
     private apiKeys: string[] = this.loadKeysFromEnv();
     private currentKeyIndex = 0;
     private genAI: GoogleGenAI | null = null;
