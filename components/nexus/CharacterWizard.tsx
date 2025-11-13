@@ -12,6 +12,21 @@ import { calculateNewCharacterFromWizard } from '../../services/rulesEngine';
 import { getStaticAvatar, getAbilityModifier } from '../../utils';
 import { Skill, SpellDefinition, CharacterInventoryItem, EquipmentChoice } from '../../types';
 import { findClass, findSpell, getItemDef, getAllClasses } from '../../data/registry';
+import { AbilityRoller } from '../profile/AbilityRoller';
+
+// Constants untuk Stats
+const ABILITY_INFO: Record<string, string> = {
+    strength: "Fisik & Atletik",
+    dexterity: "Refleks & Akurasi",
+    constitution: "Stamina & HP",
+    intelligence: "Logika & Memori",
+    wisdom: "Intuisi & Persepsi",
+    charisma: "Pesona & Kepemimpinan"
+};
+
+const POINT_BUY_COSTS: Record<number, number> = {
+    8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9
+};
 
 // Helper untuk Inventory
 const createInvItem = (name: string, qty = 1, equipped = false) => {
@@ -26,7 +41,9 @@ interface CharacterWizardProps {
   onCancel: () => void;
 }
 
-type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'EQUIPMENT' | 'STATS';
+import { generationService } from '../../services/ai/generationService';
+
+type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'EQUIPMENT' | 'STATS' | 'REVIEW';
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
 
 export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, onCancel }) => {
@@ -37,7 +54,10 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const [selectedSkills, setSelectedSkills] = useState<Skill[]>([]);
   const [selectedSpells, setSelectedSpells] = useState<string[]>([]);
   const [selectedEquipment, setSelectedEquipment] = useState<Record<number, EquipmentChoice['options'][0]>>({});
-  
+  const [statsMethod, setStatsMethod] = useState<'STANDARD' | 'POINT_BUY' | 'MANUAL'>('STANDARD');
+  const [generatedAvatarUrl, setGeneratedAvatarUrl] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     gender: 'Pria',
@@ -80,6 +100,22 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAppStore();
 
+  const handleGenerateAvatar = async () => {
+    if (!formData.raceId || !formData.classId) return;
+    setIsGeneratingImage(true);
+    try {
+        const summary = `Fantasy RPG Character Portrait: ${formData.gender} ${formData.raceId} ${formData.classId}, ${formData.backgroundName} background, high fantasy style, detailed face`;
+        // Gunakan layanan AI yang sudah ada (auto-cache & stylize)
+        const url = await generationService.autoCreateNpcPortrait(summary);
+        setGeneratedAvatarUrl(url);
+    } catch (e) {
+        console.error("Avatar Gen Error:", e);
+        alert("Gagal memvisualisasikan jiwa. Coba lagi.");
+    } finally {
+        setIsGeneratingImage(false);
+    }
+  };
+
   const handleCreate = async () => {
     if (!user) return;
 
@@ -105,7 +141,8 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
 
       // 2. Inject Data Tambahan (Manual Override)
       characterData.proficientSkills = [...characterData.proficientSkills, ...selectedSkills];
-      characterData.image = getStaticAvatar(raceName, formData.gender); // Pakai static avatar
+      // PRIORITAS: Gunakan Avatar AI jika sudah digenerate, jika tidak fallback ke static
+      characterData.image = generatedAvatarUrl || getStaticAvatar(raceName, formData.gender); 
       characterData.gender = formData.gender as "Pria" | "Wanita";
       
       // 3. Susun Inventory
@@ -146,6 +183,34 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Logic Point Buy
+  const getPointCost = (score: number) => POINT_BUY_COSTS[score] ?? 0;
+  const getRemainingPoints = () => {
+    let totalUsed = 0;
+    ALL_ABILITIES.forEach(a => {
+        const s = formData.abilityScores[a] || 8;
+        totalUsed += getPointCost(s);
+    });
+    return 27 - totalUsed;
+  };
+
+  const handlePointBuyChange = (ability: Ability, increment: boolean) => {
+      const current = formData.abilityScores[ability] || 8;
+      const next = increment ? current + 1 : current - 1;
+      
+      if (next < 8 || next > 15) return;
+      
+      if (increment) {
+          const costDiff = getPointCost(next) - getPointCost(current);
+          if (getRemainingPoints() - costDiff < 0) return; // Tidak cukup poin
+      }
+
+      setFormData(prev => ({
+          ...prev, 
+          abilityScores: { ...prev.abilityScores, [ability]: next }
+      }));
   };
 
   const handleScoreChange = (ability: Ability, newScoreStr: string) => {
@@ -482,34 +547,157 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         )}
 
         {step === 'STATS' && (
-          <div className="flex flex-col gap-4">
-            <p className="text-parchment font-retro text-center">Bagikan skor ini: <span className="font-pixel text-gold">{STANDARD_ARRAY.join(', ')}</span></p>
-            <div className="space-y-2">
-              {ALL_ABILITIES.map((ability) => {
-                const assignedScores = Object.values(formData.abilityScores);
-                const availableScores = STANDARD_ARRAY.filter(s => !assignedScores.includes(s));
-                const currentScore = formData.abilityScores[ability];
-
-                return (
-                  <div key={ability} className="flex items-center justify-between">
-                    <label className="font-pixel text-parchment capitalize text-lg">{ability.substring(0,3)}</label>
-                    <select
-                      value={currentScore || ''}
-                      onChange={(e) => handleScoreChange(ability, e.target.value)}
-                      className="bg-black border-2 border-wood p-2 font-retro text-parchment focus:border-gold outline-none w-28 text-center"
+          <div className="flex flex-col gap-4 animate-fade-in">
+            {/* Tab Navigasi Stats */}
+            <div className="flex border-b border-wood/30 pb-2 justify-center gap-2">
+                {(['STANDARD', 'POINT_BUY', 'MANUAL'] as const).map(m => (
+                    <button 
+                        key={m}
+                        onClick={() => {
+                            setStatsMethod(m);
+                            // Reset logic saat ganti metode
+                            const resetScores: any = {};
+                            if (m === 'POINT_BUY') {
+                                ALL_ABILITIES.forEach(a => resetScores[a] = 8);
+                            }
+                            setFormData(prev => ({...prev, abilityScores: resetScores}));
+                        }}
+                        className={`text-[10px] font-pixel px-3 py-1 transition-all ${statsMethod === m ? 'bg-gold text-black' : 'text-faded hover:text-parchment'}`}
                     >
-                      <option value="">-</option>
-                      {currentScore && <option value={currentScore}>{currentScore}</option>}
-                      {availableScores.map(score => <option key={score} value={score}>{score}</option>)}
-                    </select>
+                        {m.replace('_', ' ')}
+                    </button>
+                ))}
+            </div>
+
+            {/* Info Header */}
+            <div className="text-center">
+                {statsMethod === 'STANDARD' && <p className="text-xs text-parchment font-retro">Bagikan angka: <span className="text-gold">15, 14, 13, 12, 10, 8</span></p>}
+                {statsMethod === 'POINT_BUY' && <p className="text-xs text-parchment font-retro">Sisa Poin: <span className="text-gold font-pixel text-lg">{getRemainingPoints()}/27</span></p>}
+                {statsMethod === 'MANUAL' && <p className="text-xs text-parchment font-retro">Lempar dadu untuk nasibmu!</p>}
+            </div>
+
+            {/* Main Stats Grid */}
+            <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-1">
+              {ALL_ABILITIES.map((ability) => {
+                const currentScore = formData.abilityScores[ability] || (statsMethod === 'POINT_BUY' ? 8 : 0);
+                
+                return (
+                  <div key={ability} className="flex items-center justify-between border-b border-wood/20 pb-1">
+                    <div className="flex flex-col">
+                        <span className="font-pixel text-parchment text-sm uppercase">{ability}</span>
+                        <span className="text-[9px] text-faded italic">{ABILITY_INFO[ability]}</span>
+                    </div>
+
+                    {/* UI Controls per Method */}
+                    <div className="w-32 flex justify-end">
+                        {statsMethod === 'STANDARD' && (
+                            <select
+                              value={formData.abilityScores[ability] || ''}
+                              onChange={(e) => handleScoreChange(ability, e.target.value)}
+                              className="bg-black border border-wood p-1 font-pixel text-gold text-sm w-full text-center"
+                            >
+                              <option value="">-</option>
+                              {/* Tampilkan skor saat ini + skor yang belum dipakai */}
+                              {formData.abilityScores[ability] && <option value={formData.abilityScores[ability]}>{formData.abilityScores[ability]}</option>}
+                              {STANDARD_ARRAY.filter(s => !Object.values(formData.abilityScores).includes(s)).map(s => (
+                                  <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                        )}
+
+                        {statsMethod === 'POINT_BUY' && (
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => handlePointBuyChange(ability, false)} className="w-6 h-6 bg-red-900/50 text-red-200 border border-red-800 hover:bg-red-800">-</button>
+                                <span className="font-pixel text-gold w-6 text-center">{currentScore}</span>
+                                <button onClick={() => handlePointBuyChange(ability, true)} disabled={currentScore >= 15} className="w-6 h-6 bg-green-900/50 text-green-200 border border-green-800 hover:bg-green-800">+</button>
+                            </div>
+                        )}
+
+                        {statsMethod === 'MANUAL' && (
+                            <div className="flex justify-end">
+                                {currentScore > 0 ? (
+                                    <span className="font-pixel text-gold text-lg animate-land">{currentScore}</span>
+                                ) : (
+                                    <div className="scale-75 origin-right">
+                                        <AbilityRoller ability={ability} currentScore={null} onRoll={(a, s) => {
+                                            setFormData(prev => ({...prev, abilityScores: {...prev.abilityScores, [a]: s}}));
+                                        }} />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                   </div>
                 );
               })}
             </div>
-            <div className="flex gap-2 mt-4">
+
+            <div className="flex gap-2 mt-2 relative z-20">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('EQUIPMENT')} fullWidth />
-              <RuneButton label={isSubmitting ? "MEMANGGIL..." : "BANGKITKAN"} variant="danger" fullWidth disabled={!isAllScoresAssigned || isSubmitting} onClick={handleCreate} />
+              <RuneButton 
+                label="LANJUT KE FINAL" 
+                fullWidth 
+                disabled={Object.keys(formData.abilityScores).length < 6} 
+                onClick={() => setStep('REVIEW')} 
+              />
             </div>
+          </div>
+        )}
+
+        {step === 'REVIEW' && (
+          <div className="flex flex-col gap-4 animate-fade-in">
+             <div className="flex gap-4">
+                {/* Kiri: Summary Text */}
+                <div className="w-1/2 flex flex-col gap-2 text-xs text-faded border-r border-wood/30 pr-2">
+                    <h3 className="font-pixel text-gold text-sm border-b border-wood/50 pb-1">RINGKASAN JIWA</h3>
+                    <div><span className="text-parchment">Nama:</span> {formData.name}</div>
+                    <div><span className="text-parchment">Ras:</span> {formData.raceId} ({formData.gender})</div>
+                    <div><span className="text-parchment">Kelas:</span> {formData.classId}</div>
+                    <div><span className="text-parchment">Latar:</span> {formData.backgroundName}</div>
+                    <div className="mt-1"><span className="text-parchment">Atribut Utama:</span></div>
+                    <div className="grid grid-cols-3 gap-1 text-[9px]">
+                        {Object.entries(formData.abilityScores).map(([k, v]) => (
+                            <div key={k} className="bg-black/40 px-1 rounded">{k.substring(0,3).toUpperCase()}: {v}</div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Kanan: Avatar Generator */}
+                <div className="w-1/2 flex flex-col items-center justify-center gap-2">
+                    <div className="w-32 h-32 border-2 border-gold bg-black/50 flex items-center justify-center overflow-hidden relative shadow-pixel-glow">
+                        {generatedAvatarUrl ? (
+                            <img src={generatedAvatarUrl} alt="Generated Soul" className="w-full h-full object-cover animate-fade-in" />
+                        ) : (
+                            <div className="text-[9px] text-center text-faded px-2 font-retro">
+                                {isGeneratingImage ? "Menenun Wajah..." : "Visual Belum Terbentuk"}
+                            </div>
+                        )}
+                        {isGeneratingImage && (
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                <div className="animate-spin w-6 h-6 border-2 border-gold border-t-transparent rounded-full"></div>
+                            </div>
+                        )}
+                    </div>
+                    <button 
+                        onClick={handleGenerateAvatar}
+                        disabled={isGeneratingImage}
+                        className="font-pixel text-[10px] px-3 py-1 bg-blue-900/50 border border-blue-500 text-blue-200 hover:bg-blue-800 transition-colors disabled:opacity-50 w-full"
+                    >
+                        {generatedAvatarUrl ? "GENERATE ULANG" : "VISUALISASIKAN"}
+                    </button>
+                </div>
+             </div>
+
+             <div className="flex gap-2 mt-4">
+                <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('STATS')} fullWidth />
+                <RuneButton 
+                    label={isSubmitting ? "MENGIKAT JIWA..." : "BANGKITKAN"} 
+                    variant="danger" 
+                    fullWidth 
+                    disabled={isSubmitting || isGeneratingImage} 
+                    onClick={handleCreate} 
+                />
+             </div>
           </div>
         )}
       </PixelCard>
