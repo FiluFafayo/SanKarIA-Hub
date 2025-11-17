@@ -147,44 +147,44 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
         // --- Authentication (REAL-TIME) ---
         initialize: async () => {
-            // 1. Langsung set loading
+            // 1. Set loading state
             set(state => ({ auth: { ...state.auth, isAuthLoading: true } }));
 
-            // 2. HANYA PASANG PENDENGAR (LISTENER).
-            // JANGAN panggil `await dataService.getCurrentUser()`.
-            // Pengecekan itu nge-block, jadi kalo dia hang, listener di bawahnya
-            // nggak akan pernah kedaftar. Ini sumber bug-nya.
-            
-            // `onAuthStateChange` akan OTOMATIS nembakin event `INITIAL_SESSION`
-            // yang fungsinya sama (dan lebih bener) daripada getCurrentUser.
-            
             try {
+                // 2. PASANG LISTENER DULU
+                // Ini akan menangani event di MASA DEPAN (login, logout, token refresh)
                 dataService.onAuthStateChange((event, session) => {
+                    // Listener INI yang akan menangani update state SETELAH inisialisasi
                     console.log(`[Auth] Event Triggered: ${event}`, session?.user?.email);
-                    
                     const user = session?.user ?? null;
 
-                    // INI KUNCINYA:
-                    // Event APAPUN (baik INITIAL_SESSION, SIGNED_IN, SIGNED_OUT)
-                    // menandakan bahwa proses loading auth sudah selesai.
-                    // Jadi kita bisa aman set isAuthLoading: false.
-                    set(state => ({ 
-                        auth: { 
-                            ...state.auth, 
-                            user, 
-                            isAuthLoading: false // Stop loading setelah kita dapat sinyal pasti
-                        } 
-                    }));
+                    // Set user-nya, TAPI JANGAN set loading: false di sini
+                    // Biarkan pengecekan manual di bawah yang mengontrol "boot sequence"
+                    set(state => ({ auth: { ...state.auth, user } }));
 
-                    // Jika user logout atau sesi habis, paksa kembali ke Nexus/Login
+                    // Jika user logout, paksa kembali ke Nexus
                     if (event === 'SIGNED_OUT') {
                         get().actions.returnToNexus();
                     }
                 });
-                
+
+                // 3. LAKUKAN PENGECEKAN AKTIF (SEKARANG)
+                // Ini adalah "snapshot" saat aplikasi boot.
+                // `getCurrentUser()` akan resolve user dari local storage/session.
+                const currentUser = await dataService.getCurrentUser();
+                if (currentUser) {
+                    console.log("[Auth] Initial Check Found (manual):", currentUser.email);
+                    set(state => ({ auth: { ...state.auth, user: currentUser } }));
+                }
+
             } catch (error) {
-                // Ini jaga-jaga kalau onAuthStateChange *gagal dipasang* (jarang bgt)
-                console.error("[Auth] FATAL: Error attaching auth listener:", error);
+                console.error("[Auth] Error during initialization:", error);
+                // Jika error, set user ke null (tapi biarkan finally handle loading)
+                set(state => ({ auth: { ...state.auth, user: null } }));
+            } finally {
+                // 4. JAMINAN
+                // Apapun yang terjadi (sukses atau error), 
+                // proses boot selesai. Set loading ke false.
                 set(state => ({ auth: { ...state.auth, isAuthLoading: false } }));
             }
         },

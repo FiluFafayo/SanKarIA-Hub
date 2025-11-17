@@ -14,7 +14,7 @@ const BootScreen = () => (
 
     {/* Loading Bar Retro */}
     <div className="w-full max-w-[200px] h-2 bg-gray-900 border border-wood relative overflow-hidden">
-      {/* Kita hilangkan animasi grow, biarkan indeterminate atau ganti nanti */}
+      {/* Ganti animasi grow (palsu) dengan indeterminate (jujur) */}
       <div className="absolute inset-y-0 left-0 bg-gold w-full opacity-50"></div>
       <div className="absolute inset-y-0 left-0 bg-gold h-full w-[50%] animate-pulse shadow-[0_0_10px_#d4af37]"></div>
     </div>
@@ -24,7 +24,7 @@ const BootScreen = () => (
 );
 
 const App: React.FC = () => {
-  // 1. Ambil user, initialize, DAN isAuthLoading
+  // 1. Ambil state auth yang SEBENARNYA: user dan isAuthLoading
   const { user, initialize, isAuthLoading } = useAppStore();
   // State Mesin: Menentukan layar mana yang aktif
   const [appState, setAppState] = useState<'BOOT' | 'NEXUS' | 'BATTLE'>('BOOT');
@@ -32,7 +32,7 @@ const App: React.FC = () => {
   // Effect 1: Hanya panggil initialize saat mount
   useEffect(() => {
     initialize(); // Cek sesi login saat aplikasi dimuat
-  }, []);
+  }, [initialize]); // Tambahkan dependency
 
   // Effect 2: Pindahkan state dari BOOT ke NEXUS HANYA SAAT auth selesai loading
   useEffect(() => {
@@ -41,13 +41,13 @@ const App: React.FC = () => {
       // Pindahkan ke NEXUS. Timer 2 detik dihapus.
       setAppState('NEXUS');
     }
-    
+
     // Jika user logout (user jadi null) saat di dalam battle/game,
     // paksa kembali ke NEXUS (layar login)
     if (appState === 'BATTLE' && !user && !isAuthLoading) {
         setAppState('NEXUS');
     }
-    
+
   }, [isAuthLoading, appState, user]); // Dijalankan tiap isAuthLoading, appState, atau user berubah
 
   return (
@@ -55,7 +55,7 @@ const App: React.FC = () => {
 
       {/* STATE 1: BOOT SCREEN.
         Tampilkan ini jika appState masih 'BOOT' ATAU jika auth masih loading.
-        Ini mencegah layar kelip aneh saat refresh.
+        Ini adalah kunci anti-race-condition.
       */}
       {(appState === 'BOOT' || isAuthLoading) && <BootScreen />}
 
