@@ -14,33 +14,55 @@ const BootScreen = () => (
 
     {/* Loading Bar Retro */}
     <div className="w-full max-w-[200px] h-2 bg-gray-900 border border-wood relative overflow-hidden">
-      <div className="absolute inset-y-0 left-0 bg-gold animate-[grow_2s_ease-out_forwards] w-full shadow-[0_0_10px_#d4af37]"></div>
+      {/* Kita hilangkan animasi grow, biarkan indeterminate atau ganti nanti */}
+      <div className="absolute inset-y-0 left-0 bg-gold w-full opacity-50"></div>
+      <div className="absolute inset-y-0 left-0 bg-gold h-full w-[50%] animate-pulse shadow-[0_0_10px_#d4af37]"></div>
     </div>
 
-    <div className="mt-2 text-[10px] text-faded animate-pulse">INITIALIZING ASSETS...</div>
+    <div className="mt-2 text-[10px] text-faded animate-pulse">CHECKING AUTH...</div>
   </div>
 );
 
 const App: React.FC = () => {
-  const { user, initialize } = useAppStore(); // Ambil User & Init Function
+  // 1. Ambil user, initialize, DAN isAuthLoading
+  const { user, initialize, isAuthLoading } = useAppStore();
   // State Mesin: Menentukan layar mana yang aktif
   const [appState, setAppState] = useState<'BOOT' | 'NEXUS' | 'BATTLE'>('BOOT');
 
+  // Effect 1: Hanya panggil initialize saat mount
   useEffect(() => {
     initialize(); // Cek sesi login saat aplikasi dimuat
-    // Simulasi booting sistem (2 detik)
-    const timer = setTimeout(() => setAppState('NEXUS'), 2000);
-    return () => clearTimeout(timer);
   }, []);
+
+  // Effect 2: Pindahkan state dari BOOT ke NEXUS HANYA SAAT auth selesai loading
+  useEffect(() => {
+    // Jika kita di state BOOT dan loading selesai (sudah false)
+    if (appState === 'BOOT' && !isAuthLoading) {
+      // Pindahkan ke NEXUS. Timer 2 detik dihapus.
+      setAppState('NEXUS');
+    }
+    
+    // Jika user logout (user jadi null) saat di dalam battle/game,
+    // paksa kembali ke NEXUS (layar login)
+    if (appState === 'BATTLE' && !user && !isAuthLoading) {
+        setAppState('NEXUS');
+    }
+    
+  }, [isAuthLoading, appState, user]); // Dijalankan tiap isAuthLoading, appState, atau user berubah
 
   return (
     <GameLayout>
 
-      {/* STATE 1: BOOT SCREEN */}
-      {appState === 'BOOT' && <BootScreen />}
+      {/* STATE 1: BOOT SCREEN.
+        Tampilkan ini jika appState masih 'BOOT' ATAU jika auth masih loading.
+        Ini mencegah layar kelip aneh saat refresh.
+      */}
+      {(appState === 'BOOT' || isAuthLoading) && <BootScreen />}
 
-      {/* STATE 2: MAIN MENU (NEXUS) or LOGIN GATE */}
-      {appState === 'NEXUS' && (
+      {/* STATE 2: MAIN MENU (NEXUS) or LOGIN GATE
+        Hanya tampilkan jika appState 'NEXUS' DAN auth SUDAH TIDAK loading
+      */}
+      {appState === 'NEXUS' && !isAuthLoading && (
         !user ? (
           <GrimoireLogin />
         ) : (
@@ -52,8 +74,10 @@ const App: React.FC = () => {
         )
       )}
 
-      {/* STATE 3: GAMEPLAY (BATTLE) */}
-      {appState === 'BATTLE' && (
+      {/* STATE 3: GAMEPLAY (BATTLE)
+        Hanya tampilkan jika appState 'BATTLE' DAN auth SUDAH TIDAK loading
+      */}
+      {appState === 'BATTLE' && !isAuthLoading && (
         <BattleScene
           // Kalau user kabur/exit, kembalikan ke NEXUS
           onExit={() => setAppState('NEXUS')}
