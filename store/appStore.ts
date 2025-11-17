@@ -147,48 +147,44 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
         // --- Authentication (REAL-TIME) ---
         initialize: async () => {
+            // 1. Langsung set loading
             set(state => ({ auth: { ...state.auth, isAuthLoading: true } }));
+
+            // 2. HANYA PASANG PENDENGAR (LISTENER).
+            // JANGAN panggil `await dataService.getCurrentUser()`.
+            // Pengecekan itu nge-block, jadi kalo dia hang, listener di bawahnya
+            // nggak akan pernah kedaftar. Ini sumber bug-nya.
             
-            // 1. Pasang listener DULUAN. Ini sumber kebenaran (source of truth).
-            let listenerAlreadySetUser = false;
-            dataService.onAuthStateChange((event, session) => {
-                console.log(`[Auth] Event Triggered: ${event}`, session?.user?.email);
-                const user = session?.user ?? null;
-
-                if (event === 'INITIAL_SESSION') {
-                    listenerAlreadySetUser = true;
-                    // Saat sesi awal, CUKUP set user-nya.
-                    // JANGAN set isAuthLoading: false di sini.
-                    set(state => ({ auth: { ...state.auth, user }}));
-                } else {
-                    // Untuk event login/logout/dll, baru kita set loading
-                    set(state => ({ 
-                        auth: { ...state.auth, user, isAuthLoading: false }
-                    }));
-                }
-
-                // Jika user logout atau sesi habis, paksa kembali ke Nexus/Login
-                if (event === 'SIGNED_OUT') {
-                    get().actions.returnToNexus();
-                }
-            });
-
-            // 2. Lakukan pengecekan manual (getCurrentUser)
-            // Ini untuk jaga-jaga kalau listener INITIAL_SESSION telat
+            // `onAuthStateChange` akan OTOMATIS nembakin event `INITIAL_SESSION`
+            // yang fungsinya sama (dan lebih bener) daripada getCurrentUser.
+            
             try {
-                const currentUser = await dataService.getCurrentUser();
-                if (currentUser && !listenerAlreadySetUser) {
-                    // Jika listener belum jalan, tapi kita nemu user, set user-nya
-                    console.log("[Auth] Initial Check Found (manual):", currentUser.email);
-                    set(state => ({ auth: { ...state.auth, user: currentUser } }));
-                }
+                dataService.onAuthStateChange((event, session) => {
+                    console.log(`[Auth] Event Triggered: ${event}`, session?.user?.email);
+                    
+                    const user = session?.user ?? null;
+
+                    // INI KUNCINYA:
+                    // Event APAPUN (baik INITIAL_SESSION, SIGNED_IN, SIGNED_OUT)
+                    // menandakan bahwa proses loading auth sudah selesai.
+                    // Jadi kita bisa aman set isAuthLoading: false.
+                    set(state => ({ 
+                        auth: { 
+                            ...state.auth, 
+                            user, 
+                            isAuthLoading: false // Stop loading setelah kita dapat sinyal pasti
+                        } 
+                    }));
+
+                    // Jika user logout atau sesi habis, paksa kembali ke Nexus/Login
+                    if (event === 'SIGNED_OUT') {
+                        get().actions.returnToNexus();
+                    }
+                });
+                
             } catch (error) {
-                console.error("[Auth] Error during manual user check:", error);
-                // Biarkan finally yang handle loading
-            } finally {
-                // 3. JAMINAN UTAMA
-                // Setelah semua proses sinkron/asinkron di atas SELESAI,
-                // kita *PASTIKAN* isAuthLoading jadi false.
+                // Ini jaga-jaga kalau onAuthStateChange *gagal dipasang* (jarang bgt)
+                console.error("[Auth] FATAL: Error attaching auth listener:", error);
                 set(state => ({ auth: { ...state.auth, isAuthLoading: false } }));
             }
         },
