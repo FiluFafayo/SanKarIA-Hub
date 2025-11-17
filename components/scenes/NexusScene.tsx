@@ -59,7 +59,7 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
           <button 
             onClick={() => {
                if (!selectedCharacterId) {
-                 alert("PILIH JIWA TERLEBIH DAHULU DI API UNGGUN!");
+                 useAppStore.getState().actions.pushNotification({ type: 'info', message: 'Pilih jiwa terlebih dahulu di Api Unggun.' });
                  setViewMode('CAMPFIRE');
                } else {
                  setViewMode('GATE');

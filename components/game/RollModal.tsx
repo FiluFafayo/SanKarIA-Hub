@@ -3,6 +3,7 @@ import { Character, DiceRoll, RollRequest, Ability } from '../../types';
 import { ModalWrapper } from '../ModalWrapper';
 import { Die } from '../Die';
 import { getAbilityModifier, getProficiencyBonus, rollDice } from '../../utils';
+import { RuneButton } from '../grimoire/RuneButton';
 
 interface RollModalProps {
     request: RollRequest;
@@ -210,10 +211,10 @@ const { diceNotation, modifier, title, dc, modifierBreakdown, relevantAbility, i
 
     return (
         <ModalWrapper onClose={() => {}} title={title}>
-            <div className="bg-gray-800/80 backdrop-blur-sm border border-purple-500/30 rounded-xl p-8 shadow-2xl text-white w-full max-w-lg text-center">
-                <h2 className="font-cinzel text-3xl text-purple-200">{title}</h2>
-                <p className="text-lg my-2">{request.reason}</p>
-                {dc && <p className="text-gray-400">Target Kesulitan (DC): {dc}</p>}
+            <div className="bg-black/80 backdrop-blur-sm border border-wood rounded-xl p-6 shadow-pixel-lg text-parchment w-full max-w-lg text-center">
+                <h2 className="font-pixel text-2xl text-gold">{title}</h2>
+                <p className="text-sm my-2 text-faded">{request.reason}</p>
+                {dc && <p className="text-[12px] text-faded">DC: {dc}</p>}
                 
                 <div className="flex justify-center flex-wrap items-center gap-4 my-8 min-h-[160px]">
                     {/* --- LOGIKA RENDER BARU --- */}
@@ -250,10 +251,10 @@ const { diceNotation, modifier, title, dc, modifierBreakdown, relevantAbility, i
                                 </div>
                             )}
 
-                            <h3 className="font-bold text-7xl mb-4" style={{color: finalRoll.success ? '#48bb78' : '#f56565', textShadow: `0 0 15px ${finalRoll.success ? 'rgba(72,187,120,0.7)' : 'rgba(245,101,101,0.7)'}`}}>{finalRoll.total}</h3>
+                            <h3 className="font-pixel text-5xl mb-4" style={{color: finalRoll.success ? '#e6c160' : '#e07070'}}>{finalRoll.total}</h3>
                             
                             {isAttackOrCheck ? (
-                                <div className="text-gray-200 text-sm bg-gray-900/50 p-3 rounded-lg w-full max-w-xs space-y-1">
+                                <div className="text-parchment text-xs bg-black/50 border border-wood/40 p-3 rounded w-full max-w-xs space-y-1">
                                     <div className="flex justify-between">
                                         <span>Hasil Dadu (d20):</span>
                                         <span className="font-mono font-bold">{finalRoll.rolls[0]}</span>
@@ -279,23 +280,23 @@ const { diceNotation, modifier, title, dc, modifierBreakdown, relevantAbility, i
                                     </>
                                     )}
                                     <hr className="border-gray-600 my-1" />
-                                    <div className="flex justify-between font-bold text-base">
+                                    <div className="flex justify-between font-pixel text-sm text-gold">
                                         <span>Total:</span>
                                         <span className="font-mono">{finalRoll.total}</span>
                                     </div>
                                 </div>
                             ) : (
-                                <div className="text-gray-300 mt-2 text-sm">
+                                <div className="text-parchment mt-2 text-sm">
                                     <p>Kerusakan yang Diberikan: {finalRoll.total}</p>
                                 </div>
                             )}
                             
-                             <p className="text-2xl font-bold mt-4" style={{color: finalRoll.success ? '#48bb78' : '#f56565'}}>{finalRoll.success ? 'BERHASIL!' : 'GAGAL!'}</p>
+                             <p className="font-pixel text-xl mt-4" style={{color: finalRoll.success ? '#e6c160' : '#e07070'}}>{finalRoll.success ? 'BERHASIL!' : 'GAGAL!'}</p>
                         </div>
                     )}
                 </div>
                 
-                {phase === 'waiting' && <button onClick={handleRoll} className="font-cinzel text-2xl bg-purple-600 hover:bg-purple-500 px-8 py-4 rounded-lg shadow-lg transition-transform hover:scale-105">Lemparkan!</button>}
+                {phase === 'waiting' && <RuneButton label="LEMparKAN!" onClick={handleRoll} />}
             </div>
         </ModalWrapper>
     );

@@ -98,7 +98,8 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
     } catch (e) { return ""; }
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user } = useAppStore();
+  const user = useAppStore(s => s.auth.user);
+  const pushNotification = useAppStore(s => s.actions.pushNotification);
 
   const handleGenerateAvatar = async () => {
     if (!formData.raceId || !formData.classId) return;
@@ -124,7 +125,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         setGeneratedAvatarUrl(url);
     } catch (e) {
         console.error("Avatar Gen Error:", e);
-        alert(`Gagal memvisualisasikan jiwa: ${e instanceof Error ? e.message : 'Error misterius'}`);
+        pushNotification({ type: 'error', message: `Gagal memvisualisasikan jiwa: ${e instanceof Error ? e.message : 'Error misterius'}` });
     } finally {
         setIsGeneratingImage(false);
     }
@@ -135,7 +136,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
     
     if (!user) {
         console.error("❌ User session tidak ditemukan!");
-        alert("Sesi Anda habis atau tidak valid. Silakan refresh halaman.");
+        pushNotification({ type: 'warning', message: "Sesi Anda habis atau tidak valid. Silakan refresh halaman." });
         return;
     }
 
@@ -144,7 +145,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
     const className = formData.classId; // classId is now the name itself
 
     if (!raceName || !className || !formData.backgroundName || Object.keys(formData.abilityScores).length !== 6) {
-      alert("Harap lengkapi semua data termasuk Ability Scores.");
+      pushNotification({ type: 'warning', message: "Harap lengkapi semua data termasuk Ability Scores." });
       return;
     }
 
@@ -199,7 +200,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
       onComplete();
     } catch (e) {
       console.error("Failed to summon soul:", e);
-      alert(`Gagal memanggil jiwa baru: ${e instanceof Error ? e.message : String(e)}`);
+      pushNotification({ type: 'error', message: `Gagal memanggil jiwa baru: ${e instanceof Error ? e.message : String(e)}` });
     } finally {
       setIsSubmitting(false);
     }

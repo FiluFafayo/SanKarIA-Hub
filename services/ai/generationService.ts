@@ -415,7 +415,7 @@ class GenerationService {
         - Background: ${data.background}
         - Skill Utama: ${data.skills.join(', ')}
         - Equipment Dominan: ${data.equipment.slice(0, 3).join(', ')}
-
+        
         Instruksi:
         1. Jangan sebutkan angka statistik.
         2. Fokus pada bagaimana skill mempengaruhi pose (misal: "Stealth" -> "membungkuk waspada", "Intimidation" -> "dada membusung garang").
@@ -425,14 +425,32 @@ class GenerationService {
         Output contoh: "A sturdy dwarf holding a warhammer high, wearing chain mail, with a stern expression and a shield ready to block."
         `;
 
-        const call = async (client: any) => {
-            const response = await client.models.generateContent({
-                model: 'gemini-1.5-flash',
-                contents: prompt,
-            });
-            return response.text.trim();
-        };
-        return geminiService.makeApiCall(call);
+        // Coba AI terlebih dahulu, lalu fallback ke perakit lokal jika gagal
+        try {
+            const call = async (client: any) => {
+                const response = await client.models.generateContent({
+                    model: 'gemini-1.5-flash',
+                    contents: prompt,
+                });
+                return response.text.trim();
+            };
+            return await geminiService.makeApiCall(call);
+        } catch (err) {
+            // Fallback: rakit deskripsi visual sederhana tanpa AI
+            const cls = data.class.toLowerCase();
+            const race = `${data.gender} ${data.race}`.toLowerCase();
+            const poseHint = (() => {
+                const s = data.skills.map(x => x.toLowerCase());
+                if (s.includes('stealth')) return 'crouched and alert';
+                if (s.includes('intimidation')) return 'chest out with a fierce glare';
+                if (s.includes('athletics')) return 'standing strong with firm stance';
+                if (s.includes('perception')) return 'eyes scanning the surroundings';
+                if (s.includes('acrobatics')) return 'light on feet, ready to leap';
+                return 'calm yet ready';
+            })();
+            const gear = data.equipment.slice(0, 3).join(', ');
+            return `A ${race} ${cls}, ${poseHint}, wearing or carrying ${gear}.`;
+        }
     }
 
     // FASE GRATIS: Pollinations.ai Bridge
