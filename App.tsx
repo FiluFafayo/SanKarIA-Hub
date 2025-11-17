@@ -24,8 +24,9 @@ const BootScreen = () => (
 );
 
 const App: React.FC = () => {
-  // 1. Ambil state auth yang SEBENARNYA: user dan isAuthLoading
-  const { user, initialize, isAuthLoading } = useAppStore();
+  const user = useAppStore((s) => s.auth.user);
+  const isAuthLoading = useAppStore((s) => s.auth.isAuthLoading);
+  const initialize = useAppStore((s) => s.initialize);
   // State Mesin: Menentukan layar mana yang aktif
   const [appState, setAppState] = useState<'BOOT' | 'NEXUS' | 'BATTLE'>('BOOT');
 
