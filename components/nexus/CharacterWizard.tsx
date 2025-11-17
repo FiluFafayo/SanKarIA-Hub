@@ -99,6 +99,10 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const user = useAppStore(s => s.auth.user);
+  // Tambahan: Validasi user object saat inisialisasi
+  if (!user) {
+    console.warn("User tidak ditemukan dalam sesi, karakter tidak dapat disimpan");
+  }
   const pushNotification = useAppStore(s => s.actions.pushNotification);
 
   const handleGenerateAvatar = async () => {
