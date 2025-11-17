@@ -150,7 +150,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-1.5-flash',
+                model: geminiService.getTextModelName(),
                 contents: prompt,
                 config: {
                     responseMimeType: "application/json",
@@ -176,7 +176,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-1.5-flash',
+                model: geminiService.getTextModelName(),
                 contents: prompt,
                 config: {
                     tools: [{ functionDeclarations: SETUP_TOOLS }],
@@ -215,7 +215,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-1.5-flash',
+                model: geminiService.getTextModelName(),
                 contents: prompt,
             });
             return response.text.trim();
@@ -239,7 +239,7 @@ class GenerationService {
         `;
 
         const call = async (client: any) => {
-            const response = await client.models.generateContent({ model: 'gemini-1.5-flash', contents: prompt });
+            const response = await client.models.generateContent({ model: geminiService.getTextModelName(), contents: prompt });
             try {
                 const parsed = JSON.parse(response.text);
                 const minutesToAdd = parsed.timePassedInMinutes || 60; // Fallback 1 jam
@@ -267,7 +267,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.0-flash-preview-image-generation', // (P0 FIX) Ganti ke model yang sesuai
+                model: geminiService.getImageModelName(),
                 contents: { parts: [{ text: prompt }] },
                 config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
             });
@@ -301,7 +301,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.0-flash-preview-image-generation',
+                model: geminiService.getImageModelName(),
                 contents: { parts: [imagePart, textPart] },
                 config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
             });
@@ -379,7 +379,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.0-flash-preview-image-generation',
+                model: geminiService.getImageModelName(),
                 contents: {
                     parts: [
                         imagePart,
@@ -404,53 +404,36 @@ class GenerationService {
 
     // FASE 3: Smart Visual Interpreter
     // Menerjemahkan data statistik game (Class, Skill, Equip) menjadi deskripsi visual konkret
-    async generateVisualDescription(data: { race: string; gender: string; class: string; background: string; skills: string[]; equipment: string[] }): Promise<string> {
-        const prompt = `
-        Peran kamu adalah Concept Artist untuk game Retro RPG 16-bit.
-        Terjemahkan data karakter berikut menjadi deskripsi visual singkat (maksimal 2 kalimat) yang fokus pada POSTUR, GESTUR, dan PENAMPILAN.
-        
-        Data Karakter:
-        - Ras/Gender: ${data.gender} ${data.race}
-        - Kelas: ${data.class}
-        - Background: ${data.background}
-        - Skill Utama: ${data.skills.join(', ')}
-        - Equipment Dominan: ${data.equipment.slice(0, 3).join(', ')}
-        
-        Instruksi:
-        1. Jangan sebutkan angka statistik.
-        2. Fokus pada bagaimana skill mempengaruhi pose (misal: "Stealth" -> "membungkuk waspada", "Intimidation" -> "dada membusung garang").
-        3. Gambarkan equipment utama yang terlihat.
-        4. Gunakan Bahasa Inggris untuk hasil prompt gambar yang lebih baik.
-        
-        Output contoh: "A sturdy dwarf holding a warhammer high, wearing chain mail, with a stern expression and a shield ready to block."
-        `;
+    async generateVisualDescription(data: { 
+        race: string; 
+        gender: string; 
+        class: string; 
+        background: string; 
+        skills: string[]; 
+        abilityScores: Record<string, number>; 
+        primaryHeld: string[]; 
+        secondaryBack: string[]; 
+    }): Promise<string> {
+        const genderEn = (data.gender || '').toLowerCase() === 'wanita' ? 'girl' : 'boy';
+        const topEntry = Object.entries(data.abilityScores || {}).sort((a, b) => (b[1] || 0) - (a[1] || 0))[0];
+        const topAttr = topEntry ? topEntry[0].toLowerCase() : '';
+        const topDesc = (() => {
+            switch (topAttr) {
+                case 'strength': return 'muscular stance, lifting gear with ease';
+                case 'dexterity': return 'nimble posture, light on feet, poised to move';
+                case 'constitution': return 'sturdy frame and unwavering presence';
+                case 'intelligence': return 'calculating gaze and precise, deliberate motions';
+                case 'wisdom': return 'calm focus, watchful eyes, measured steps';
+                case 'charisma': return 'confident posture and captivating expression';
+                default: return 'balanced stance, ready for adventure';
+            }
+        })();
 
-        // Coba AI terlebih dahulu, lalu fallback ke perakit lokal jika gagal
-        try {
-            const call = async (client: any) => {
-                const response = await client.models.generateContent({
-                    model: 'gemini-1.5-flash',
-                    contents: prompt,
-                });
-                return response.text.trim();
-            };
-            return await geminiService.makeApiCall(call);
-        } catch (err) {
-            // Fallback: rakit deskripsi visual sederhana tanpa AI
-            const cls = data.class.toLowerCase();
-            const race = `${data.gender} ${data.race}`.toLowerCase();
-            const poseHint = (() => {
-                const s = data.skills.map(x => x.toLowerCase());
-                if (s.includes('stealth')) return 'crouched and alert';
-                if (s.includes('intimidation')) return 'chest out with a fierce glare';
-                if (s.includes('athletics')) return 'standing strong with firm stance';
-                if (s.includes('perception')) return 'eyes scanning the surroundings';
-                if (s.includes('acrobatics')) return 'light on feet, ready to leap';
-                return 'calm yet ready';
-            })();
-            const gear = data.equipment.slice(0, 3).join(', ');
-            return `A ${race} ${cls}, ${poseHint}, wearing or carrying ${gear}.`;
-        }
+        const held = (data.primaryHeld || []).join(', ');
+        const back = (data.secondaryBack || []).join(', ');
+        const skillsLine = data.skills.slice(0, 3).join(', ');
+
+        return `16-bit retro RPG full-body pixel art of a ${genderEn} ${data.race} ${data.class} from a ${data.background} background, ${topDesc}. Holds ${held} in hands; ${back ? `${back} strapped on the back; ` : ''}skills: ${skillsLine}. Crisp pixels, high contrast, SNES-style, no anti-aliasing.`;
     }
 
     // FASE GRATIS: Pollinations.ai Bridge
@@ -523,7 +506,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-1.5-flash',
+                model: geminiService.getTextModelName(),
                 contents: prompt,
                 config: {
                     responseMimeType: 'application/json',

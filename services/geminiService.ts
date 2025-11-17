@@ -11,6 +11,8 @@ class GeminiService {
     private apiKeys: string[] = this.loadKeysFromEnv();
     private currentKeyIndex = 0;
     private genAI: GoogleGenAI | null = null;
+    private resolvedTextModel: string | null = null;
+    private resolvedImageModel: string | null = null;
 
     // Helper untuk membaca Env Var (Support comma-separated untuk rotasi)
     private loadKeysFromEnv(): string[] {
@@ -53,6 +55,8 @@ class GeminiService {
 
         try {
             this.genAI = new GoogleGenAI({ apiKey: key });
+            // Deteksi model secara asynchronous, tidak menghalangi alur
+            this.detectPreferredModels(this.genAI).catch(() => {});
             return this.genAI;
         } catch (error) {
             console.error(`Gagal inisialisasi GoogleGenAI dengan kunci #${this.currentKeyIndex + 1}:`, error);
@@ -78,6 +82,8 @@ class GeminiService {
         while (attempts < maxAttempts) {
             try {
                 const client = this.getClient(); // Dapatkan klien (mungkin baru setelah rotasi)
+                // Pastikan deteksi model sudah pernah dicoba
+                this.detectPreferredModels(client).catch(() => {});
                 const timeoutPromise = new Promise<never>((_, reject) =>
                     setTimeout(() => reject(new Error(`API call timed out after 30 seconds (Attempt ${attempts + 1}/${maxAttempts})`)), 30000)
                 );
@@ -114,6 +120,43 @@ class GeminiService {
         }
         // Ini seharusnya tidak akan tercapai, tapi untuk keamanan typescript
         throw new Error("Gagal melakukan panggilan API setelah semua upaya.");
+    }
+
+    private async detectPreferredModels(client: GoogleGenAI) {
+        if (this.resolvedTextModel && this.resolvedImageModel) return;
+        try {
+            // @ts-ignore: list tersedia di SDK
+            const models = await client.models.list();
+            const names: string[] = Array.isArray(models.models)
+                ? models.models.map((m: any) => m.name || m.model || '')
+                : [];
+
+            const textPriority = [
+                'gemini-1.5-flash',
+                'gemini-1.5-flash-latest',
+                'gemini-1.5-pro',
+                'gemini-flash',
+                'gemini-pro',
+            ];
+            const imagePriority = [
+                'gemini-2.0-flash-preview-image-generation',
+                'gemini-2.0-flash-lite-preview',
+                'imagen-3.0',
+            ];
+
+            this.resolvedTextModel = textPriority.find((n) => names.includes(n)) || this.resolvedTextModel;
+            this.resolvedImageModel = imagePriority.find((n) => names.includes(n)) || this.resolvedImageModel;
+        } catch (e) {
+            // Abaikan kegagalan; fallback akan dipakai
+        }
+    }
+
+    public getTextModelName(): string {
+        return this.resolvedTextModel || 'gemini-1.5-flash';
+    }
+
+    public getImageModelName(): string {
+        return this.resolvedImageModel || 'gemini-2.0-flash-preview-image-generation';
     }
 
     // Fungsi ini tetap di sini karena ini adalah utilitas murni, bukan logika game.

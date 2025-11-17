@@ -105,18 +105,19 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
     if (!formData.raceId || !formData.classId) return;
     setIsGeneratingImage(true);
     try {
-        // 1. Kumpulkan Data Konteks
-        const equipList = Object.values(selectedEquipment).flatMap(e => e.itemNames);
+        const primaryHeld = selectedEquipment[0]?.itemNames || [];
+        const secondaryBack = selectedEquipment[1]?.itemNames || [];
         const contextData = {
             race: formData.raceId,
             gender: formData.gender,
             class: formData.classId,
             background: formData.backgroundName,
             skills: selectedSkills,
-            equipment: equipList
+            abilityScores: formData.abilityScores,
+            primaryHeld,
+            secondaryBack,
         };
 
-        // 2. Terjemahkan ke Visual Prompt (Smart Interpreter)
         const visualPrompt = await generationService.generateVisualDescription(contextData);
         console.log("🎨 [SMART PROMPT] AI Visual Interpretation:", visualPrompt); // LOG UTAMA
 
@@ -667,7 +668,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
 
         {step === 'REVIEW' && (
           <div className="flex flex-col gap-4 animate-fade-in">
-             <div className="flex gap-4">
+          <div className="flex gap-4 items-start">
                 {/* Kiri: Summary Text */}
                 <div className="w-1/2 flex flex-col gap-2 text-xs text-faded border-r border-wood/30 pr-2">
                     <h3 className="font-pixel text-gold text-sm border-b border-wood/50 pb-1">RINGKASAN JIWA</h3>
@@ -697,9 +698,8 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                 </div>
 
                 {/* Kanan: Avatar Generator */}
-                <div className="w-1/2 flex flex-col items-center justify-center gap-2">
-                    {/* Ubah ke rasio Portrait (~3:4) agar serasi dengan gambar Ras */}
-                    <div className="w-32 h-[170px] border-2 border-gold bg-black/50 flex items-center justify-center overflow-hidden relative shadow-pixel-glow">
+                <div className="w-1/2 flex flex-col justify-between gap-2 self-stretch">
+                    <div className="w-full flex-1 min-h-[240px] border-2 border-gold bg-black/50 flex items-center justify-center overflow-hidden relative shadow-pixel-glow">
                         {generatedAvatarUrl ? (
                             <img src={generatedAvatarUrl} alt="Generated Soul" className="w-full h-full object-cover animate-fade-in" />
                         ) : (
@@ -713,13 +713,12 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                             </div>
                         )}
                     </div>
-                    <button 
+                    <RuneButton 
+                        label={generatedAvatarUrl ? "GENERATE ULANG" : "VISUALISASIKAN"}
                         onClick={handleGenerateAvatar}
                         disabled={isGeneratingImage}
-                        className="font-pixel text-[10px] px-3 py-1 bg-blue-900/50 border border-blue-500 text-blue-200 hover:bg-blue-800 transition-colors disabled:opacity-50 w-full"
-                    >
-                        {generatedAvatarUrl ? "GENERATE ULANG" : "VISUALISASIKAN"}
-                    </button>
+                        fullWidth
+                    />
                 </div>
              </div>
 
