@@ -148,36 +148,47 @@ export const useAppStore = create<AppStore>((set, get) => ({
         // --- Authentication (REAL-TIME) ---
         initialize: async () => {
             set(state => ({ auth: { ...state.auth, isAuthLoading: true } }));
-            try {
-                // 1. Cek sesi instan (untuk mempercepat UI jika sudah ada di storage)
-                const currentUser = await dataService.getCurrentUser();
-                if (currentUser) {
-                    console.log("[Auth] Initial Check Found:", currentUser.email);
-                    set(state => ({ auth: { ...state.auth, user: currentUser } }));
+            
+            // 1. Pasang listener DULUAN. Ini sumber kebenaran (source of truth).
+            let listenerAlreadySetUser = false;
+            dataService.onAuthStateChange((event, session) => {
+                console.log(`[Auth] Event Triggered: ${event}`, session?.user?.email);
+                const user = session?.user ?? null;
+
+                if (event === 'INITIAL_SESSION') {
+                    listenerAlreadySetUser = true;
+                    // Saat sesi awal, CUKUP set user-nya.
+                    // JANGAN set isAuthLoading: false di sini.
+                    set(state => ({ auth: { ...state.auth, user }}));
+                } else {
+                    // Untuk event login/logout/dll, baru kita set loading
+                    set(state => ({ 
+                        auth: { ...state.auth, user, isAuthLoading: false }
+                    }));
                 }
 
-                // 2. PASANG PENDENGAR (LISTENER) - Ini kunci perbaikannya!
-                // Ini akan menangkap momen redirect dari Google saat token diproses
-                dataService.onAuthStateChange((event, session) => {
-                    console.log(`[Auth] Event Triggered: ${event}`, session?.user?.email);
-                    
-                    const user = session?.user ?? null;
-                    set(state => ({ 
-                        auth: { 
-                            ...state.auth, 
-                            user, 
-                            isAuthLoading: false // Stop loading setelah kita dapat sinyal pasti
-                        } 
-                    }));
+                // Jika user logout atau sesi habis, paksa kembali ke Nexus/Login
+                if (event === 'SIGNED_OUT') {
+                    get().actions.returnToNexus();
+                }
+            });
 
-                    // Jika user logout atau sesi habis, paksa kembali ke Nexus/Login
-                    if (event === 'SIGNED_OUT') {
-                        get().actions.returnToNexus();
-                    }
-                });
-                
+            // 2. Lakukan pengecekan manual (getCurrentUser)
+            // Ini untuk jaga-jaga kalau listener INITIAL_SESSION telat
+            try {
+                const currentUser = await dataService.getCurrentUser();
+                if (currentUser && !listenerAlreadySetUser) {
+                    // Jika listener belum jalan, tapi kita nemu user, set user-nya
+                    console.log("[Auth] Initial Check Found (manual):", currentUser.email);
+                    set(state => ({ auth: { ...state.auth, user: currentUser } }));
+                }
             } catch (error) {
-                console.error("[Auth] Error setting up auth:", error);
+                console.error("[Auth] Error during manual user check:", error);
+                // Biarkan finally yang handle loading
+            } finally {
+                // 3. JAMINAN UTAMA
+                // Setelah semua proses sinkron/asinkron di atas SELESAI,
+                // kita *PASTIKAN* isAuthLoading jadi false.
                 set(state => ({ auth: { ...state.auth, isAuthLoading: false } }));
             }
         },
