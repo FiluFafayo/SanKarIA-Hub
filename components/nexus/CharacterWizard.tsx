@@ -167,8 +167,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
 
       // 2. Inject Data Tambahan (Manual Override)
       characterData.proficientSkills = [...characterData.proficientSkills, ...selectedSkills];
-      // PRIORITAS: Gunakan Avatar AI jika sudah digenerate, jika tidak fallback ke static
-      characterData.image = generatedAvatarUrl || getStaticAvatar(raceName, formData.gender); 
+      characterData.avatar_url = generatedAvatarUrl || getStaticAvatar(raceName, formData.gender);
       characterData.gender = formData.gender as "Pria" | "Wanita";
       
       // 3. Susun Inventory
