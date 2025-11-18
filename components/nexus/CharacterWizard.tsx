@@ -58,7 +58,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const [generatedAvatarUrl, setGeneratedAvatarUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [visualPromptOptions, setVisualPromptOptions] = useState<string[] | null>(null);
-  const [promptVariantIndex, setPromptVariantIndex] = useState(0);
+  const [promptVariantIndex, setPromptVariantIndex] = useState(2);
   const [visualContextSig, setVisualContextSig] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -127,16 +127,20 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         const newSig = JSON.stringify(contextData);
 
         if (visualPromptOptions && visualPromptOptions.length > 0 && generatedAvatarUrl && visualContextSig === newSig) {
-            const nextIndex = (promptVariantIndex + 1) % visualPromptOptions.length;
-            const url = await generationService.generateCharacterPortrait(visualPromptOptions[nextIndex], formData.raceId, formData.gender);
-            setPromptVariantIndex(nextIndex);
+            const selected = visualPromptOptions[2] || visualPromptOptions[0];
+            console.log("🎨 [SMART PROMPT] Selected Option:", selected);
+            const url = await generationService.generateCharacterPortrait(selected, formData.raceId, formData.gender);
+            setPromptVariantIndex(2);
             setGeneratedAvatarUrl(url);
         } else {
             const visualPrompts = await generationService.generateVisualDescription(contextData);
             setVisualPromptOptions(visualPrompts);
             setVisualContextSig(newSig);
-            setPromptVariantIndex(0);
-            const url = await generationService.generateCharacterPortrait(visualPrompts[0], formData.raceId, formData.gender);
+            setPromptVariantIndex(2);
+            console.log("🎨 [SMART PROMPT] Options:", visualPrompts);
+            const selected = visualPrompts[2] || visualPrompts[0];
+            console.log("🎨 [SMART PROMPT] Selected Option:", selected);
+            const url = await generationService.generateCharacterPortrait(selected, formData.raceId, formData.gender);
             setGeneratedAvatarUrl(url);
         }
     } catch (e) {
@@ -715,7 +719,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                 <div className="w-1/2 flex flex-col justify-between gap-2 self-stretch">
                     <div className="w-full flex-1 min-h-[240px] border-2 border-gold bg-black/50 flex items-center justify-center overflow-hidden relative shadow-pixel-glow">
                         {generatedAvatarUrl ? (
-                            <img src={generatedAvatarUrl} alt="Generated Soul" className="w-full h-full object-cover animate-fade-in" />
+                            <img src={generatedAvatarUrl} alt="Generated Soul" className="w-full h-full object-contain animate-fade-in" />
                         ) : (
                             <div className="text-[9px] text-center text-faded px-2 font-retro">
                                 {isGeneratingImage ? "Menenun Wajah..." : "Visual Belum Terbentuk"}

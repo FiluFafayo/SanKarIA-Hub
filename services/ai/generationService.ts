@@ -414,6 +414,8 @@ class GenerationService {
         primaryHeld: string[]; 
         secondaryBack: string[]; 
     }): Promise<string[]> {
+        const genderKey = (data.gender || '').toLowerCase();
+        const genderEn = genderKey.includes('wanita') ? 'female' : 'male';
         const topEntry = Object.entries(data.abilityScores || {}).sort((a, b) => (b[1] || 0) - (a[1] || 0))[0];
         const topAttr = topEntry ? topEntry[0].toLowerCase() : '';
         const topDesc = (() => {
@@ -448,6 +450,8 @@ class GenerationService {
             return 'young adult human';
         })();
 
+        const demographic = `${genderEn} ${ageTag}`;
+
         const classDesc = (() => {
             if (classKey.includes('rogue')) return 'agile stance, hooded cowl, patched leather vest';
             if (classKey.includes('fighter')) return 'armored look, solid stance, practical straps';
@@ -463,6 +467,25 @@ class GenerationService {
             if (bgKey.includes('soldier')) return 'rank insignia and tidy strap work';
             if (bgKey.includes('sage')) return 'ink flecks and a compact scroll strap';
             return 'subtle personal accents reflecting their origin';
+        })();
+
+        const envDesc = (() => {
+            const c = classKey; const b = bgKey;
+            if (c.includes('rogue') && b.includes('criminal')) return 'gritty slum alley with flickering lanterns';
+            if (c.includes('rogue') && b.includes('outlander')) return 'edge of a dense forest camp with rough tents';
+            if (c.includes('rogue') && b.includes('soldier')) return 'shadowed corner near a barracks yard';
+            if (c.includes('rogue') && b.includes('sage')) return 'dusty archive hallway with dim sconces';
+            if (c.includes('fighter') && b.includes('soldier')) return 'training yard with battered dummies and banners';
+            if (c.includes('fighter') && b.includes('outlander')) return 'rocky canyon trail under a harsh sky';
+            if (c.includes('fighter') && b.includes('sage')) return 'armory hallway lined with racks and scrolls';
+            if (c.includes('cleric') && b.includes('acolyte')) return 'candlelit chapel with stained-glass shimmer';
+            if (c.includes('cleric') && b.includes('soldier')) return 'field tent shrine amid distant marching lines';
+            if (c.includes('cleric') && b.includes('outlander')) return 'stone circle clearing lit by moonlight';
+            if (c.includes('wizard') && b.includes('sage')) return 'arcane library with tall shelves and floating motes';
+            if (c.includes('wizard') && b.includes('soldier')) return 'arcane tower balcony overlooking a battlefield';
+            if (c.includes('wizard') && b.includes('outlander')) return 'remote observatory under starry sky';
+            if (b.includes('folk')) return 'humble village lane with woven banners';
+            return 'moody fantasy backdrop suited to their role';
         })();
 
         const normalizeNames = (arr: string[]) => (arr || []).map(s => (s || '').toLowerCase());
@@ -516,17 +539,18 @@ class GenerationService {
         const skillPhrases = (data.skills || []).slice(0, 2).map(skillVisual).filter(Boolean);
         const skillLine = skillPhrases.join('; ');
 
-        const baseLine = `${ageTag} ${data.race} ${data.class} from a ${data.background} background. ${raceDesc}. ${classDesc}. ${bgDesc}. ${topDesc}.`;
+        const baseLine = `${demographic} ${data.class} from a ${data.background} background. ${raceDesc}. ${classDesc}. ${bgDesc}. ${topDesc}.`;
         const kitLine = `Minimal kit: ${heldPhrase}${backPhrase ? '; ' + backPhrase : ''}.`;
+        const bgLine = `Background environment: ${envDesc}.`;
 
-        const style1 = '16-bit SNES full-body pixel art, crisp pixels, high contrast, no anti-aliasing; 24–32 color palette tuned to GUI';
-        const style2 = 'Game Boy Color-style full-body pixel art, 12–16 colors, subtle dithering, crisp 3/4 view';
-        const style3 = 'Neo-Geo Pocket SD full-body pixel art, chibi proportions, bold pixels, blocky shading, 20–24 colors';
+        const style1 = '16-bit SNES full-body pixel art, crisp pixels, high contrast, no anti-aliasing; 24–32 color palette tuned to GUI; low-resolution pixel blocks, visible pixel grid';
+        const style2 = 'Game Boy Color-style full-body pixel art, 12–16 colors, subtle dithering, crisp 3/4 view; low-resolution pixel blocks, visible pixel grid';
+        const style3 = 'Neo-Geo Pocket SD full-body pixel art, chibi proportions, bold pixels, blocky shading, 20–24 colors; low-resolution pixel blocks, visible pixel grid';
 
-        const opt1 = `[SMART PROMPT] ${baseLine} ${skillLine ? `Visualize traits via ${skillLine}. ` : ''}${kitLine} ${style1}.`;
-        const opt2 = `[SMART PROMPT] ${baseLine} ${skillLine ? `Visualize traits via ${skillLine}. ` : ''}${kitLine} ${style2}.`;
-        const opt3 = `[SMART PROMPT] ${baseLine} ${skillLine ? `Visualize traits via ${skillLine}. ` : ''}${kitLine} ${style3}.`;
-
+        const opt1 = `[SMART PROMPT] ${baseLine} ${skillLine ? `Visualize traits via ${skillLine}. ` : ''}${kitLine} ${bgLine} ${style1}. Full-body standing pose, head-to-toe visible (feet included), no crop, centered.`;
+        const opt2 = `[SMART PROMPT] ${baseLine} ${skillLine ? `Visualize traits via ${skillLine}. ` : ''}${kitLine} ${bgLine} ${style2}. Full-body standing pose, head-to-toe visible (feet included), no crop, centered.`;
+        const opt3 = `[SMART PROMPT] ${baseLine} ${skillLine ? `Visualize traits via ${skillLine}. ` : ''}${kitLine} ${bgLine} ${style3}. Full-body standing pose, head-to-toe visible (feet included), no crop, centered.`;
+        
         return [opt1, opt2, opt3];
     }
 
@@ -535,12 +559,15 @@ class GenerationService {
         console.log("[FREE-GEN] Mengalihkan request gambar ke Pollinations (Hemat Kuota)...");
 
         // 1. Susun Prompt Spesifik untuk External Generator
-        const finalPrompt = `pixel art style, 16-bit retro rpg character portrait, ${visualDescription}, pixelated, snes graphics, dark fantasy background, crisp pixels, no anti-aliasing, high contrast, full body display`;
+        const genderKey = (gender || '').toLowerCase();
+        const genderEn = genderKey.includes('wanita') ? 'female' : 'male';
+        const finalPrompt = `pixel art style, 16-bit retro rpg character portrait, ${genderEn} ${race}, ${visualDescription}, heavy pixelation, visible pixel grid, nearest-neighbor aesthetic, crisp 1px outlines, no anti-aliasing, high contrast, full body standing pose, head-to-toe visible (feet included), centered, no crop`;
+        console.log("[FREE-GEN] T2I Prompt:", finalPrompt);
         
         // 2. Parameter URL (Portrait Ratio ~3:4)
         const seed = Math.floor(Math.random() * 1000000);
         const width = 480;
-        const height = 640; // Rasio 3:4
+        const height = 720;
         const encodedPrompt = encodeURIComponent(finalPrompt);
         
         // 3. Panggil API Publik (Tanpa Key)
