@@ -44,7 +44,9 @@ interface CharacterWizardProps {
 import { generationService } from '../../services/ai/generationService';
 import { renderCharacterLayout } from '../../services/pixelRenderer'; // BARU: Impor generator blueprint
 
-type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'EQUIPMENT' | 'STATS' | 'REVIEW';
+import { SPRITE_PARTS } from '../../data/spriteParts'; // BARU: Impor data sprite
+
+type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'VISUAL' | 'EQUIPMENT' | 'STATS' | 'REVIEW'; // BARU: Tambah step 'VISUAL'
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
 
 export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, onCancel }) => {
@@ -69,6 +71,12 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
     classId: '',
     backgroundName: '',
     abilityScores: {} as Partial<AbilityScores>,
+    // BARU: State untuk data visual (sesuai kebutuhan pixelRenderer)
+    hair: 'h_bald',
+    facialHair: 'ff_none',
+    headAccessory: 'ha_none',
+    scars: [] as string[], // Izinkan beberapa luka
+    bodyType: 'bt_normal',
   });
 
   // Helper: Toggle Skill
@@ -161,12 +169,12 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
             // Data inventory yang baru dibuat
             inventory: kludgeInventory,
             
-            // Data yang tidak dikumpulkan wizard, pakai default agar renderer tidak error
-            bodyType: 'Normal',
-            hair: 'Botak',
-            facialHair: 'Tidak Ada',
-            headAccessory: 'Tidak Ada',
-            scars: [],
+            // [FIX FASE FINAL] Ambil data visual dari formData, bukan hardcode
+            bodyType: formData.bodyType,
+            hair: formData.hair,
+            facialHair: formData.facialHair,
+            headAccessory: formData.headAccessory,
+            scars: formData.scars,
 
             // Data dummy lain (tidak dibaca renderer, tapi perlu untuk tipe Character)
             id: 'temp', ownerId: 'temp', name: formData.name, level: 1, xp: 0,
@@ -246,6 +254,13 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
       characterData.proficientSkills = [...characterData.proficientSkills, ...selectedSkills];
       characterData.avatar_url = generatedAvatarUrl || getStaticAvatar(raceName, formData.gender);
       characterData.gender = formData.gender as "Pria" | "Wanita";
+      
+      // [FIX FASE FINAL] Pastikan data visual kustom tersimpan saat karakter dibuat
+      characterData.hair = formData.hair;
+      characterData.facialHair = formData.facialHair;
+      characterData.headAccessory = formData.headAccessory;
+      characterData.scars = formData.scars;
+      characterData.bodyType = formData.bodyType;
       
       // 3. Susun Inventory
       const inventory: Omit<CharacterInventoryItem, "instanceId">[] = [];
@@ -358,6 +373,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
           {step === 'RACE' && "ASAL USUL (RAS)"}
           {step === 'CLASS' && "TAKDIR (KELAS)"}
           {step === 'BACKGROUND' && "LATAR BELAKANG"}
+          {step === 'VISUAL' && "PENAMPAKAN (VISUAL)"}
           {step === 'STATS' && "ATRIBUT KEKUATAN"}
         </h2>
 
@@ -590,9 +606,92 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
             )}
             <div className="flex gap-2 mt-4 relative z-20">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('CLASS')} fullWidth />
-              <RuneButton label="LANJUT" fullWidth disabled={!formData.backgroundName} onClick={() => setStep('EQUIPMENT')} />
+              <RuneButton label="LANJUT" fullWidth disabled={!formData.backgroundName} onClick={() => setStep('VISUAL')} />
             </div>
           </>
+        )}
+
+        {/* BARU: Step Visual Kustomisasi */}
+        {step === 'VISUAL' && (
+          <div className="flex flex-col gap-4 animate-fade-in">
+             <div className="text-center border-b border-wood/30 pb-2">
+                 <h3 className="font-pixel text-lg text-gold mb-1">KUSTOMISASI</h3>
+                 <p className="text-parchment font-retro text-xs">
+                    Tentukan ciri fisik unik jiwamu.
+                 </p>
+             </div>
+             
+             <div className="flex flex-col gap-3 overflow-y-auto max-h-[350px] pr-2">
+                
+                {/* Opsi Rambut */}
+                <div className="border border-wood p-2 bg-black/40">
+                    <p className="font-pixel text-xs text-gold mb-2">RAMBUT</p>
+                    <div className="grid grid-cols-3 gap-1">
+                        {SPRITE_PARTS.hair.map(part => (
+                             <div key={part.id} 
+                                  onClick={() => setFormData(prev => ({...prev, hair: part.id}))}
+                                  className={`text-[9px] px-2 py-1 border cursor-pointer text-center ${formData.hair === part.id ? 'bg-gold text-black border-gold' : 'border-wood text-faded hover:bg-white/5'}`}>
+                                 {part.name}
+                             </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Opsi Jenggot/Kumis (Facial Hair) */}
+                <div className="border border-wood p-2 bg-black/40">
+                    <p className="font-pixel text-xs text-gold mb-2">FITUR WAJAH (JENGGOT/KUMIS)</p>
+                    <div className="grid grid-cols-3 gap-1">
+                        {SPRITE_PARTS.facial_feature.filter(p => p.id.startsWith('ff_beard') || p.id.startsWith('ff_mustache') || p.id === 'ff_none').map(part => (
+                             <div key={part.id} 
+                                  onClick={() => setFormData(prev => ({...prev, facialHair: part.id}))}
+                                  className={`text-[9px] px-2 py-1 border cursor-pointer text-center ${formData.facialHair === part.id ? 'bg-gold text-black border-gold' : 'border-wood text-faded hover:bg-white/5'}`}>
+                                 {part.name}
+                             </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Opsi Aksesori Kepala */}
+                <div className="border border-wood p-2 bg-black/40">
+                    <p className="font-pixel text-xs text-gold mb-2">AKSESORI KEPALA</p>
+                    <div className="grid grid-cols-3 gap-1">
+                        {SPRITE_PARTS.head_accessory.map(part => (
+                             <div key={part.id} 
+                                  onClick={() => setFormData(prev => ({...prev, headAccessory: part.id}))}
+                                  className={`text-[9px] px-2 py-1 border cursor-pointer text-center ${formData.headAccessory === part.id ? 'bg-gold text-black border-gold' : 'border-wood text-faded hover:bg-white/5'}`}>
+                                 {part.name}
+                             </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Opsi Luka (Scars) */}
+                <div className="border border-wood p-2 bg-black/40">
+                    <p className="font-pixel text-xs text-gold mb-2">LUKA (Bisa pilih lebih dari 1)</p>
+                    <div className="grid grid-cols-3 gap-1">
+                        {SPRITE_PARTS.facial_feature.filter(p => p.id.startsWith('ff_scar') || p.id.startsWith('ff_one_eye')).map(part => (
+                             <div key={part.id} 
+                                  onClick={() => {
+                                      const currentScars = formData.scars;
+                                      if (currentScars.includes(part.id)) {
+                                          setFormData(prev => ({...prev, scars: prev.scars.filter(s => s !== part.id)}));
+                                      } else {
+                                          setFormData(prev => ({...prev, scars: [...prev.scars, part.id]}));
+                                      }
+                                  }}
+                                  className={`text-[9px] px-2 py-1 border cursor-pointer text-center ${formData.scars.includes(part.id) ? 'bg-gold text-black border-gold' : 'border-wood text-faded hover:bg-white/5'}`}>
+                                 {part.name}
+                             </div>
+                        ))}
+                    </div>
+                </div>
+
+             </div>
+             <div className="flex gap-2 mt-2 relative z-20">
+              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('BACKGROUND')} fullWidth />
+              <RuneButton label="LANJUT" fullWidth onClick={() => setStep('EQUIPMENT')} />
+            </div>
+          </div>
         )}
 
         {step === 'EQUIPMENT' && (
@@ -642,7 +741,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                 ))}
              </div>
              <div className="flex gap-2 mt-2 relative z-20">
-              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('BACKGROUND')} fullWidth />
+              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('VISUAL')} fullWidth />
               <RuneButton label="LANJUT" fullWidth onClick={() => setStep('STATS')} />
             </div>
           </div>
