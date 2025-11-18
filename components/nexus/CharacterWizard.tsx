@@ -47,6 +47,7 @@ import { renderCharacterLayout } from '../../services/pixelRenderer'; // BARU: I
 import { SPRITE_PARTS } from '../../data/spriteParts'; // BARU: Impor data sprite
 // HAPUS: Kita tidak pakai repository untuk upload blueprint lagi
 // import { characterRepository } from '../../services/repository/characterRepository';
+import { HfInference } from '@huggingface/inference';
 
 type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'VISUAL' | 'EQUIPMENT' | 'STATS' | 'REVIEW'; // BARU: Tambah step 'VISUAL'
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
@@ -193,54 +194,27 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
       const simplePrompt = `(pixel art:1.5), (16-bit rpg style:1.4), (chibi:1.2), (18-color palette:1.3), crisp pixel detailing, a ${formData.gender.toLowerCase()} ${formData.raceId} ${formData.classId}, ${formData.backgroundName} background, full-body standing pose, centered`;
       const negativePrompt = `(photorealistic:1.5), (3d render:1.5), (smooth shading:1.4), painting, detailed, high resolution, blurry, deformed hands, warped, mangled, fused, text, signature, watermark`;
 
-      // 5. [REFAKTOR] BANGUN PANGGILAN API KE HUGGING FACE
       const HF_TOKEN = import.meta.env.VITE_HUGGINGFACE_API_KEY;
       if (!HF_TOKEN) {
         throw new Error("VITE_HUGGINGFACE_API_KEY tidak ditemukan. Cek Vercel Env Vars.");
       }
-
-      // Model standar, paling mungkin "hot"
       const MODEL_ID = "runwayml/stable-diffusion-v1-5";
+      const hf = new HfInference(HF_TOKEN);
 
-      // [FIX 410] Ganti domain ke router baru sesuai pesan error Hugging Face
-      const API_URL = `https://router.huggingface.co/hf-inference/models/${MODEL_ID}`;
-
-      // Parameter untuk img2img
-      const params = new URLSearchParams({
-        prompt: simplePrompt,
-        negative_prompt: negativePrompt,
-        strength: "0.6", // 60% prompt, 40% blueprint. Bisa di-tweak (0.5 - 0.8)
-      });
-
-      const finalUrl = `${API_URL}?${params.toString()}`;
-
-      console.log("🎨 [IMG2IMG-HF] Mengganti Pollinations dengan Hugging Face");
-      console.log("🎨 [IMG2IMG-HF] Model:", MODEL_ID);
-      console.log("🎨 [IMG2IMG-HF] Prompt Simpel:", simplePrompt);
-      console.log("🎨 [IMG2IMG-HF] URL API Final:", finalUrl);
-
-      // 6. [REFAKTOR] KIRIM BLOB DENGAN FETCH (POST)
-      const response = await fetch(finalUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${HF_TOKEN}`,
-          'Content-Type': 'image/png' // Kirim blueprint sebagai body
+      const imageBlob = await hf.imageToImage(
+        {
+          model: MODEL_ID,
+          inputs: blueprintBlob,
+          parameters: {
+            prompt: simplePrompt,
+            negative_prompt: negativePrompt,
+            strength: 0.6,
+            guidance_scale: 7.5,
+            num_inference_steps: 25,
+          },
         },
-        body: blueprintBlob,
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.error("HF Error Body:", errorBody);
-        // Cek error "cold boot"
-        if (response.status === 503 && errorBody.includes("is currently loading")) {
-          throw new Error("Model sedang 'pemanasan' (cold boot). Coba lagi dalam 1-2 menit.");
-        }
-        throw new Error(`Gagal menghubungi Hugging Face: ${response.status} ${response.statusText}`);
-      }
-
-      // 7. KONVERSI RESPON BLOB KE BASE64 UNTUK <img>
-      const imageBlob = await response.blob();
+        { use_cache: false }
+      );
       const imageBase64 = await blobToBase64(imageBlob);
 
       setGeneratedAvatarUrl(imageBase64); // Set URL base64 ini
