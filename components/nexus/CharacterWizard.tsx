@@ -201,7 +201,9 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
 
       // Model standar, paling mungkin "hot"
       const MODEL_ID = "runwayml/stable-diffusion-v1-5";
-      const API_URL = `https://api-inference.huggingface.co/models/${MODEL_ID}`;
+
+      // [FIX 410] Ganti domain ke router baru sesuai pesan error Hugging Face
+      const API_URL = `https://router.huggingface.co/hf-inference/models/${MODEL_ID}`;
 
       // Parameter untuk img2img
       const params = new URLSearchParams({
