@@ -413,27 +413,121 @@ class GenerationService {
         abilityScores: Record<string, number>; 
         primaryHeld: string[]; 
         secondaryBack: string[]; 
-    }): Promise<string> {
-        const genderEn = (data.gender || '').toLowerCase() === 'wanita' ? 'girl' : 'boy';
+    }): Promise<string[]> {
         const topEntry = Object.entries(data.abilityScores || {}).sort((a, b) => (b[1] || 0) - (a[1] || 0))[0];
         const topAttr = topEntry ? topEntry[0].toLowerCase() : '';
         const topDesc = (() => {
             switch (topAttr) {
-                case 'strength': return 'muscular stance, lifting gear with ease';
-                case 'dexterity': return 'nimble posture, light on feet, poised to move';
-                case 'constitution': return 'sturdy frame and unwavering presence';
-                case 'intelligence': return 'calculating gaze and precise, deliberate motions';
-                case 'wisdom': return 'calm focus, watchful eyes, measured steps';
-                case 'charisma': return 'confident posture and captivating expression';
-                default: return 'balanced stance, ready for adventure';
+                case 'strength': return 'power conveyed through a solid, muscular stance';
+                case 'dexterity': return 'agility conveyed through a nimble, low-profile posture';
+                case 'constitution': return 'endurance conveyed through a sturdy frame and resolute presence';
+                case 'intelligence': return 'precision conveyed through a calculating gaze and deliberate motions';
+                case 'wisdom': return 'awareness conveyed through calm focus and watchful eyes';
+                case 'charisma': return 'presence conveyed through a confident posture and captivating expression';
+                default: return 'readiness conveyed through a balanced, adventure-ready stance';
             }
         })();
 
-        const held = (data.primaryHeld || []).join(', ');
-        const back = (data.secondaryBack || []).join(', ');
-        const skillsLine = data.skills.slice(0, 3).join(', ');
+        const raceKey = (data.race || '').toLowerCase();
+        const classKey = (data.class || '').toLowerCase();
+        const bgKey = (data.background || '').toLowerCase();
 
-        return `16-bit retro RPG full-body pixel art of a ${genderEn} ${data.race} ${data.class} from a ${data.background} background, ${topDesc}. Holds ${held} in hands; ${back ? `${back} strapped on the back; ` : ''}skills: ${skillsLine}. Crisp pixels, high contrast, SNES-style, no anti-aliasing.`;
+        const raceDesc = (() => {
+            if (raceKey.includes('halfling')) return 'small build, rounded cheeks, subtly pointed ears, tough bare soles';
+            if (raceKey.includes('dwarf')) return 'stocky frame, thick brows, braided beard with simple metal beads';
+            if (raceKey.includes('elf')) return 'slender build, pointed ears, graceful bearing';
+            if (raceKey.includes('tiefling')) return 'distinct horns and tail, warm skin tone, striking silhouette';
+            return 'versatile features and average build';
+        })();
+
+        const ageTag = (() => {
+            if (raceKey.includes('halfling')) return 'adult halfling';
+            if (raceKey.includes('dwarf')) return 'adult dwarf';
+            if (raceKey.includes('elf')) return 'adult elf';
+            if (raceKey.includes('tiefling')) return 'adult tiefling';
+            return 'young adult human';
+        })();
+
+        const classDesc = (() => {
+            if (classKey.includes('rogue')) return 'agile stance, hooded cowl, patched leather vest';
+            if (classKey.includes('fighter')) return 'armored look, solid stance, practical straps';
+            if (classKey.includes('cleric')) return 'sturdy mantle and simple robe, holy symbol subtly visible';
+            if (classKey.includes('wizard')) return 'robe with focus-ready sleeves, attentive posture';
+            return 'adventurer attire suited to travel';
+        })();
+
+        const bgDesc = (() => {
+            if (bgKey.includes('folk')) return 'handwoven village sash and a small emblem';
+            if (bgKey.includes('outlander')) return 'weathered cloak with rough stitches and a small bone charm';
+            if (bgKey.includes('acolyte')) return 'priestly sash and clean straps, holy accents';
+            if (bgKey.includes('soldier')) return 'rank insignia and tidy strap work';
+            if (bgKey.includes('sage')) return 'ink flecks and a compact scroll strap';
+            return 'subtle personal accents reflecting their origin';
+        })();
+
+        const normalizeNames = (arr: string[]) => (arr || []).map(s => (s || '').toLowerCase());
+        const heldNames = normalizeNames(data.primaryHeld || []);
+        const backNames = normalizeNames(data.secondaryBack || []);
+
+        const heldPhrase = (() => {
+            const s = heldNames[0] || '';
+            if (s.includes('rapier')) return 'slim rapier in hand';
+            if (s.includes('shortsword')) return 'shortsword in hand';
+            if (s.includes('longsword')) return 'longsword in hand';
+            if (s.includes('dagger')) return 'small dagger in hand';
+            if (s.includes('mace')) return 'mace in hand';
+            if (s.includes('warhammer')) return 'warhammer in hand';
+            if (s.includes('quarterstaff')) return 'quarterstaff in hand';
+            if (s.includes('shield')) return 'round shield at forearm';
+            if (s) return `${s} in hand`;
+            return 'minimal primary kit in hand';
+        })();
+
+        const backPhrase = (() => {
+            const hasShortbow = backNames.some(n => n.includes('shortbow'));
+            const hasLongbow = backNames.some(n => n.includes('longbow'));
+            const hasArrows = backNames.some(n => n.includes('arrows') || n.includes('bolts') || n.includes('quiver'));
+            const parts: string[] = [];
+            if (hasShortbow) parts.push('slim shortbow silhouette on back');
+            if (hasLongbow) parts.push('slim longbow silhouette on back');
+            if (hasArrows) parts.push('compact quiver with few tips visible');
+            return parts.join(', ');
+        })();
+
+        const skillVisual = (skill: string) => {
+            const k = (skill || '').toLowerCase();
+            if (k.includes('stealth')) return 'low posture and rim-light on dark cloth';
+            if (k.includes('investigation')) return 'focused gaze scanning ground-scratch markers';
+            if (k.includes('deception')) return 'half-smile and a hidden hand under the cloak';
+            if (k.includes('perception')) return 'watchful eyes and subtle head tilt toward distant sound';
+            if (k.includes('survival')) return 'weathered mantle and mud flecks on boots';
+            if (k.includes('athletics')) return 'taut muscles and planted feet';
+            if (k.includes('intimidation')) return 'sharp glare and clenched fist';
+            if (k.includes('acrobatics')) return 'balanced, light-footed poise';
+            if (k.includes('persuasion')) return 'open hand gesture and confident smile';
+            if (k.includes('insight')) return 'calm, measured gaze';
+            if (k.includes('religion')) return 'holy symbol subtly framed';
+            if (k.includes('arcana')) return 'arcane focus subtly glowing';
+            if (k.includes('medicine')) return 'small bandage satchel visible';
+            if (k.includes('sleight')) return 'quick fingers poised near belt pouch';
+            return '';
+        };
+
+        const skillPhrases = (data.skills || []).slice(0, 2).map(skillVisual).filter(Boolean);
+        const skillLine = skillPhrases.join('; ');
+
+        const baseLine = `${ageTag} ${data.race} ${data.class} from a ${data.background} background. ${raceDesc}. ${classDesc}. ${bgDesc}. ${topDesc}.`;
+        const kitLine = `Minimal kit: ${heldPhrase}${backPhrase ? '; ' + backPhrase : ''}.`;
+
+        const style1 = '16-bit SNES full-body pixel art, crisp pixels, high contrast, no anti-aliasing; 24–32 color palette tuned to GUI';
+        const style2 = 'Game Boy Color-style full-body pixel art, 12–16 colors, subtle dithering, crisp 3/4 view';
+        const style3 = 'Neo-Geo Pocket SD full-body pixel art, chibi proportions, bold pixels, blocky shading, 20–24 colors';
+
+        const opt1 = `[SMART PROMPT] ${baseLine} ${skillLine ? `Visualize traits via ${skillLine}. ` : ''}${kitLine} ${style1}.`;
+        const opt2 = `[SMART PROMPT] ${baseLine} ${skillLine ? `Visualize traits via ${skillLine}. ` : ''}${kitLine} ${style2}.`;
+        const opt3 = `[SMART PROMPT] ${baseLine} ${skillLine ? `Visualize traits via ${skillLine}. ` : ''}${kitLine} ${style3}.`;
+
+        return [opt1, opt2, opt3];
     }
 
     // FASE GRATIS: Pollinations.ai Bridge
@@ -441,7 +535,7 @@ class GenerationService {
         console.log("[FREE-GEN] Mengalihkan request gambar ke Pollinations (Hemat Kuota)...");
 
         // 1. Susun Prompt Spesifik untuk External Generator
-        const finalPrompt = `pixel art style, 16-bit retro rpg character portrait, ${gender} ${race}, ${visualDescription}, pixelated, snes graphics, dark fantasy background, crisp pixels, no anti-aliasing, high contrast, full body display`;
+        const finalPrompt = `pixel art style, 16-bit retro rpg character portrait, ${visualDescription}, pixelated, snes graphics, dark fantasy background, crisp pixels, no anti-aliasing, high contrast, full body display`;
         
         // 2. Parameter URL (Portrait Ratio ~3:4)
         const seed = Math.floor(Math.random() * 1000000);

@@ -57,6 +57,9 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const [statsMethod, setStatsMethod] = useState<'STANDARD' | 'POINT_BUY' | 'MANUAL'>('STANDARD');
   const [generatedAvatarUrl, setGeneratedAvatarUrl] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [visualPromptOptions, setVisualPromptOptions] = useState<string[] | null>(null);
+  const [promptVariantIndex, setPromptVariantIndex] = useState(0);
+  const [visualContextSig, setVisualContextSig] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -121,13 +124,21 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
             primaryHeld,
             secondaryBack,
         };
+        const newSig = JSON.stringify(contextData);
 
-        const visualPrompt = await generationService.generateVisualDescription(contextData);
-        console.log("🎨 [SMART PROMPT] AI Visual Interpretation:", visualPrompt); // LOG UTAMA
-
-        // 3. Generate Gambar dengan Prompt Tersebut
-        const url = await generationService.generateCharacterPortrait(visualPrompt, formData.raceId, formData.gender);
-        setGeneratedAvatarUrl(url);
+        if (visualPromptOptions && visualPromptOptions.length > 0 && generatedAvatarUrl && visualContextSig === newSig) {
+            const nextIndex = (promptVariantIndex + 1) % visualPromptOptions.length;
+            const url = await generationService.generateCharacterPortrait(visualPromptOptions[nextIndex], formData.raceId, formData.gender);
+            setPromptVariantIndex(nextIndex);
+            setGeneratedAvatarUrl(url);
+        } else {
+            const visualPrompts = await generationService.generateVisualDescription(contextData);
+            setVisualPromptOptions(visualPrompts);
+            setVisualContextSig(newSig);
+            setPromptVariantIndex(0);
+            const url = await generationService.generateCharacterPortrait(visualPrompts[0], formData.raceId, formData.gender);
+            setGeneratedAvatarUrl(url);
+        }
     } catch (e) {
         console.error("Avatar Gen Error:", e);
         pushNotification({ type: 'error', message: `Gagal memvisualisasikan jiwa: ${e instanceof Error ? e.message : 'Error misterius'}` });
