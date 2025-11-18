@@ -1,5 +1,6 @@
 import { dataService } from '../dataService';
 import { Character, CharacterInventoryItem, SpellDefinition, AbilityScores, CharacterFeature, Skill, Ability } from '../../types';
+import { decode } from 'base64-arraybuffer'; // BARU: Impor decoder
 
 type DbCharacter = {
   id: string;
@@ -446,5 +447,46 @@ export const characterRepository = {
       ((finalInventory || []) as unknown as DbCharacterInventoryJoined[]),
       ((finalSpells || []) as unknown as DbCharacterSpellJoined[])
     );
+  },
+
+  // BARU: Fungsi untuk upload blueprint, butuh 'decode'
+  async uploadCharacterBlueprint(characterId: string, base64Data: string): Promise<string> {
+    const supabase = dataService.getClient();
+    try {
+        const contentType = 'image/png';
+        const base64String = base64Data.replace('data:image/png;base64,', '');
+        const buffer = decode(base64String);
+        
+        // Simpan di folder 'blueprints' (bucket 'assets' sesuai asumsi dari file lain)
+        const filePath = `blueprints/${characterId}_${Date.now()}.png`;
+
+        const { error } = await supabase.storage
+            .from('assets') // Asumsi bucket 'assets'
+            .upload(filePath, buffer, {
+                contentType,
+                cacheControl: '600', // Cache 10 menit
+                upsert: true
+            });
+
+        if (error) {
+            console.error('Error uploading blueprint:', error);
+            throw error;
+        }
+
+        const { data } = supabase.storage
+            .from('assets')
+            .getPublicUrl(filePath);
+
+        if (!data.publicUrl) {
+            throw new Error("Gagal mendapatkan URL publik untuk blueprint.");
+        }
+        
+        console.log(`[SYS] Blueprint diupload ke: ${data.publicUrl}`);
+        return data.publicUrl;
+
+    } catch (e) {
+        console.error("Kesalahan upload blueprint:", e);
+        throw new Error("Gagal meng-upload blueprint karakter.");
+    }
   },
 };
