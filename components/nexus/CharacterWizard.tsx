@@ -199,16 +199,22 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         throw new Error("VITE_HUGGINGFACE_API_KEY tidak ditemukan. Cek Vercel Env Vars.");
       }
       const hf = new HfInference(HF_TOKEN);
+      // Prioritaskan model yang lebih cocok untuk img2img dan tambahkan alternatif
       const MODEL_CANDIDATES = [
-        "stabilityai/sdxl-turbo",
+        // Model yang Anda sebutkan (sering dipakai untuk editing/img2img)
+        "black-forest-labs/FLUX.1-Kontext-dev",
+        "Qwen/Qwen-Image-Edit",
+        // Fallback umum yang kadang tersedia via HF inference
         "timbrooks/instruct-pix2pix",
-        "runwayml/stable-diffusion-v1-5"
+        "stabilityai/sdxl-turbo",
+        "runwayml/stable-diffusion-v1-5",
       ];
 
       let imageBlob: Blob | null = null;
       let lastError: any = null;
       for (const modelId of MODEL_CANDIDATES) {
         try {
+          // Coba tanpa memaksa provider dulu (biarkan client menentukan provider terbaik)
           imageBlob = await hf.imageToImage(
             {
               model: modelId,
@@ -221,11 +227,33 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                 num_inference_steps: 25,
               },
             },
-            { use_cache: false, provider: 'hf-inference', wait_for_model: true }
+            { use_cache: false, wait_for_model: true }
           );
           if (imageBlob) break;
-        } catch (e) {
-          lastError = e;
+        } catch (e1) {
+          // Jika gagal, coba lagi dengan provider 'hf-inference' (compatibilitas beberapa model)
+          try {
+            imageBlob = await hf.imageToImage(
+              {
+                model: modelId,
+                inputs: blueprintBlob,
+                parameters: {
+                  prompt: simplePrompt,
+                  negative_prompt: negativePrompt,
+                  strength: 0.6,
+                  guidance_scale: 7.5,
+                  num_inference_steps: 25,
+                },
+              },
+              { use_cache: false, provider: 'hf-inference', wait_for_model: true }
+            );
+            if (imageBlob) break;
+          } catch (e2) {
+            // simpan error terakhir untuk debugging/pesan ke user
+            lastError = e2;
+            console.debug(`Model ${modelId} tidak tersedia via HF inference:`, e2);
+            // lanjut ke kandidat berikutnya
+          }
         }
       }
       if (!imageBlob) {
