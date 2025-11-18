@@ -42,6 +42,7 @@ interface CharacterWizardProps {
 }
 
 import { generationService } from '../../services/ai/generationService';
+import { renderCharacterLayout } from '../../services/pixelRenderer'; // BARU: Impor generator blueprint
 
 type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'EQUIPMENT' | 'STATS' | 'REVIEW';
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
@@ -111,40 +112,101 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const handleGenerateAvatar = async () => {
     if (!formData.raceId || !formData.classId) return;
     setIsGeneratingImage(true);
-    try {
-        const primaryHeld = selectedEquipment[0]?.itemNames || [];
-        const secondaryBack = selectedEquipment[1]?.itemNames || [];
-        const contextData = {
-            race: formData.raceId,
-            gender: formData.gender,
-            class: formData.classId,
-            background: formData.backgroundName,
-            skills: selectedSkills,
-            abilityScores: formData.abilityScores,
-            primaryHeld,
-            secondaryBack,
-        };
-        const newSig = JSON.stringify(contextData);
+    
+    // HAPUS SEMUA LOGIKA 'visualPromptOptions' DAN 'generateVisualDescription'.
+    // KITA SEKARANG MENGGUNAKAN ALUR IMG2IMG DENGAN BLUEPRINT.
 
-        if (visualPromptOptions && visualPromptOptions.length > 0 && generatedAvatarUrl && visualContextSig === newSig) {
-            const selected = visualPromptOptions[2] || visualPromptOptions[0];
-            console.log("🎨 [SMART PROMPT] Selected Option:", selected);
-            const url = await generationService.generateCharacterPortrait(selected, formData.raceId, formData.gender);
-            setPromptVariantIndex(2);
-            setGeneratedAvatarUrl(url);
-        } else {
-            const visualPrompts = await generationService.generateVisualDescription(contextData);
-            setVisualPromptOptions(visualPrompts);
-            setVisualContextSig(newSig);
-            setPromptVariantIndex(2);
-            console.log("🎨 [SMART PROMPT] Options:", visualPrompts);
-            const selected = visualPrompts[2] || visualPrompts[0];
-            console.log("🎨 [SMART PROMPT] Selected Option:", selected);
-            const url = await generationService.generateCharacterPortrait(selected, formData.raceId, formData.gender);
-            setGeneratedAvatarUrl(url);
-        }
+    try {
+        // 1. BUAT "K-LUDGE" INVENTORY DARI STATE WIZARD
+        //    Ini diperlukan agar pixelRenderer (Fase 0) bisa menggambar blueprint senjata/armor
+        const kludgeInventory: CharacterInventoryItem[] = [];
+        const cls = findClass(formData.classId);
+
+        // a. Fixed Equipment (dari kelas)
+        cls?.startingEquipment.fixed.forEach((fix, idx) => {
+            const itemDef = getItemDef(fix.itemName);
+            if (itemDef) {
+                kludgeInventory.push({
+                    instanceId: `fix-${idx}`,
+                    item: itemDef,
+                    quantity: fix.quantity,
+                    isEquipped: itemDef.type === 'armor', // Asumsi armor langsung dipakai
+                });
+            }
+        });
+
+        // b. Chosen Equipment (dari wizard step)
+        Object.values(selectedEquipment).forEach((opt, idx) => {
+            opt.itemNames.forEach((name, nameIdx) => {
+                const itemDef = getItemDef(name);
+                if (itemDef) {
+                    kludgeInventory.push({
+                        instanceId: `choice-${idx}-${nameIdx}`,
+                        item: itemDef,
+                        quantity: 1,
+                        isEquipped: true, // Asumsi semua equipment pilihan langsung dipakai
+                    });
+                }
+            });
+        });
+
+        // 2. BUAT "K-LUDGE" CHARACTER OBJECT
+        //    Objek ini HANYA untuk memenuhi kebutuhan data 'renderCharacterLayout'
+        const kludgeCharacter: Character = {
+            // Data dari formData
+            gender: formData.gender as "Pria" | "Wanita",
+            race: formData.raceId, // Ini adalah 'name' (e.g., "Elf")
+            class: formData.classId, // Ini adalah 'name' (e.g., "Fighter")
+            
+            // Data inventory yang baru dibuat
+            inventory: kludgeInventory,
+            
+            // Data yang tidak dikumpulkan wizard, pakai default agar renderer tidak error
+            bodyType: 'Normal',
+            hair: 'Botak',
+            facialHair: 'Tidak Ada',
+            headAccessory: 'Tidak Ada',
+            scars: [],
+
+            // Data dummy lain (tidak dibaca renderer, tapi perlu untuk tipe Character)
+            id: 'temp', ownerId: 'temp', name: formData.name, level: 1, xp: 0,
+            avatar_url: '', background: formData.backgroundName, personalityTrait: '',
+            ideal: '', bond: '', flaw: '', abilityScores: formData.abilityScores as AbilityScores,
+            maxHp: 10, currentHp: 10, tempHp: 0, armorClass: 10, speed: 30,
+            hitDice: {}, deathSaves: { successes: 0, failures: 0 }, conditions: [],
+            racialTraits: [], classFeatures: [], proficientSkills: [], proficientSavingThrows: [],
+            spellSlots: [], knownSpells: [],
+        };
+
+        // 3. RENDER BLUEPRINT (MEMANGGIL FASE 0)
+        const blueprintBase64 = renderCharacterLayout(kludgeCharacter);
+        
+        // 4. BUAT PROMPT SEDERHANA (BUKAN SASTRA)
+        //    Kita tetap pakai deskripsi ras/kelas, tapi dengan bobot (weights)
+        const simplePrompt = `(retro 16-bit RPG style:1.4), (chibi:1.2), (18-color restricted palette:1.3), crisp pixel detailing, a ${formData.gender.toLowerCase()} ${formData.raceId} ${formData.classId}, ${formData.backgroundName} background, full-body standing pose, centered`;
+        
+        const negativePrompt = `(photorealistic:1.5), (3d render:1.5), (smooth shading:1.4), painting, detailed, high resolution, blurry, deformed hands, warped, mangled, fused, text, signature`;
+
+        // 5. BANGUN URL IMG2IMG (SESUAI APIDOCS.MD & generationService.ts)
+        const encodedPrompt = encodeURIComponent(simplePrompt);
+        const encodedNegative = encodeURIComponent(negativePrompt);
+        const encodedImage = encodeURIComponent(blueprintBase64); // Kirim base64 sebagai URI component
+        const seed = Math.floor(Math.random() * 1000000);
+        const POLLINATIONS_URL = "https://image.pollinations.ai/prompt";
+
+        // Alur yang benar: pakai model=kontext & 'image' param (meniru generateNpcPortrait)
+        const url = `${POLLINATIONS_URL}/${encodedPrompt}?model=kontext&image=${encodedImage}&negative_prompt=${encodedNegative}&width=512&height=512&seed=${seed}&nologo=true`;
+        
+        // Catatan: 'strength' (denoising) tidak ada di APIDOCS.md, jadi kita andalkan 'kontext'
+        
+        console.log("🎨 [IMG2IMG] Blueprint Dibuat:", kludgeCharacter);
+        console.log("🎨 [IMG2IMG] Prompt Simpel:", simplePrompt);
+        console.log("🎨 [IMG2IMG] URL API:", url.substring(0, 200) + "..."); // Jangan log base64 penuh
+
+        setGeneratedAvatarUrl(url); // Set URL ini agar <img> me-loadnya
+
     } catch (e) {
-        console.error("Avatar Gen Error:", e);
+        console.error("Avatar Gen (Img2Img) Error:", e);
         pushNotification({ type: 'error', message: `Gagal memvisualisasikan jiwa: ${e instanceof Error ? e.message : 'Error misterius'}` });
     } finally {
         setIsGeneratingImage(false);
