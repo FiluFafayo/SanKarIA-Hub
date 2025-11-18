@@ -198,23 +198,42 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
       if (!HF_TOKEN) {
         throw new Error("VITE_HUGGINGFACE_API_KEY tidak ditemukan. Cek Vercel Env Vars.");
       }
-      const MODEL_ID = "runwayml/stable-diffusion-v1-5";
+      const MODEL_ID = "timbrooks/instruct-pix2pix";
       const hf = new HfInference(HF_TOKEN);
 
-      const imageBlob = await hf.imageToImage(
-        {
-          model: MODEL_ID,
-          inputs: blueprintBlob,
-          parameters: {
-            prompt: simplePrompt,
-            negative_prompt: negativePrompt,
-            strength: 0.6,
-            guidance_scale: 7.5,
-            num_inference_steps: 25,
+      let imageBlob: Blob;
+      try {
+        imageBlob = await hf.imageToImage(
+          {
+            model: MODEL_ID,
+            inputs: blueprintBlob,
+            parameters: {
+              prompt: simplePrompt,
+              negative_prompt: negativePrompt,
+              strength: 0.6,
+              guidance_scale: 7.5,
+              num_inference_steps: 25,
+            },
           },
-        },
-        { use_cache: false }
-      );
+          { use_cache: false }
+        );
+      } catch (err: any) {
+        const altModel = "stabilityai/stable-diffusion-2-1";
+        imageBlob = await hf.imageToImage(
+          {
+            model: altModel,
+            inputs: blueprintBlob,
+            parameters: {
+              prompt: simplePrompt,
+              negative_prompt: negativePrompt,
+              strength: 0.6,
+              guidance_scale: 7.5,
+              num_inference_steps: 25,
+            },
+          },
+          { use_cache: false }
+        );
+      }
       const imageBase64 = await blobToBase64(imageBlob);
 
       setGeneratedAvatarUrl(imageBase64); // Set URL base64 ini
