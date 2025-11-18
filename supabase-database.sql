@@ -420,3 +420,48 @@ INSERT INTO "public"."monsters" (name, armor_class, max_hp, ability_scores, skil
 ALTER TABLE "public"."items" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."spells" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."monsters" ENABLE ROW LEVEL SECURITY;
+
+-- =================================================================
+-- BAGIAN 7: SETUP STORAGE (BARU - FIX BUCKET NOT FOUND)
+-- =================================================================
+
+-- 1. Buat bucket 'assets' dan set 'public'
+-- Ini memperbaiki error "Bucket not found"
+INSERT INTO "storage"."buckets"
+    ("id", "name", "public")
+VALUES
+    ('assets', 'assets', true)
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
+
+-- 2. Aktifkan RLS di storage.objects
+ALTER TABLE "storage"."objects" ENABLE ROW LEVEL SECURITY;
+
+-- 3. Kebijakan RLS untuk bucket 'assets'
+DROP POLICY IF EXISTS "Public Read Access" ON "storage"."objects";
+DROP POLICY IF EXISTS "Authenticated Upload" ON "storage"."objects";
+DROP POLICY IF EXISTS "Owner Update" ON "storage"."objects";
+DROP POLICY IF EXISTS "Owner Delete" ON "storage"."objects";
+
+-- Siapapun boleh MEMBACA (SELECT) file dari bucket 'assets' (karena public)
+CREATE POLICY "Public Read Access"
+    ON "storage"."objects" FOR SELECT
+    USING ( "bucket_id" = 'assets' );
+
+-- Hanya pengguna TERAUTENTIKASI (login) yang boleh MENG-UPLOAD (INSERT)
+CREATE POLICY "Authenticated Upload"
+    ON "storage"."objects" FOR INSERT
+    TO "authenticated"
+    WITH CHECK ( "bucket_id" = 'assets' );
+
+-- Hanya PEMILIK file yang boleh MENG-UPDATE file-nya
+CREATE POLICY "Owner Update"
+    ON "storage"."objects" FOR UPDATE
+    TO "authenticated"
+    USING ( "bucket_id" = 'assets' AND "auth"."uid"() = "owner" )
+    WITH CHECK ( "bucket_id" = 'assets' AND "auth"."uid"() = "owner" );
+
+-- Hanya PEMILIK file yang boleh MENG-HAPUS file-nya
+CREATE POLICY "Owner Delete"
+    ON "storage"."objects" FOR DELETE
+    TO "authenticated"
+    USING ( "bucket_id" = 'assets' AND "auth"."uid"() = "owner" );
