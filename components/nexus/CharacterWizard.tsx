@@ -45,8 +45,8 @@ import { generationService } from '../../services/ai/generationService';
 import { renderCharacterLayout } from '../../services/pixelRenderer'; // BARU: Impor generator blueprint
 
 import { SPRITE_PARTS } from '../../data/spriteParts'; // BARU: Impor data sprite
-// BARU: Impor repository untuk upload blueprint
-import { characterRepository } from '../../services/repository/characterRepository';
+// HAPUS: Kita tidak pakai repository untuk upload blueprint lagi
+// import { characterRepository } from '../../services/repository/characterRepository';
 
 type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'VISUAL' | 'EQUIPMENT' | 'STATS' | 'REVIEW'; // BARU: Tambah step 'VISUAL'
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
@@ -65,6 +65,27 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const [visualPromptOptions, setVisualPromptOptions] = useState<string[] | null>(null);
   const [promptVariantIndex, setPromptVariantIndex] = useState(2);
   const [visualContextSig, setVisualContextSig] = useState<string | null>(null);
+
+  // BARU: Helper untuk konversi Base64 (dari pixelRenderer) ke Blob (untuk HF API)
+  const base64ToBlob = (base64: string, mimeType: string): Blob => {
+    const byteCharacters = atob(base64.split(',')[1]);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
+  };
+
+  // BARU: Helper untuk konversi Blob (dari HF API) ke Base64 (untuk <img> src)
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
 
   const [formData, setFormData] = useState({
     name: '',
@@ -122,11 +143,12 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const handleGenerateAvatar = async () => {
     if (!formData.raceId || !formData.classId) return;
     setIsGeneratingImage(true);
-    setGeneratedAvatarUrl(null); // BARU: Kosongkan dulu
+    setGeneratedAvatarUrl(null); // Kosongkan dulu
 
+    // REFAKTOR: Mengganti Pollinations (berbayar) dengan Hugging Face (gratis)
+    // Arsitektur baru: Render-then-POST-Blob (Menghapus Supabase Upload)
     try {
-      // 1. BUAT "K-LUDGE" INVENTORY DARI STATE WIZARD
-      //    (Logika ini sudah benar dari fase sebelumnya)
+      // 1. BUAT "K-LUDGE" CHARACTER OBJECT
       const kludgeInventory: CharacterInventoryItem[] = [];
       const cls = findClass(formData.classId);
       cls?.startingEquipment.fixed.forEach((fix, idx) => {
@@ -140,22 +162,18 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         });
       });
 
-      // 2. BUAT "K-LUDGE" CHARACTER OBJECT
-      //    (Logika ini sudah benar dari fase sebelumnya)
-      const tempId = `temp_${user?.id || 'anon'}_${Date.now()}`; // ID unik sementara
       const kludgeCharacter: Character = {
         gender: formData.gender as "Pria" | "Wanita",
         race: formData.raceId,
         class: formData.classId,
         inventory: kludgeInventory,
-        // Data visual dari formData (sudah benar dari fase sebelumnya)
         bodyType: formData.bodyType,
         hair: formData.hair,
         facialHair: formData.facialHair,
         headAccessory: formData.headAccessory,
         scars: formData.scars,
         // Data dummy
-        id: tempId, ownerId: 'temp', name: formData.name, level: 1, xp: 0,
+        id: 'temp', ownerId: 'temp', name: formData.name, level: 1, xp: 0,
         avatar_url: '', background: formData.backgroundName, personalityTrait: '',
         ideal: '', bond: '', flaw: '', abilityScores: formData.abilityScores as AbilityScores,
         maxHp: 10, currentHp: 10, tempHp: 0, armorClass: 10, speed: 30,
@@ -164,40 +182,70 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         spellSlots: [], knownSpells: [],
       };
 
-      // 3. RENDER BLUEPRINT (MEMANGGIL FASE 0)
+      // 2. RENDER BLUEPRINT (MEMANGGIL FASE 0)
       const blueprintBase64 = renderCharacterLayout(kludgeCharacter);
 
-      // 4. [FIX ARSITEKTUR] UPLOAD BLUEPRINT UNTUK DAPAT URL PUBLIK
-      //    Ini adalah perbaikan krusial berdasarkan masukanmu.
-      const publicUrl = await characterRepository.uploadCharacterBlueprint(tempId, blueprintBase64);
+      // 3. KONVERSI BLUEPRINT KE BLOB
+      const blueprintBlob = base64ToBlob(blueprintBase64, 'image/png');
 
-      if (!publicUrl) {
-        throw new Error("Gagal meng-upload blueprint ke storage.");
+      // 4. BUAT PROMPT SEDERHANA
+      // Kita paksa stylenya. Blueprint akan menjaga strukturnya.
+      const simplePrompt = `(pixel art:1.5), (16-bit rpg style:1.4), (chibi:1.2), (18-color palette:1.3), crisp pixel detailing, a ${formData.gender.toLowerCase()} ${formData.raceId} ${formData.classId}, ${formData.backgroundName} background, full-body standing pose, centered`;
+      const negativePrompt = `(photorealistic:1.5), (3d render:1.5), (smooth shading:1.4), painting, detailed, high resolution, blurry, deformed hands, warped, mangled, fused, text, signature, watermark`;
+
+      // 5. [REFAKTOR] BANGUN PANGGILAN API KE HUGGING FACE
+      const HF_TOKEN = import.meta.env.VITE_HUGGINGFACE_API_KEY;
+      if (!HF_TOKEN) {
+        throw new Error("VITE_HUGGINGFACE_API_KEY tidak ditemukan. Cek Vercel Env Vars.");
       }
 
-      // 5. BUAT PROMPT SEDERHANA
-      const simplePrompt = `(retro 16-bit RPG style:1.4), (chibi:1.2), (18-color restricted palette:1.3), crisp pixel detailing, a ${formData.gender.toLowerCase()} ${formData.raceId} ${formData.classId}, ${formData.backgroundName} background, full-body standing pose, centered`;
-      const negativePrompt = `(photorealistic:1.5), (3d render:1.5), (smooth shading:1.4), painting, detailed, high resolution, blurry, deformed hands, warped, mangled, fused, text, signature`;
+      // Model standar, paling mungkin "hot"
+      const MODEL_ID = "runwayml/stable-diffusion-v1-5";
+      const API_URL = `https://api-inference.huggingface.co/models/${MODEL_ID}`;
 
-      // 6. [FIX ARSITEKTUR] BANGUN URL IMG2IMG DENGAN URL PUBLIK
-      const encodedPrompt = encodeURIComponent(simplePrompt);
-      const encodedNegative = encodeURIComponent(negativePrompt);
-      const encodedImageUrl = encodeURIComponent(publicUrl); // FIX DI SINI
-      const seed = Math.floor(Math.random() * 1000000);
-      const POLLINATIONS_URL = "https://image.pollinations.ai/prompt";
+      // Parameter untuk img2img
+      const params = new URLSearchParams({
+        prompt: simplePrompt,
+        negative_prompt: negativePrompt,
+        strength: "0.6", // 60% prompt, 40% blueprint. Bisa di-tweak (0.5 - 0.8)
+      });
 
-      // Alur yang benar: pakai model=kontext & 'image' param (sesuai APIDOCS.md)
-      const finalUrl = `${POLLINATIONS_URL}/${encodedPrompt}?model=kontext&image=${encodedImageUrl}&negative_prompt=${encodedNegative}&width=512&height=512&seed=${seed}&nologo=true`;
+      const finalUrl = `${API_URL}?${params.toString()}`;
 
-      console.log("🎨 [IMG2IMG-FIX] Blueprint Diupload:", publicUrl);
-      console.log("🎨 [IMG2IMG-FIX] Prompt Simpel:", simplePrompt);
-      console.log("🎨 [IMG2IMG-FIX] URL API Final:", finalUrl);
+      console.log("🎨 [IMG2IMG-HF] Mengganti Pollinations dengan Hugging Face");
+      console.log("🎨 [IMG2IMG-HF] Model:", MODEL_ID);
+      console.log("🎨 [IMG2IMG-HF] Prompt Simpel:", simplePrompt);
+      console.log("🎨 [IMG2IMG-HF] URL API Final:", finalUrl);
 
-      setGeneratedAvatarUrl(finalUrl); // Set URL ini agar <img> me-loadnya
+      // 6. [REFAKTOR] KIRIM BLOB DENGAN FETCH (POST)
+      const response = await fetch(finalUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${HF_TOKEN}`,
+          'Content-Type': 'image/png' // Kirim blueprint sebagai body
+        },
+        body: blueprintBlob,
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error("HF Error Body:", errorBody);
+        // Cek error "cold boot"
+        if (response.status === 503 && errorBody.includes("is currently loading")) {
+          throw new Error("Model sedang 'pemanasan' (cold boot). Coba lagi dalam 1-2 menit.");
+        }
+        throw new Error(`Gagal menghubungi Hugging Face: ${response.status} ${response.statusText}`);
+      }
+
+      // 7. KONVERSI RESPON BLOB KE BASE64 UNTUK <img>
+      const imageBlob = await response.blob();
+      const imageBase64 = await blobToBase64(imageBlob);
+
+      setGeneratedAvatarUrl(imageBase64); // Set URL base64 ini
 
     } catch (e) {
-      console.error("Avatar Gen (Img2Img-FIX) Error:", e);
-      pushNotification({ type: 'error', message: `Gagal memvisualisasikan jiwa: ${e instanceof Error ? e.message : 'Error misterius'}` });
+      console.error("Avatar Gen (Hugging Face) Error:", e);
+      pushNotification({ type: 'error', message: `Gagal visualisasi: ${e instanceof Error ? e.message : 'Error misterius'}` });
     } finally {
       setIsGeneratingImage(false);
     }
