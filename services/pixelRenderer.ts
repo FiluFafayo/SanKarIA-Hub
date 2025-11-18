@@ -33,6 +33,9 @@ const createCanvas = (width: number, height: number): HTMLCanvasElement => {
 /**
  * Merender layout pixel art untuk karakter berdasarkan data mereka.
  * Implementasi penuh Fase 2.
+ * UPGRADE FASE 0 (Roadmap 2025-11-18):
+ * - Membaca inventory karakter untuk equipment.
+ * - Menggambar blueprint senjata & perisai.
  * @param character Objek Karakter (P1)
  * @returns string data URL base64 (image/png)
  */
@@ -58,19 +61,90 @@ export const renderCharacterLayout = (character: Character): string => {
         return SPRITE_PARTS[layer].find(p => p.id === defaultId) || SPRITE_PARTS[layer][0];
     };
 
-    // --- Pemetaan Data Karakter (P1) ke Sprite Parts (Fase 0) ---
+    // --- [BARU] Helper internal untuk memetakan Item -> SpritePart ---
+    const getSpritePartFromItem = (
+        item: CharacterInventoryItem | undefined,
+        layer: 'weapon_right_hand' | 'weapon_left_hand' | 'armor_torso' | 'armor_legs'
+    ): SpritePart => {
+        let defaultId = '';
+        switch (layer) {
+            case 'weapon_right_hand': defaultId = 'wrh_none'; break;
+            case 'weapon_left_hand': defaultId = 'wlh_none'; break;
+            case 'armor_torso': defaultId = 'at_common_clothes'; break;
+            case 'armor_legs': defaultId = 'al_common_pants'; break;
+        }
+        
+        // Ambil fallback part DARI TIPE DATA YANG BENAR
+        const fallbackPart = SPRITE_PARTS[layer].find(p => p.id === defaultId) || SPRITE_PARTS[layer][0];
+
+        if (!item) {
+            return fallbackPart;
+        }
+
+        const itemName = item.item.name.toLowerCase();
+        
+        // 1. Coba cari match di 'name' sprite (e.g., "Longsword" cocok dengan "Pedang Panjang")
+        // Kita cari kata kunci dari 'sprite name' di 'item name'
+        const allParts = SPRITE_PARTS[layer];
+        for (const part of allParts) {
+            if (part.id === defaultId) continue; // Jangan match "Kosong"
+            
+            // Ambil kata kunci dari nama sprite, e.g., "Pedang Panjang" -> "pedang"
+            const spriteNameKeywords = part.name.toLowerCase().split(' ')[0]; 
+            if (itemName.includes(spriteNameKeywords)) {
+                return part;
+            }
+            // Cek juga ID, e.g., "wrh_longsword" -> "longsword"
+            const spriteIdKeyword = part.id.split('_').pop();
+            if (spriteIdKeyword && itemName.includes(spriteIdKeyword)) {
+                return part;
+            }
+        }
+        
+        // 2. Fallback untuk Perisai (karena tipenya 'armor')
+        if (layer === 'weapon_left_hand' && item.item.armorType === 'shield') {
+            return SPRITE_PARTS.weapon_left_hand.find(p => p.id === 'wlh_shield') || fallbackPart;
+        }
+
+        // 3. Fallback untuk Armor (jika nama tidak cocok, pakai class)
+        if (layer === 'armor_torso') {
+             const classMatch = SPRITE_PARTS.armor_torso.find(p => p.name.toLowerCase().includes(character.class.toLowerCase()));
+             if (classMatch) return classMatch;
+        }
+        if (layer === 'armor_legs') {
+             // Coba map dari class, e.g., 'Mage' -> 'al_mage_robe_skirt'
+             const classMatch = SPRITE_PARTS.armor_legs.find(p => p.name.toLowerCase().includes(character.class.toLowerCase()));
+             if (classMatch) return classMatch;
+             
+             // Coba map dari nama armor torso, e.g., "Jubah Penyihir" -> "Rok Jubah"
+             const torsoPart = getSpritePartFromItem(item, 'armor_torso');
+             if (torsoPart.id === 'at_mage_robe') return SPRITE_PARTS.armor_legs.find(p => p.id === 'al_mage_robe_skirt') || fallbackPart;
+             if (torsoPart.id === 'at_plate_armor') return SPRITE_PARTS.armor_legs.find(p => p.id === 'al_plate_greaves') || fallbackPart;
+             if (torsoPart.id === 'at_leather_armor') return SPRITE_PARTS.armor_legs.find(p => p.id === 'al_leather_boots') || fallbackPart;
+        }
+
+        return fallbackPart;
+    };
+
+    // --- [BARU] Logika Pemetaan Berbasis INVENTORY ---
+    const equippedTorso = character.inventory.find(i => i.isEquipped && i.item.type === 'armor' && i.item.armorType !== 'shield');
+    const equippedWeapon = character.inventory.find(i => i.isEquipped && i.item.type === 'weapon');
+    const equippedShield = character.inventory.find(i => i.isEquipped && i.item.armorType === 'shield');
+
     const parts = {
         gender_base: getPart('gender_base', character.gender === 'Pria' ? 'Bentuk Pria' : 'Bentuk Wanita', 'gb_male'),
-        race_base: getPart('race_base', character.race, 'rb_human'), // Asumsi nama Ras P1 = nama part P0
+        race_base: getPart('race_base', character.race, 'rb_human'),
         body_type: getPart('body_type', character.bodyType, 'bt_normal'),
         hair: getPart('hair', character.hair, 'h_bald'),
         facial_hair: getPart('facial_feature', character.facialHair, 'ff_none'),
         head_accessory: getPart('head_accessory', character.headAccessory, 'ha_none'),
-        armor_torso: SPRITE_PARTS.armor_torso.find(p => p.name.toLowerCase().includes(character.class.toLowerCase())) || getPart('armor_torso', '', 'at_common_clothes'),
-        armor_legs: SPRITE_PARTS.armor_legs.find(p => p.name.toLowerCase().includes(character.class.toLowerCase())) || getPart('armor_legs', '', 'al_common_pants'),
-        weapon_right: SPRITE_PARTS.weapon_right_hand[0],
-        weapon_left: SPRITE_PARTS.weapon_left_hand[0],
-        scar: SPRITE_PARTS.facial_feature.find(p => (character.scars || []).includes(p.id)) // FASE 5 FIX: Tambahkan fallback defensive
+        scar: SPRITE_PARTS.facial_feature.find(p => (character.scars || []).includes(p.id)),
+        
+        // [REFAKTOR] Gunakan helper baru
+        armor_torso: getSpritePartFromItem(equippedTorso, 'armor_torso'),
+        armor_legs: getSpritePartFromItem(equippedTorso, 'armor_legs'), // Helper akan coba map dari torso/class
+        weapon_right: getSpritePartFromItem(equippedWeapon, 'weapon_right_hand'),
+        weapon_left: getSpritePartFromItem(equippedShield, 'weapon_left_hand'),
     };
 
     // --- Logika Render Berbasis Layer ---
@@ -123,6 +197,22 @@ export const renderCharacterLayout = (character: Character): string => {
         ctx.globalCompositeOperation = 'destination-out'; // Mode 'hapus'
         ctx.fillRect(centerX + bodyWidth / 2, bodyY - bodyHeight / 2, (CHAR_CANVAS_WIDTH - centerX - bodyWidth / 2), bodyHeight); // Hapus area tangan kanan
         ctx.globalCompositeOperation = 'source-over'; // Kembali normal
+    }
+    // (Bisa ditambahkan bt_missing_arm_l di sini jika perlu)
+
+    // 9. [BARU] SENJATA KIRI (Perisai, dll)
+    // Dirender sebelum tangan kanan agar 'di belakang' jika 2H
+    if (parts.weapon_left.id !== 'wlh_none') {
+        ctx.fillStyle = parts.weapon_left.color;
+        // Gambar blueprint perisai (kotak besar di kiri)
+        ctx.fillRect(centerX - (bodyWidth / 2) - 14, bodyY - (bodyHeight / 4), 12, bodyHeight / 1.5);
+    }
+
+    // 10. [BARU] SENJATA KANAN (Pedang, dll)
+    if (parts.weapon_right.id !== 'wrh_none') {
+        ctx.fillStyle = parts.weapon_right.color;
+        // Gambar blueprint pedang (kotak panjang di kanan)
+        ctx.fillRect(centerX + (bodyWidth / 2) + 2, bodyY - (bodyHeight / 2.5), 6, bodyHeight * 0.9);
     }
 
     return canvas.toDataURL('image/png');
