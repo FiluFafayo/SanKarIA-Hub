@@ -422,8 +422,10 @@ ALTER TABLE "public"."spells" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."monsters" ENABLE ROW LEVEL SECURITY;
 
 -- =================================================================
--- BAGIAN 7: SETUP STORAGE (BARU - FIX BUCKET NOT FOUND)
+-- BAGIAN 7: SETUP STORAGE (BARU - FIX BUCKET NOT FOUND V2)
 -- =================================================================
+-- Versi ini menghapus 'ALTER TABLE "storage"."objects"' yang menyebabkan error 42501.
+-- Kita berasumsi RLS di storage.objects sudah aktif by default.
 
 -- 1. Buat bucket 'assets' dan set 'public'
 -- Ini memperbaiki error "Bucket not found"
@@ -433,10 +435,8 @@ VALUES
     ('assets', 'assets', true)
 ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 
--- 2. Aktifkan RLS di storage.objects
-ALTER TABLE "storage"."objects" ENABLE ROW LEVEL SECURITY;
-
--- 3. Kebijakan RLS untuk bucket 'assets'
+-- 2. Kebijakan RLS untuk bucket 'assets'
+-- Hapus policy lama jika ada (untuk idempotency)
 DROP POLICY IF EXISTS "Public Read Access" ON "storage"."objects";
 DROP POLICY IF EXISTS "Authenticated Upload" ON "storage"."objects";
 DROP POLICY IF EXISTS "Owner Update" ON "storage"."objects";
