@@ -1,5 +1,5 @@
 // components/nexus/CharacterWizard.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PixelCard } from '../grimoire/PixelCard';
 import { RuneButton } from '../grimoire/RuneButton';
 import { CLASS_DEFINITIONS } from '../../data/classes';
@@ -66,6 +66,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const [visualPromptOptions, setVisualPromptOptions] = useState<string[] | null>(null);
   const [promptVariantIndex, setPromptVariantIndex] = useState(2);
   const [visualContextSig, setVisualContextSig] = useState<string | null>(null);
+  const [blueprintPreview, setBlueprintPreview] = useState<string | null>(null);
 
   // BARU: Helper untuk konversi Base64 (dari pixelRenderer) ke Blob (untuk HF API)
   const base64ToBlob = (base64: string, mimeType: string): Blob => {
@@ -102,6 +103,49 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
     scars: [] as string[], // Izinkan beberapa luka
     bodyType: 'bt_normal',
   });
+
+  useEffect(() => {
+    try {
+      if (!formData.raceId || !formData.classId) {
+        setBlueprintPreview(null);
+        return;
+      }
+      const kludgeInventory: CharacterInventoryItem[] = [];
+      const cls = findClass(formData.classId);
+      cls?.startingEquipment.fixed.forEach((fix, idx) => {
+        const itemDef = getItemDef(fix.itemName);
+        if (itemDef) kludgeInventory.push({ instanceId: `fix-${idx}`, item: itemDef, quantity: fix.quantity, isEquipped: itemDef.type === 'armor' });
+      });
+      Object.values(selectedEquipment).forEach((opt, idx) => {
+        opt.itemNames.forEach((name, nameIdx) => {
+          const itemDef = getItemDef(name);
+          if (itemDef) kludgeInventory.push({ instanceId: `choice-${idx}-${nameIdx}`, item: itemDef, quantity: 1, isEquipped: true });
+        });
+      });
+      const kludgeCharacter: Character = {
+        gender: formData.gender as "Pria" | "Wanita",
+        race: formData.raceId,
+        class: formData.classId,
+        inventory: kludgeInventory,
+        bodyType: formData.bodyType,
+        hair: formData.hair,
+        facialHair: formData.facialHair,
+        headAccessory: formData.headAccessory,
+        scars: formData.scars,
+        id: 'temp', ownerId: 'temp', name: formData.name, level: 1, xp: 0,
+        avatar_url: '', background: formData.backgroundName, personalityTrait: '',
+        ideal: '', bond: '', flaw: '', abilityScores: formData.abilityScores as AbilityScores,
+        maxHp: 10, currentHp: 10, tempHp: 0, armorClass: 10, speed: 30,
+        hitDice: {}, deathSaves: { successes: 0, failures: 0 }, conditions: [],
+        racialTraits: [], classFeatures: [], proficientSkills: [], proficientSavingThrows: [],
+        spellSlots: [], knownSpells: [],
+      };
+      const blueprintBase64 = renderCharacterLayout(kludgeCharacter);
+      setBlueprintPreview(blueprintBase64);
+    } catch {
+      setBlueprintPreview(null);
+    }
+  }, [formData.gender, formData.raceId, formData.classId, formData.backgroundName, formData.bodyType, formData.hair, formData.facialHair, formData.headAccessory, formData.scars, selectedEquipment]);
 
   // Helper: Toggle Skill
   const toggleSkill = (skill: Skill, max: number) => {
@@ -931,6 +975,8 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                 <div className="w-full flex-1 min-h-[240px] border-2 border-gold bg-black/50 flex items-center justify-center overflow-hidden relative shadow-pixel-glow">
                   {generatedAvatarUrl ? (
                     <img src={generatedAvatarUrl} alt="Generated Soul" className="w-full h-full object-contain animate-fade-in" />
+                  ) : blueprintPreview ? (
+                    <img src={blueprintPreview} alt="Blueprint" className="w-full h-full object-contain animate-fade-in" />
                   ) : (
                     <div className="text-[9px] text-center text-faded px-2 font-retro">
                       {isGeneratingImage ? "Menenun Wajah..." : "Visual Belum Terbentuk"}
