@@ -91,46 +91,14 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
 
       {/* 1. CAMPFIRE (Character Select) */}
       {viewMode === 'CAMPFIRE' && (
-        // Kita butuh ubah CampfireMenu dikit biar nerima data real, 
-        // tapi untuk sekarang kita inject manual via prop di file aslinya atau edit langsung.
-        // DISINI SAYA GUNAKAN VERSI YANG SUDAH DI-ADJUST SECARA LOGIC DI BAWAH (Assume CampfireMenu logic handled via internal props or context in real impl, 
-        // tapi biar clean saya anggap CampfireMenu butuh refactor dikit untuk data real.
-        // HACK: Saya render manual UI select disini agar tidak bolak balik edit file CampfireMenu.tsx
-        <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black via-black/90 to-transparent pt-20 animate-slide-up z-40">
-           <div className="bg-surface border-t-4 border-gold p-4 shadow-pixel-glow">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="font-pixel text-gold text-sm">THE CAMPFIRE</h2>
-                <button onClick={() => setViewMode('IDLE')} className="text-red-500 font-pixel text-[10px]">[X] CLOSE</button>
-              </div>
-              
-              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide justify-center">
-                 {/* New Character Trigger */}
-                 <div onClick={() => setViewMode('CHAR_WIZARD')} className="flex flex-col items-center gap-2 cursor-pointer opacity-70 hover:opacity-100 min-w-[64px]">
-                    <div className="w-16 h-16 border-2 border-dashed border-faded flex items-center justify-center bg-black/30">
-                      <span className="text-2xl text-faded">+</span>
-                    </div>
-                    <span className="font-pixel text-[8px]">NEW</span>
-                 </div>
-
-                 {/* Character List */}
-                 {myCharacters.map(char => (
-                    <div 
-                      key={char.id} 
-                      onClick={() => setSelectedCharacterId(char.id)}
-                      className={`relative flex flex-col items-center gap-2 cursor-pointer min-w-[64px]
-                        ${selectedCharacterId === char.id ? 'opacity-100 scale-110' : 'opacity-50'}
-                      `}
-                    >
-                       <div className={`w-16 h-16 border-2 ${selectedCharacterId === char.id ? 'border-gold' : 'border-wood'}`}>
-                          {/* Placeholder Avatar karena DB belum tentu ada URL */}
-                          <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${char.name}`} className="w-full h-full bg-black" />
-                       </div>
-                       <span className="font-pixel text-[8px] bg-black px-1">{char.name}</span>
-                    </div>
-                 ))}
-              </div>
-           </div>
-        </div>
+        <CampfireMenu
+          characters={myCharacters}
+          onSelectCharacter={(id) => {
+            setSelectedCharacterId(id);
+          }}
+          onBack={() => setViewMode('IDLE')}
+          onCreate={() => setViewMode('CHAR_WIZARD')}
+        />
       )}
 
       {/* 2. WIZARDS */}
