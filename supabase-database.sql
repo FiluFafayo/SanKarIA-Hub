@@ -31,12 +31,30 @@ CREATE TABLE "public"."profiles" (
     "avatar_url" "text",
     "updated_at" timestamptz DEFAULT "now"()
 );
+
+-- Aktifkan RLS
 ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
+
+-- Hapus kebijakan lama (jika ada) untuk kebersihan
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON "public"."profiles";
+DROP POLICY IF EXISTS "Users can insert or update their own profile." ON "public"."profiles";
+DROP POLICY IF EXISTS "Users can manage their own profile." ON "public"."profiles";
+
+-- Kebijakan RLS BARU yang lebih eksplisit
 CREATE POLICY "Public profiles are viewable by everyone." ON "public"."profiles"
-    FOR SELECT USING (true);
-CREATE POLICY "Users can insert or update their own profile." ON "public"."profiles"
-    FOR ALL USING ("auth"."uid"() = "id")
+    FOR SELECT TO authenticated, anon
+    USING (true);
+
+CREATE POLICY "Users can manage their own profile." ON "public"."profiles"
+    FOR ALL
+    USING ("auth"."uid"() = "id")
     WITH CHECK ("auth"."uid"() = "id");
+
+-- Berikan izin eksplisit ke peran yang relevan
+GRANT USAGE ON SCHEMA "public" TO "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."profiles" TO "anon", "authenticated";
+GRANT INSERT, UPDATE, DELETE ON TABLE "public"."profiles" TO "authenticated";
+
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"()
 RETURNS TRIGGER AS $$
