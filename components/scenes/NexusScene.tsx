@@ -28,7 +28,9 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   // 1. Fetch Real Data
   const refreshCharacters = async () => {
     if (user) {
+      console.log('[DEBUG] refreshCharacters called with user:', user);
       const chars = await characterRepository.getMyCharacters(user.id);
+      console.log('[DEBUG] Characters fetched:', chars);
       setMyCharacters(chars);
       if (chars.length > 0 && !selectedCharacterId) {
         setSelectedCharacterId(chars[0].id);

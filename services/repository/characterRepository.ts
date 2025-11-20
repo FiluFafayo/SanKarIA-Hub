@@ -203,10 +203,50 @@ export const characterRepository = {
   async getMyCharacters(userId: string): Promise<Character[]> {
     const supabase = dataService.getClient();
 
+    console.log('[DEBUG] getMyCharacters called with userId:', userId);
+
+    // Cek auth state terlebih dahulu
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('[DEBUG] Auth session:', { session, sessionError });
+
+    // PENTING: Gunakan session user ID daripada parameter userId untuk memastikan
+    // bahwa kita menggunakan auth context yang benar sesuai RLS policy
+    const currentUserId = session?.user?.id || userId;
+    console.log('[DEBUG] Using currentUserId:', currentUserId);
+
+    // PASTIKAN profile ada untuk user ini
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', currentUserId)
+      .single();
+    
+    console.log('[DEBUG] Profile check:', { profileData, profileError });
+
+    // Jika profile tidak ada, buat secara manual
+    if (!profileData && !profileError) {
+      console.log('[DEBUG] Profile not found, creating manually...');
+      const { error: createProfileError } = await supabase
+        .from('profiles')
+        .insert({ 
+          id: currentUserId, 
+          email: session?.user?.email || 'unknown@email.com',
+          full_name: session?.user?.user_metadata?.full_name || session?.user?.email || 'Unknown User'
+        });
+      
+      if (createProfileError) {
+        console.error('[DEBUG] Failed to create profile:', createProfileError);
+      } else {
+        console.log('[DEBUG] Profile created successfully');
+      }
+    }
+
     const { data: charData, error: charError } = await supabase
       .from('characters')
       .select('*')
-      .eq('owner_id', userId);
+      .eq('owner_id', currentUserId);
+
+    console.log('[DEBUG] Character query result:', { charData, charError });
 
     if (charError) throw charError;
     if (!charData || charData.length === 0) return [];
@@ -342,6 +382,19 @@ export const characterRepository = {
     ownerId: string
   ): Promise<Character> {
     const supabase = dataService.getClient();
+
+    // Cek auth state untuk memastikan ownerId sesuai dengan user yang login
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const sessionUserId = session?.user?.id;
+    
+    console.log('[DEBUG] saveNewCharacter called with:', { charData, ownerId, sessionUserId });
+    
+    if (sessionUserId && sessionUserId !== ownerId) {
+      console.warn('[DEBUG] WARNING: ownerId parameter berbeda dengan session user ID!', { 
+        ownerId, 
+        sessionUserId 
+      });
+    }
 
     const { data: allItems } = await supabase.from('items').select('*');
     const { data: allSpells } = await supabase.from('spells').select('*');

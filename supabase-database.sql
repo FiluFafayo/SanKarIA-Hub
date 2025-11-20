@@ -41,14 +41,23 @@ CREATE POLICY "Users can insert or update their own profile." ON "public"."profi
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- Debug: Log the new user data
+    RAISE NOTICE 'Creating profile for new user: %', NEW.id;
+    
     INSERT INTO "public"."profiles" ("id", "email", "full_name", "avatar_url")
     VALUES (
-        "new"."id",
-        "new"."email",
-        "new"."raw_user_meta_data"->>'full_name',
-        "new"."raw_user_meta_data"->>'avatar_url'
+        NEW."id",
+        NEW."email",
+        COALESCE(NEW."raw_user_meta_data"->>'full_name', NEW."email"),
+        COALESCE(NEW."raw_user_meta_data"->>'avatar_url', '')
     );
-    RETURN "new";
+    
+    RAISE NOTICE 'Profile created successfully for user: %', NEW.id;
+    RETURN NEW;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE WARNING 'Failed to create profile for user %: %', NEW.id, SQLERRM;
+        RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
