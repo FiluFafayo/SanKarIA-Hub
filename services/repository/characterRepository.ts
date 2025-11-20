@@ -208,11 +208,11 @@ export const characterRepository = {
     
     // 2. Fallback ke param HANYA jika sesi tidak tersedia (edge case), 
     // tapi idealnya kita throw error jika session null.
-    const currentUserId = session?.user?.id || userId;
-
+    const currentUserId = session?.user?.id;
     if (!currentUserId) {
-        console.warn('[Security] getMyCharacters dipanggil tanpa sesi aktif atau userId.');
-        return [];
+        // Opsional: return [] atau throw error, tapi JANGAN pakai userId dari parameter
+        console.warn('[Security] Akses ditolak: User tidak terautentikasi.');
+        return []; 
     }
     console.log('[DEBUG] Using currentUserId:', currentUserId);
 
@@ -365,16 +365,13 @@ export const characterRepository = {
     charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
     inventoryData: Omit<CharacterInventoryItem, 'instanceId'>[],
     spellData: SpellDefinition[]
-    // Parameter ownerId DIHAPUS. Jangan pernah percaya input user untuk ID pemilik.
+    // ownerId DIHAPUS TOTAL
   ): Promise<Character> {
     const supabase = dataService.getClient();
-
     const { data: { session } } = await supabase.auth.getSession();
-    const ownerId = session?.user?.id;
+    const ownerId = session?.user?.id; // AMBIL DARI SINI
 
-    if (!ownerId) {
-        throw new Error("[Security] Tidak dapat menyimpan karakter: User tidak terautentikasi.");
-    }
+    if (!ownerId) throw new Error("[Security] Save gagal: Sesi tidak valid.");
 
     const { data: allItems } = await supabase.from('items').select('*');
     const { data: allSpells } = await supabase.from('spells').select('*');
