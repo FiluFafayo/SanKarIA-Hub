@@ -5,8 +5,7 @@ import { DungeonGate } from '../nexus/DungeonGate';
 import { CharacterWizard } from '../nexus/CharacterWizard';
 import { CampaignWizard } from '../nexus/CampaignWizard';
 import { useAppStore } from '../../store/appStore';
-import { characterRepository } from '../../services/repository/characterRepository';
-import { dataService } from '../../services/dataService';
+import { useDataStore } from '../../store/dataStore'; // GANTI DENGAN DATASTORE
 import { Character } from '../../types';
 
 interface NexusSceneProps {
@@ -21,88 +20,38 @@ const BackgroundLayer = () => (
   </div>
 );
 
+// Indikator loading yang lebih eksplisit
+const LoadingIndicator = () => (
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50">
+        <div className="animate-pulse text-gold font-pixel text-lg">MEMUAT JIWA...</div>
+        <div className="w-32 h-1 bg-gold/20 mt-4 overflow-hidden">
+            <div className="w-1/3 h-full bg-gold animate-loading-bar" />
+        </div>
+    </div>
+);
+
+
 export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   const [viewMode, setViewMode] = useState<'IDLE' | 'CAMPFIRE' | 'GATE' | 'CHAR_WIZARD' | 'CAMP_WIZARD'>('IDLE');
-  const [myCharacters, setMyCharacters] = useState<Character[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // HAPUS: State lokal untuk karakter dan status refresh
+  // const [myCharacters, setMyCharacters] = useState<Character[]>([]);
+  // const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // GUNAKAN SSoT dari store
   const { user, setSelectedCharacterId, selectedCharacterId } = useAppStore();
+  const { state: dataState, actions: dataActions } = useDataStore();
+  const { characters, isLoading, hasLoaded } = dataState;
 
-  // 1. Fetch Real Data
-  const refreshCharacters = async () => {
-    if (user) {
-      console.log('[DEBUG] refreshCharacters called with user:', user);
-      try {
-        const chars = await characterRepository.getMyCharacters(user.id);
-        console.log('[DEBUG] Characters fetched:', chars);
-        setMyCharacters(chars);
-        if (chars.length > 0 && !selectedCharacterId) {
-          setSelectedCharacterId(chars[0].id);
-        }
-        return true;
-      } catch (error) {
-        console.error('[DEBUG] Error fetching characters:', error);
-        return false;
-      }
-    } else {
-      console.log('[DEBUG] refreshCharacters called but no user available');
-      return false;
-    }
-  };
+  // HAPUS: Semua logika fetching data lokal (refreshCharacters, refreshCharactersWithRetry, useEffect)
+  // Logika ini sekarang ditangani secara global oleh App.tsx -> useDataStore.fetchInitialData
 
-  // Retry mechanism untuk refresh characters dengan delay
-  const refreshCharactersWithRetry = async (maxRetries = 3, delayMs = 1000) => {
-    setIsRefreshing(true);
-    try {
-      for (let i = 0; i < maxRetries; i++) {
-        console.log(`[DEBUG] refreshCharactersWithRetry attempt ${i + 1}/${maxRetries}`);
-        
-        // Jika user tidak tersedia di state, coba ambil dari auth service
-        let currentUser = user;
-        if (!currentUser) {
-          console.log('[DEBUG] User not available in state, trying to get from auth service...');
-          try {
-            const { data: { session } } = await dataService.getClient().auth.getSession();
-            if (session?.user) {
-              currentUser = session.user;
-              console.log('[DEBUG] Got user from auth service:', currentUser);
-            }
-          } catch (authError) {
-            console.error('[DEBUG] Failed to get user from auth service:', authError);
-          }
-        }
-        
-        if (currentUser) {
-          try {
-            const chars = await characterRepository.getMyCharacters(currentUser.id);
-            console.log('[DEBUG] Characters fetched:', chars);
-            setMyCharacters(chars);
-            if (chars.length > 0 && !selectedCharacterId) {
-              setSelectedCharacterId(chars[0].id);
-            }
-            return true;
-          } catch (error) {
-            console.error('[DEBUG] Error fetching characters:', error);
-          }
-        }
-        
-        if (i < maxRetries - 1) {
-          console.log(`[DEBUG] Waiting ${delayMs}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
-      }
-      console.error('[DEBUG] refreshCharacters failed after all retries');
-      return false;
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      console.log('[DEBUG] User changed, refreshing characters...');
-      refreshCharactersWithRetry(3, 1000);
-    }
-  }, [user]);
+  // Logika untuk memicu fetch awal ada di App.tsx, bukan di sini.
+  // useEffect(() => {
+  //   if (user) {
+  //     dataActions.fetchInitialData(user.id);
+  //   }
+  // }, [user, dataActions]); // Panggil fetchInitialData saat user berubah
 
   return (
     <div className="relative w-full h-full flex flex-col">
@@ -114,8 +63,11 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
         <p className="font-retro text-faded text-sm mt-1 tracking-widest">RPG TABLETOP ENGINE</p>
       </div>
 
+      {/* Tampilkan loading indicator berdasarkan state dari dataStore */}
+      {(isLoading || !hasLoaded) && <LoadingIndicator />}
+
       {/* CENTRAL INTERACTIVE AREA */}
-      {viewMode === 'IDLE' && (
+      {viewMode === 'IDLE' && hasLoaded && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pt-20 gap-8">
           
           {/* PLAY BUTTON: Cek apakah sudah pilih karakter */}
@@ -157,7 +109,7 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
       {viewMode === 'CAMPFIRE' && (
         <div className="relative">
           <CampfireMenu
-            characters={myCharacters}
+            characters={characters} // Gunakan karakter dari dataStore
             onSelectCharacter={(id) => {
               setSelectedCharacterId(id);
             }}
@@ -167,11 +119,11 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
           {/* Refresh button */}
           <div className="absolute top-4 right-4 z-20">
             <button
-              onClick={() => refreshCharactersWithRetry(3, 1000)}
-              disabled={isRefreshing}
-              className={`px-3 py-1 text-xs font-pixel border ${isRefreshing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'} bg-orange-800 text-white border-orange-600`}
+              onClick={() => user && dataActions.fetchInitialData(user.id)} // Panggil aksi dari store
+              disabled={isLoading} // Gunakan isLoading dari store
+              className={`px-3 py-1 text-xs font-pixel border ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'} bg-orange-800 text-white border-orange-600`}
             >
-              {isRefreshing ? 'Loading...' : 'Refresh'}
+              {isLoading ? 'LOADING...' : 'REFRESH'}
             </button>
           </div>
         </div>
@@ -183,10 +135,8 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
             onCancel={() => setViewMode('CAMPFIRE')}
             onComplete={async () => {
                console.log('[DEBUG] CharacterWizard onComplete called');
-               const success = await refreshCharactersWithRetry(3, 1000);
+               // Cukup kembali ke Campfire, data akan otomatis ter-update oleh store
                setViewMode('CAMPFIRE');
-               // Note: Character selection will be handled by the refreshCharacters function
-               // which calls setSelectedCharacterId if there are characters and no character is selected
             }}
          />
       )}
@@ -221,7 +171,7 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
          <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 opacity-70">
             <div className="w-2 h-2 bg-green-500 animate-pulse" />
             <span className="font-pixel text-[8px] text-faded">
-               SOUL: {myCharacters.find(c => c.id === selectedCharacterId)?.name || 'UNKNOWN'}
+               SOUL: {characters.find(c => c.id === selectedCharacterId)?.name || 'UNKNOWN'}
             </span>
          </div>
       )}
