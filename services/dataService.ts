@@ -458,45 +458,40 @@ class DataService {
             return null;
         }
 
-        // 1. Coba ambil profil yang ada
-        const { data: existingProfile, error: selectError } = await supabase
+        // [FIX] Gunakan maybeSingle() untuk menghindari error 406 (Not Acceptable) di console
+        const { data: existingProfile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
         if (existingProfile) {
             return existingProfile;
         }
 
-        // 2. Jika tidak ada (error 'PGRST116'), buat baru
-        if (selectError && selectError.code === 'PGRST116') {
-            console.log(`[DataService] No profile found for ${user.id}. Creating one.`);
-            const { data: newProfile, error: insertError } = await supabase
-                .from('profiles')
-                .insert({
-                    id: user.id,
-                    email: user.email,
-                    full_name: user.user_metadata?.full_name || user.email,
-                    avatar_url: user.user_metadata?.avatar_url || '',
-                })
-                .select()
-                .single();
-
-            if (insertError) {
-                console.error('[DataService] Error creating profile:', insertError);
-                return null;
-            }
-            return newProfile;
-        }
+        // [FIX] Gunakan UPSERT (Insert or Update) alih-alih INSERT.
+        // Ini menangani Race Condition: Jika trigger SQL sudah duluan membuat profil,
+        // upsert akan sekadar mengupdate (atau do nothing), sehingga tidak kena error 409 Conflict.
+        console.log(`[DataService] Profile missing or sync needed. Upserting for ${user.id}.`);
         
-        // 3. Handle error lain yang mungkin terjadi saat select
-        if (selectError) {
-            console.error('[DataService] Error fetching profile:', selectError);
+        const { data: newProfile, error: upsertError } = await supabase
+            .from('profiles')
+            .upsert({
+                id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || user.email,
+                avatar_url: user.user_metadata?.avatar_url || '',
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'id' })
+            .select()
+            .single();
+
+        if (upsertError) {
+            // Jika masih error, kemungkinan RLS atau koneksi, tapi bukan duplikat lagi.
+            console.error('[DataService] Error upserting profile:', upsertError);
             return null;
         }
-
-        return null; // Fallback
+        return newProfile;
     }
 
     // =================================================================
