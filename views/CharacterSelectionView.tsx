@@ -12,10 +12,9 @@ interface CharacterSelectionViewProps {
   characters: Character[]; // SSoT Karakter milikku (tetap di-pass dari ViewManager)
   onSelect: (character: Character) => void;
   onClose: () => void;
-  userId: string; // Ambil userId
 }
 
-export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ characters, onSelect, onClose, userId }) => {
+export const CharacterSelectionView: React.FC<CharacterSelectionViewProps> = ({ characters, onSelect, onClose }) => {
   const templates = getRawCharacterTemplates();
   // FASE 2: Ganti aksi dataStore dengan aksi appStore
   const { navigateTo, startTemplateFlow } = useAppStore(s => s.actions);

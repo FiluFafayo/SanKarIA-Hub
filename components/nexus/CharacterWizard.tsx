@@ -386,7 +386,8 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         if (sp && !selectedSpells.includes(name)) spells.push(sp);
       });
 
-      await characterRepository.saveNewCharacter(characterData, inventory, spells, user.id);
+      // [Fase 1 Fix] Hapus parameter ownerId, biarkan backend mengambil dari sesi
+      await characterRepository.saveNewCharacter(characterData, inventory, spells);
       onComplete();
     } catch (e) {
       console.error("Failed to summon soul:", e);
