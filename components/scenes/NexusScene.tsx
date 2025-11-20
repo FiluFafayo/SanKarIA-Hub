@@ -7,6 +7,7 @@ import { CampaignWizard } from '../nexus/CampaignWizard';
 import { useAppStore } from '../../store/appStore';
 import { useDataStore } from '../../store/dataStore'; // GANTI DENGAN DATASTORE
 import { Character } from '../../types';
+import { authRepository } from '../../services/repository/authRepository';
 
 interface NexusSceneProps {
   onStartGame: () => void;
@@ -42,6 +43,14 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   const { user, setSelectedCharacterId, selectedCharacterId } = useAppStore();
   const { state: dataState, actions: dataActions } = useDataStore();
   const { characters, isLoading, hasLoaded } = dataState;
+
+  const handleLogout = async () => {
+    await authRepository.signOut();
+  };
+
+  const handleLogout = async () => {
+    await authRepository.signOut();
+  };
 
   // HAPUS: Semua logika fetching data lokal (refreshCharacters, refreshCharactersWithRetry, useEffect)
   // Logika ini sekarang ditangani secara global oleh App.tsx -> useDataStore.fetchInitialData
@@ -174,6 +183,18 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
                SOUL: {characters.find(c => c.id === selectedCharacterId)?.name || 'UNKNOWN'}
             </span>
          </div>
+      )}
+
+      {/* LOGOUT BUTTON */}
+      {viewMode === 'IDLE' && (
+        <div className="absolute bottom-4 right-4 z-10">
+          <button 
+            onClick={handleLogout}
+            className="font-pixel text-faded text-[10px] hover:text-red-400 transition-colors bg-black/50 px-3 py-2 border border-wood/50 hover:border-red-500"
+          >
+            KELUAR
+          </button>
+        </div>
       )}
     </div>
   );
