@@ -153,7 +153,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
             try {
                 // 2. PASANG LISTENER DULU
                 // Ini akan menangani event di MASA DEPAN (login, logout, token refresh)
-                dataService.onAuthStateChange((event, session) => {
+                dataService.onAuthStateChange(async (event, session) => {
                     // Listener INI yang akan menangani update state SETELAH inisialisasi
                     console.log(`[Auth] Event Triggered: ${event}`, session?.user?.email);
                     const user = session?.user ?? null;
@@ -161,6 +161,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
                     // Set user-nya, TAPI JANGAN set loading: false di sini
                     // Biarkan pengecekan manual di bawah yang mengontrol "boot sequence"
                     set(state => ({ auth: { ...state.auth, user } }));
+
+                    if (user) {
+                        await dataService.getOrCreateProfile();
+                    }
 
                     // Jika user logout, paksa kembali ke Nexus
                     if (event === 'SIGNED_OUT') {
@@ -175,6 +179,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 if (currentUser) {
                     console.log("[Auth] Initial Check Found (manual):", currentUser.email);
                     set(state => ({ auth: { ...state.auth, user: currentUser } }));
+                    await dataService.getOrCreateProfile();
                 }
 
             } catch (error) {

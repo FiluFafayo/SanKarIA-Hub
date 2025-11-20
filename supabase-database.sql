@@ -3,22 +3,33 @@
 -- =================================================================
 
 -- =================================================================
--- MANDAT 4.4: CLEAN SLATE (HAPUS SEMUA TABEL LAMA)
+-- MANDAT 4.4: DATABASE RESET (BERSIHKAN SEMUA SKEMA)
 -- =================================================================
-DROP TABLE IF EXISTS "public"."game_events" CASCADE;
-DROP TABLE IF EXISTS "public"."campaign_monsters" CASCADE;
-DROP TABLE IF EXISTS "public"."campaign_players" CASCADE;
-DROP TABLE IF EXISTS "public"."character_inventory" CASCADE;
-DROP TABLE IF EXISTS "public"."character_spells" CASCADE;
-DROP TABLE IF EXISTS "public"."campaigns" CASCADE;
-DROP TABLE IF EXISTS "public"."characters" CASCADE;
-DROP TABLE IF EXISTS "public"."profiles" CASCADE;
-DROP TABLE IF EXISTS "public"."items" CASCADE;
-DROP TABLE IF EXISTS "public"."spells" CASCADE;
-DROP TABLE IF EXISTS "public"."monsters" CASCADE;
-DROP FUNCTION IF EXISTS "public"."handle_new_user"() CASCADE;
-DROP FUNCTION IF EXISTS "public"."is_character_owner"("character_id_to_check" "uuid") CASCADE;
-DROP FUNCTION IF EXISTS "public"."is_campaign_member"("campaign_id_to_check" "uuid") CASCADE;
+
+-- 1. Bersihkan skema 'public' dengan menghapus dan membuatnya kembali.
+-- Ini akan menghapus semua tabel, fungsi, dan objek lain di dalamnya.
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO anon;
+GRANT ALL ON SCHEMA public TO authenticated;
+GRANT ALL ON SCHEMA public TO service_role;
+
+-- 2. Kosongkan skema 'auth' (DILEWATI) - Pengguna dikelola via Supabase Dashboard.
+-- Blok berikut dinonaktifkan untuk menghindari error permission.
+-- DO $$
+-- DECLARE
+--     r RECORD;
+-- BEGIN
+--     FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'auth') LOOP
+--         EXECUTE 'TRUNCATE TABLE auth.' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
+--     END LOOP;
+-- END $$;
+
+-- 3. Kosongkan skema 'storage' dengan menghapus semua objek dan bucket.
+-- Ini akan menghapus semua file yang diunggah.
+DELETE FROM storage.objects;
+DELETE FROM storage.buckets;
 
 -- =================================================================
 -- BAGIAN 1: TABEL PROFIL & PENGGUNA (Otentikasi)
