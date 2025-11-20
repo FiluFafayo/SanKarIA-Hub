@@ -449,6 +449,56 @@ class DataService {
         return this.supabase.auth.onAuthStateChange(callback);
     }
 
+    public async getOrCreateProfile(): Promise<DbProfile | null> {
+        const supabase = this.ensureSupabase();
+        const user = await this.getCurrentUser();
+
+        if (!user) {
+            console.warn("[DataService] getOrCreateProfile called without a user.");
+            return null;
+        }
+
+        // 1. Coba ambil profil yang ada
+        const { data: existingProfile, error: selectError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+        if (existingProfile) {
+            return existingProfile;
+        }
+
+        // 2. Jika tidak ada (error 'PGRST116'), buat baru
+        if (selectError && selectError.code === 'PGRST116') {
+            console.log(`[DataService] No profile found for ${user.id}. Creating one.`);
+            const { data: newProfile, error: insertError } = await supabase
+                .from('profiles')
+                .insert({
+                    id: user.id,
+                    email: user.email,
+                    full_name: user.user_metadata?.full_name || user.email,
+                    avatar_url: user.user_metadata?.avatar_url || '',
+                })
+                .select()
+                .single();
+
+            if (insertError) {
+                console.error('[DataService] Error creating profile:', insertError);
+                return null;
+            }
+            return newProfile;
+        }
+        
+        // 3. Handle error lain yang mungkin terjadi saat select
+        if (selectError) {
+            console.error('[DataService] Error fetching profile:', selectError);
+            return null;
+        }
+
+        return null; // Fallback
+    }
+
     // =================================================================
     // METODE KARAKTER (MANDAT 3.4: SSoT KARAKTER)
     // =================================================================

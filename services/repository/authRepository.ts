@@ -1,4 +1,5 @@
 import { dataService } from '../dataService';
+import { DbProfile } from '../types';
 
 export const authRepository = {
   signInWithGoogle: async (): Promise<void> => {
@@ -7,8 +8,10 @@ export const authRepository = {
   signOut: async (): Promise<void> => {
     await dataService.signOut();
   },
-  // Helper tambahan
   getCurrentUser: async (): Promise<any> => {
     return await dataService.getCurrentUser();
-  }
+  },
+  getOrCreateProfile: async (): Promise<DbProfile | null> => {
+    return await dataService.getOrCreateProfile();
+  },
 };

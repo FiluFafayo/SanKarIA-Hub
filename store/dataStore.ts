@@ -182,9 +182,17 @@ export const useDataStore = create<DataStore>((set, get) => ({
 			get().actions._setLoading(true);
 
             try {
-                const { globalData, character, campaign } = getRepositories();
+                const { globalData, auth, character, campaign } = getRepositories();
+                
+                // LANGKAH 1: Pastikan profil ada SEBELUM mengambil data lain.
+                const profile = await auth.getOrCreateProfile();
+                if (!profile) {
+                    throw new Error("Gagal memverifikasi atau membuat profil pengguna.");
+                }
+
+                // LANGKAH 2: Lanjutkan alur normal
                 await globalData.cacheGlobalData();
-                let fetchedCharacters = await character.getMyCharacters(userId); // Ganti jadi 'let'
+                let fetchedCharacters = await character.getMyCharacters(userId);
                 get().actions._setCharacters(fetchedCharacters);
 
                 const myCharacterIds = fetchedCharacters.map((c) => c.id);
