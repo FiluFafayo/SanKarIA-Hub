@@ -22,20 +22,25 @@ interface AppLayoutProps {
 }
 
 // FASE 2: Modifikasi LoadingScreen untuk menangani status error
-const LoadingScreen: React.FC<{ theme: string; message: string; isError?: boolean }> = ({ 
-    theme, message, isError = false 
+const LoadingScreen: React.FC<{ theme: string; message: string; isError?: boolean; onRetry?: () => void }> = ({ 
+    theme, message, isError = false, onRetry
 }) => (
      <div className={`w-full h-full bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme}`}>
         <h1 className={`font-cinzel text-5xl ${!isError ? 'animate-pulse' : 'text-red-400'}`}>
-            {isError ? "Koneksi Gagal" : "SanKarIA Hub"}
+            {isError ? "Koneksi Terputus" : "SanKarIA Hub"}
         </h1>
-        <p className={`mt-2 ${isError ? 'text-red-300' : ''}`}>{message}</p>
+        <div className={`mt-4 p-4 border ${isError ? 'border-red-800 bg-red-900/20' : 'border-transparent'} max-w-md text-center`}>
+             <p className={`${isError ? 'text-red-300 font-mono text-sm' : 'text-faded'}`}>{message}</p>
+        </div>
         {isError && (
             <button 
-                onClick={() => window.location.reload()}
-                className="mt-4 font-cinzel bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded"
+                onClick={() => {
+                    if (onRetry) onRetry();
+                    else window.location.reload();
+                }}
+                className="mt-6 font-cinzel text-sm uppercase tracking-widest bg-red-900/50 border border-red-500 hover:bg-red-800 text-white px-8 py-3 shadow-[0_0_15px_rgba(220,38,38,0.5)] transition-all"
             >
-                Coba Lagi
+                Bangkitkan Ulang
             </button>
         )}
     </div>
@@ -44,8 +49,8 @@ const LoadingScreen: React.FC<{ theme: string; message: string; isError?: boolea
 export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, setTheme }) => {
 
     // State SSoT (dari dataStore)
-    const { isLoading, hasLoaded, characters } = useDataStore(s => s.state);
-    const { addPlayerToCampaign } = useDataStore(s => s.actions); // Ambil aksi
+    const { isLoading, hasLoaded, characters, error } = useDataStore(s => s.state);
+    const { addPlayerToCampaign, fetchInitialData } = useDataStore(s => s.actions); // Ambil aksi & fetcher
 
     // State Navigasi (dari appStore)
     const { currentView, campaignToJoinOrStart, returnToNexus, startJoinFlow, notifications, pushNotification } = useAppStore(s => ({
@@ -130,17 +135,25 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
         return <LoadingScreen theme={theme} message="Memuat petualangan..." />;
     }
 
-    if (isLoading && !hasLoaded) {
+    if (isLoading) {
          return <LoadingScreen theme={theme} message="Memuat semesta..." />;
     }
 
+    // Tambahkan prop onRetry ke render error state di bawah
+
     // FASE 2: Tangani Gagal Load SSoT
-    if (!isLoading && !hasLoaded) {
+    if (error) {
         return <LoadingScreen 
                     theme={theme} 
-                    message="Gagal memuat data awal dari database. Periksa koneksi Anda." 
-                    isError={true} 
+                    message={error} 
+                    isError={true}
+                    onRetry={() => userId && fetchInitialData(userId)} // Retry fetch
                 />;
+    }
+
+    // Fallback jika stuck (tidak loading, belum loaded, tapi tidak ada error)
+    if (!isLoading && !hasLoaded) {
+         return <LoadingScreen theme={theme} message="Menyiapkan koneksi..." />;
     }
 
     // 2. Tampilkan GameScreen jika sesi game aktif
