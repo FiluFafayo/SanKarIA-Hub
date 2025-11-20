@@ -35,8 +35,8 @@ export interface CharacterRepository {
   saveNewCharacter(
     charData: Omit<Character, 'id' | 'ownerId' | 'inventory' | 'knownSpells'>,
     inventoryData: { item: any; quantity: number; isEquipped: boolean }[],
-    spellData: any[],
-    ownerId: string
+    spellData: any[]
+    // ownerId removed
   ): Promise<Character>;
 }
 
