@@ -45,20 +45,20 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   const { pushNotification } = actions; 
   
   const { state: dataState, actions: dataActions } = useDataStore();
-  const { characters, isLoading, hasLoaded } = dataState;
+  const { characters, isLoading, hasLoaded, error } = dataState;
 
   const handleLogout = async () => {
     await authRepository.signOut();
   };
 
-  // [FIX CRITICAL] Pemicu Fetch Data: Tanpa ini, aplikasi stuck di "Memuat Jiwa..."
+  // [FIX CRITICAL] Pemicu Fetch Data
   useEffect(() => {
-    // Hanya fetch jika user ada, data belum loaded, dan tidak sedang loading
-    if (user && !hasLoaded && !isLoading) {
+    // Cek error agar tidak infinite loop saat gagal
+    if (user && !hasLoaded && !isLoading && !error) {
       console.log('[NexusScene] Memulai penarikan data jiwa untuk:', user.id);
       dataActions.fetchInitialData(user.id);
     }
-  }, [user, hasLoaded, isLoading, dataActions]);
+  }, [user, hasLoaded, isLoading, error, dataActions]);
 
   // BARU: Efek untuk menangani kasus "tidak ada karakter"
   useEffect(() => {
@@ -95,10 +95,32 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
       </div>
 
       {/* Tampilkan loading indicator berdasarkan state dari dataStore */}
-      {(isLoading || !hasLoaded) && <LoadingIndicator />}
+      {(isLoading || (!hasLoaded && !error)) && <LoadingIndicator />}
+
+      {/* ERROR STATE UI */}
+      {error && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 gap-4 p-8 text-center">
+            <h2 className="text-red-500 font-pixel text-xl animate-pulse">KONEKSI TERPUTUS</h2>
+            <p className="text-red-200 font-retro text-sm max-w-md border border-red-900/50 p-4 bg-red-950/30">
+                {error}
+            </p>
+            <button 
+                onClick={() => user && dataActions.fetchInitialData(user.id)}
+                className="px-6 py-3 bg-red-900 border-2 border-red-500 text-white font-pixel hover:bg-red-800 transition-colors shadow-[0_0_10px_red]"
+            >
+                COBA LAGI
+            </button>
+            <button 
+                onClick={handleLogout}
+                className="text-xs text-faded hover:text-white underline mt-8"
+            >
+                Keluar / Logout
+            </button>
+        </div>
+      )}
 
       {/* CENTRAL INTERACTIVE AREA */}
-      {viewMode === 'IDLE' && hasLoaded && (
+      {viewMode === 'IDLE' && hasLoaded && !error && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pt-20 gap-8">
           
           {/* PLAY BUTTON: Cek apakah sudah pilih karakter */}

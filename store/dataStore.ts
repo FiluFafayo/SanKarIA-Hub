@@ -39,6 +39,7 @@ interface DataState {
 	characters: Character[];
 	isLoading: boolean;
 	hasLoaded: boolean;
+	error: string | null;
 }
 
 const initialState: DataState = {
@@ -46,11 +47,13 @@ const initialState: DataState = {
 	characters: [],
 	isLoading: false,
 	hasLoaded: false,
+	error: null,
 };
 
 interface DataActions {
 	// Aksi internal untuk memodifikasi state
 	_setLoading: (status: boolean) => void;
+	_setError: (error: string | null) => void;
 	_setCampaigns: (campaigns: Campaign[]) => void;
 	_setCharacters: (characters: Character[]) => void;
 	_addCampaign: (campaign: Campaign) => void;
@@ -112,6 +115,8 @@ export const useDataStore = create<DataStore>((set, get) => ({
 		// --- Aksi Internal ---
 		_setLoading: (status) =>
 			set((state) => ({ state: { ...state.state, isLoading: status } })),
+		_setError: (error) =>
+			set((state) => ({ state: { ...state.state, error } })),
 		_setCampaigns: (campaigns) =>
 			set((state) => ({ state: { ...state.state, campaigns } })),
 		_setCharacters: (characters) =>
@@ -177,13 +182,14 @@ export const useDataStore = create<DataStore>((set, get) => ({
 
 		// --- Aksi Publik (Thunks) ---
 		fetchInitialData: async (userId) => {
-			if (get().state.hasLoaded || get().state.isLoading) return; // Mencegah load ganda
+			if (get().state.hasLoaded || get().state.isLoading) return;
 
 			get().actions._setLoading(true);
+			get().actions._setError(null);
 
             try {
                 const { globalData, auth, character, campaign } = getRepositories();
-                
+
                 // LANGKAH 1: Pastikan profil ada SEBELUM mengambil data lain.
                 const profile = await auth.getOrCreateProfile();
                 if (!profile) {
@@ -202,12 +208,9 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 get().actions._setCampaigns(fetchedCampaigns);
 
 				set((state) => ({ state: { ...state.state, hasLoaded: true } }));
-			} catch (error) {
+			} catch (error: any) {
 				console.error("Gagal memuat data:", error);
-				// FASE 4: Hapus alert()
-				console.error(
-					"Gagal memuat data dari Supabase. Periksa koneksi internet Anda atau coba lagi nanti."
-				);
+				get().actions._setError(error.message || "Gagal memuat data semesta.");
 			} finally {
 				get().actions._setLoading(false);
 			}
