@@ -40,7 +40,10 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   // const [isRefreshing, setIsRefreshing] = useState(false);
 
   // GUNAKAN SSoT dari store
-  const { user, setSelectedCharacterId, selectedCharacterId } = useAppStore();
+  // [FIX] Ambil actions dari store untuk akses pushNotification
+  const { user, setSelectedCharacterId, selectedCharacterId, actions } = useAppStore();
+  const { pushNotification } = actions; 
+  
   const { state: dataState, actions: dataActions } = useDataStore();
   const { characters, isLoading, hasLoaded } = dataState;
 
@@ -53,7 +56,8 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
     // Kondisi: tidak sedang loading, user sudah login, TAPI array karakter kosong
     if (!isLoading && user && characters.length === 0) {
       console.log('[NexusScene] No characters found after loading, opening wizard...');
-      setIsCreatingCharacter(true); // Otomatis buka wizard
+      // [FIX] Gunakan setViewMode yang valid, bukan variabel hantu
+      setViewMode('CHAR_WIZARD'); 
       pushNotification({
         type: 'info',
         message: 'Selamat datang, Petualang! Ciptakan jiwa pertamamu untuk memulai.',
