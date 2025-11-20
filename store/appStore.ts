@@ -92,16 +92,14 @@ interface NotificationActions {
 // =================================================================
 type AppStore = {
     navigation: NavigationState;
-    auth: AuthState;     // Tambahkan AuthState
+    auth: AuthState;
     levelUp: LevelUpState;
     notifications: NotificationState;
-    
-    // Helper getters untuk kemudahan akses di komponen (shortcut)
-    user: any | null; 
-    isAuthLoading: boolean;
+
+    // [REMOVED] Getters dihapus karena isu spread operator
 
     actions: NavigationActions & AuthActions & LevelUpActions & NotificationActions;
-    
+
     // Flat actions untuk kemudahan destructuring (shortcut)
     initialize: () => Promise<void>;
     login: () => Promise<void>;
@@ -115,9 +113,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     levelUp: initialLevelUpState,
     notifications: initialNotificationState,
 
-    // === GETTERS (Derived State) ===
-    get user() { return get().auth.user },
-    get isAuthLoading() { return get().auth.isAuthLoading },
+    // === GETTERS REMOVED (Bad Practice) ===
+    // Akses langsung state.auth.user atau state.auth.isAuthLoading di komponen.
 
     // === FLAT ACTIONS (Proxies) ===
     initialize: async () => get().actions.initialize(),
@@ -148,75 +145,75 @@ export const useAppStore = create<AppStore>((set, get) => ({
         })),
 
         // --- Authentication (LOGGING & SAFETY VALVE) ---
-    initialize: async () => {
-        const log = (msg: string) => {
-            console.log(`[AppStore] ${msg}`);
-            set(s => ({ auth: { ...s.auth, authLog: [...s.auth.authLog, msg] } }));
-        };
+        initialize: async () => {
+            const log = (msg: string) => {
+                console.log(`[AppStore] ${msg}`);
+                set(s => ({ auth: { ...s.auth, authLog: [...s.auth.authLog, msg] } }));
+            };
 
-        log("1. Initialize started. Setting isAuthLoading=true");
-        set(state => ({ auth: { ...state.auth, isAuthLoading: true } }));
+            log("1. Initialize started. Setting isAuthLoading=true");
+            set(state => ({ auth: { ...state.auth, isAuthLoading: true } }));
 
-        // SAFETY VALVE: Timer 5 Detik
-        // Jika initialize macet, timer ini akan meledak dan memaksa loading berhenti.
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Auth Initialization Timed Out (5s)")), 5000)
-        );
+            // SAFETY VALVE: Timer 5 Detik
+            // Jika initialize macet, timer ini akan meledak dan memaksa loading berhenti.
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Auth Initialization Timed Out (5s)")), 5000)
+            );
 
-        const authProcess = async () => {
-            try {
-                log("2. Registering onAuthStateChange listener...");
-                dataService.onAuthStateChange(async (event, session) => {
-                    console.log(`[AuthListener] Event: ${event}`, session?.user?.email);
-                    const user = session?.user ?? null;
+            const authProcess = async () => {
+                try {
+                    log("2. Registering onAuthStateChange listener...");
+                    dataService.onAuthStateChange(async (event, session) => {
+                        console.log(`[AuthListener] Event: ${event}`, session?.user?.email);
+                        const user = session?.user ?? null;
 
-                    // Update user state realtime
-                    set(state => ({ auth: { ...state.auth, user } }));
+                        // Update user state realtime
+                        set(state => ({ auth: { ...state.auth, user } }));
 
-                    if (user) {
-                        log(`3a. User detected in listener: ${user.email}. Syncing profile (bg)...`);
-                        dataService.getOrCreateProfile().catch(e => console.error("Profile sync error:", e));
+                        if (user) {
+                            log(`3a. User detected in listener: ${user.email}. Syncing profile (bg)...`);
+                            dataService.getOrCreateProfile().catch(e => console.error("Profile sync error:", e));
+                        }
+
+                        if (event === 'SIGNED_OUT') {
+                            log("User signed out via listener.");
+                            get().actions.returnToNexus();
+                        }
+                    });
+
+                    log("4. Calling dataService.getCurrentUser()...");
+                    const currentUser = await dataService.getCurrentUser();
+
+                    if (currentUser) {
+                        log(`5. Initial Check Found User: ${currentUser.email}`);
+                        set(state => ({ auth: { ...state.auth, user: currentUser } }));
+
+                        log("6. Triggering profile check (background)...");
+                        dataService.getOrCreateProfile().catch(e => log(`Profile Error: ${e.message}`));
+                    } else {
+                        log("5. Initial Check: No User Found (Guest/Logout)");
+                        set(state => ({ auth: { ...state.auth, user: null } }));
                     }
 
-                    if (event === 'SIGNED_OUT') {
-                        log("User signed out via listener.");
-                        get().actions.returnToNexus();
-                    }
-                });
-
-                log("4. Calling dataService.getCurrentUser()...");
-                const currentUser = await dataService.getCurrentUser();
-
-                if (currentUser) {
-                    log(`5. Initial Check Found User: ${currentUser.email}`);
-                    set(state => ({ auth: { ...state.auth, user: currentUser } }));
-
-                    log("6. Triggering profile check (background)...");
-                    dataService.getOrCreateProfile().catch(e => log(`Profile Error: ${e.message}`));
-                } else {
-                    log("5. Initial Check: No User Found (Guest/Logout)");
+                } catch (error: any) {
+                    log(`!!! CRITICAL AUTH ERROR: ${error.message}`);
+                    console.error("[Auth] Error detail:", error);
                     set(state => ({ auth: { ...state.auth, user: null } }));
                 }
+            };
 
-            } catch (error: any) {
-                log(`!!! CRITICAL AUTH ERROR: ${error.message}`);
-                console.error("[Auth] Error detail:", error);
-                set(state => ({ auth: { ...state.auth, user: null } }));
+            // Balapan: Proses Auth vs Timer 5 Detik
+            try {
+                await Promise.race([authProcess(), timeoutPromise]);
+                log("7. Initialization sequence completed normally.");
+            } catch (timeoutError: any) {
+                log(`7. ${timeoutError.message} - FORCING UNLOCK.`);
+                // Jangan throw, kita tangani dengan mematikan loading
+            } finally {
+                log("8. FINALLY: Setting isAuthLoading = false. GATES OPEN.");
+                set(state => ({ auth: { ...state.auth, isAuthLoading: false } }));
             }
-        };
-
-        // Balapan: Proses Auth vs Timer 5 Detik
-        try {
-            await Promise.race([authProcess(), timeoutPromise]);
-            log("7. Initialization sequence completed normally.");
-        } catch (timeoutError: any) {
-            log(`7. ${timeoutError.message} - FORCING UNLOCK.`);
-            // Jangan throw, kita tangani dengan mematikan loading
-        } finally {
-            log("8. FINALLY: Setting isAuthLoading = false. GATES OPEN.");
-            set(state => ({ auth: { ...state.auth, isAuthLoading: false } }));
-        }
-    },
+        },
         login: async () => {
             try {
                 await dataService.signInWithGoogle();

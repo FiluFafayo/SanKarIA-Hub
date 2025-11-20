@@ -23,27 +23,27 @@ const BackgroundLayer = () => (
 
 // Indikator loading yang lebih eksplisit
 const LoadingIndicator = () => (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50">
-        <div className="animate-pulse text-gold font-pixel text-lg">MEMUAT JIWA...</div>
-        <div className="w-32 h-1 bg-gold/20 mt-4 overflow-hidden">
-            <div className="w-1/3 h-full bg-gold animate-loading-bar" />
-        </div>
+  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50">
+    <div className="animate-pulse text-gold font-pixel text-lg">MEMUAT JIWA...</div>
+    <div className="w-32 h-1 bg-gold/20 mt-4 overflow-hidden">
+      <div className="w-1/3 h-full bg-gold animate-loading-bar" />
     </div>
+  </div>
 );
 
 
 export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   const [viewMode, setViewMode] = useState<'IDLE' | 'CAMPFIRE' | 'GATE' | 'CHAR_WIZARD' | 'CAMP_WIZARD'>('IDLE');
-  
+
   // HAPUS: State lokal untuk karakter dan status refresh
   // const [myCharacters, setMyCharacters] = useState<Character[]>([]);
   // const [isRefreshing, setIsRefreshing] = useState(false);
 
   // GUNAKAN SSoT dari store
-  // [FIX] Ambil actions dari store untuk akses pushNotification
-  const { user, setSelectedCharacterId, selectedCharacterId, actions } = useAppStore();
-  const { pushNotification } = actions; 
-  
+  const { auth, setSelectedCharacterId, selectedCharacterId, actions } = useAppStore();
+  const user = auth.user; // Akses manual
+  const { pushNotification } = actions;
+
   const { state: dataState, actions: dataActions } = useDataStore();
   const { characters, isLoading, hasLoaded, error } = dataState;
 
@@ -66,7 +66,7 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
     if (!isLoading && user && characters.length === 0) {
       console.log('[NexusScene] No characters found after loading, opening wizard...');
       // [FIX] Gunakan setViewMode yang valid, bukan variabel hantu
-      setViewMode('CHAR_WIZARD'); 
+      setViewMode('CHAR_WIZARD');
       pushNotification({
         type: 'info',
         message: 'Selamat datang, Petualang! Ciptakan jiwa pertamamu untuk memulai.',
@@ -100,38 +100,38 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
       {/* ERROR STATE UI */}
       {error && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 gap-4 p-8 text-center">
-            <h2 className="text-red-500 font-pixel text-xl animate-pulse">KONEKSI TERPUTUS</h2>
-            <p className="text-red-200 font-retro text-sm max-w-md border border-red-900/50 p-4 bg-red-950/30">
-                {error}
-            </p>
-            <button 
-                onClick={() => user && dataActions.fetchInitialData(user.id)}
-                className="px-6 py-3 bg-red-900 border-2 border-red-500 text-white font-pixel hover:bg-red-800 transition-colors shadow-[0_0_10px_red]"
-            >
-                COBA LAGI
-            </button>
-            <button 
-                onClick={handleLogout}
-                className="text-xs text-faded hover:text-white underline mt-8"
-            >
-                Keluar / Logout
-            </button>
+          <h2 className="text-red-500 font-pixel text-xl animate-pulse">KONEKSI TERPUTUS</h2>
+          <p className="text-red-200 font-retro text-sm max-w-md border border-red-900/50 p-4 bg-red-950/30">
+            {error}
+          </p>
+          <button
+            onClick={() => user && dataActions.fetchInitialData(user.id)}
+            className="px-6 py-3 bg-red-900 border-2 border-red-500 text-white font-pixel hover:bg-red-800 transition-colors shadow-[0_0_10px_red]"
+          >
+            COBA LAGI
+          </button>
+          <button
+            onClick={handleLogout}
+            className="text-xs text-faded hover:text-white underline mt-8"
+          >
+            Keluar / Logout
+          </button>
         </div>
       )}
 
       {/* CENTRAL INTERACTIVE AREA */}
       {viewMode === 'IDLE' && hasLoaded && !error && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center pt-20 gap-8">
-          
+
           {/* PLAY BUTTON: Cek apakah sudah pilih karakter */}
-          <button 
+          <button
             onClick={() => {
-               if (!selectedCharacterId) {
-                 useAppStore.getState().actions.pushNotification({ type: 'info', message: 'Pilih jiwa terlebih dahulu di Api Unggun.' });
-                 setViewMode('CAMPFIRE');
-               } else {
-                 setViewMode('GATE');
-               }
+              if (!selectedCharacterId) {
+                useAppStore.getState().actions.pushNotification({ type: 'info', message: 'Pilih jiwa terlebih dahulu di Api Unggun.' });
+                setViewMode('CAMPFIRE');
+              } else {
+                setViewMode('GATE');
+              }
             }}
             className="group relative flex flex-col items-center gap-2 transition-transform active:scale-95"
           >
@@ -144,14 +144,14 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
           </button>
 
           {/* PROFILE BUTTON */}
-          <button 
+          <button
             onClick={() => setViewMode('CAMPFIRE')}
             className="group relative flex flex-col items-center gap-2 transition-transform active:scale-95 mt-4"
           >
-             <div className="w-16 h-16 rounded-full bg-orange-900/20 border-2 border-orange-800 flex items-center justify-center animate-pulse group-hover:bg-orange-500/20 transition-colors">
-                🔥
-             </div>
-             <span className="font-pixel text-faded text-[10px] group-hover:text-orange-400">CAMPFIRE</span>
+            <div className="w-16 h-16 rounded-full bg-orange-900/20 border-2 border-orange-800 flex items-center justify-center animate-pulse group-hover:bg-orange-500/20 transition-colors">
+              🔥
+            </div>
+            <span className="font-pixel text-faded text-[10px] group-hover:text-orange-400">CAMPFIRE</span>
           </button>
         </div>
       )}
@@ -184,36 +184,36 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
 
       {/* 2. WIZARDS */}
       {viewMode === 'CHAR_WIZARD' && (
-         <CharacterWizard 
-            onCancel={() => setViewMode('CAMPFIRE')}
-            onComplete={async () => {
-               console.log('[DEBUG] CharacterWizard onComplete called');
-               // Cukup kembali ke Campfire, data akan otomatis ter-update oleh store
-               setViewMode('CAMPFIRE');
-            }}
-         />
+        <CharacterWizard
+          onCancel={() => setViewMode('CAMPFIRE')}
+          onComplete={async () => {
+            console.log('[DEBUG] CharacterWizard onComplete called');
+            // Cukup kembali ke Campfire, data akan otomatis ter-update oleh store
+            setViewMode('CAMPFIRE');
+          }}
+        />
       )}
 
       {viewMode === 'CAMP_WIZARD' && (
-         <CampaignWizard 
-            onCancel={() => setViewMode('GATE')}
-            onComplete={(id) => {
-               console.log("Created Campaign:", id);
-               onStartGame(); // Auto start logic
-            }}
-         />
+        <CampaignWizard
+          onCancel={() => setViewMode('GATE')}
+          onComplete={(id) => {
+            console.log("Created Campaign:", id);
+            onStartGame(); // Auto start logic
+          }}
+        />
       )}
 
       {/* 3. DUNGEON GATE (Play Menu) */}
       {viewMode === 'GATE' && (
-        <DungeonGate 
+        <DungeonGate
           onBack={() => setViewMode('IDLE')}
           onEnterWorld={(code) => {
             if (code === 'NEW_CAMPAIGN_TRIGGER') {
-                setViewMode('CAMP_WIZARD');
+              setViewMode('CAMP_WIZARD');
             } else {
-                console.log("Joining:", code);
-                onStartGame();
+              console.log("Joining:", code);
+              onStartGame();
             }
           }}
         />
@@ -221,18 +221,18 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
 
       {/* FOOTER STATUS */}
       {selectedCharacterId && viewMode === 'IDLE' && (
-         <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 opacity-70">
-            <div className="w-2 h-2 bg-green-500 animate-pulse" />
-            <span className="font-pixel text-[8px] text-faded">
-               SOUL: {characters.find(c => c.id === selectedCharacterId)?.name || 'UNKNOWN'}
-            </span>
-         </div>
+        <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 opacity-70">
+          <div className="w-2 h-2 bg-green-500 animate-pulse" />
+          <span className="font-pixel text-[8px] text-faded">
+            SOUL: {characters.find(c => c.id === selectedCharacterId)?.name || 'UNKNOWN'}
+          </span>
+        </div>
       )}
 
       {/* LOGOUT BUTTON */}
       {viewMode === 'IDLE' && (
         <div className="absolute bottom-4 right-4 z-10">
-          <button 
+          <button
             onClick={handleLogout}
             className="font-pixel text-faded text-[10px] hover:text-red-400 transition-colors bg-black/50 px-3 py-2 border border-wood/50 hover:border-red-500"
           >

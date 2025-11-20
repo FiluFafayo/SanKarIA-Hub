@@ -22,18 +22,18 @@ interface AppLayoutProps {
 }
 
 // FASE 2: Modifikasi LoadingScreen untuk menangani status error
-const LoadingScreen: React.FC<{ theme: string; message: string; isError?: boolean; onRetry?: () => void }> = ({ 
+const LoadingScreen: React.FC<{ theme: string; message: string; isError?: boolean; onRetry?: () => void }> = ({
     theme, message, isError = false, onRetry
 }) => (
-     <div className={`w-full h-full bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme}`}>
+    <div className={`w-full h-full bg-bg-primary flex flex-col items-center justify-center text-text-primary ${theme}`}>
         <h1 className={`font-cinzel text-5xl ${!isError ? 'animate-pulse' : 'text-red-400'}`}>
             {isError ? "Koneksi Terputus" : "SanKarIA Hub"}
         </h1>
         <div className={`mt-4 p-4 border ${isError ? 'border-red-800 bg-red-900/20' : 'border-transparent'} max-w-md text-center`}>
-             <p className={`${isError ? 'text-red-300 font-mono text-sm' : 'text-faded'}`}>{message}</p>
+            <p className={`${isError ? 'text-red-300 font-mono text-sm' : 'text-faded'}`}>{message}</p>
         </div>
         {isError && (
-            <button 
+            <button
                 onClick={() => {
                     if (onRetry) onRetry();
                     else window.location.reload();
@@ -109,11 +109,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
             pushNotification({ message: 'Berhasil bergabung ke campaign.', type: 'success' });
 
         } catch (e) {
-             console.error("Gagal join campaign:", e);
-             // FASE 4: Hapus alert()
-             console.error("Gagal bergabung ke campaign. Mungkin Anda sudah bergabung?");
-             pushNotification({ message: 'Gagal bergabung ke campaign.', type: 'error' });
-             returnToNexus();
+            console.error("Gagal join campaign:", e);
+            // FASE 4: Hapus alert()
+            console.error("Gagal bergabung ke campaign. Mungkin Anda sudah bergabung?");
+            pushNotification({ message: 'Gagal bergabung ke campaign.', type: 'error' });
+            returnToNexus();
         }
     };
 
@@ -122,7 +122,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
         // Aksi exitGameSession di gameStore menangani
         // penyimpanan SSoT (Campaign + Character) DAN reset state runtime,
         // DAN reset navigasi (via appStore).
-        exitGameSession(); 
+        exitGameSession();
         pushNotification({ message: 'Sesi berakhir. Kemajuan disimpan.', type: 'success' });
     };
 
@@ -136,36 +136,36 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
     }
 
     if (isLoading) {
-         return <LoadingScreen theme={theme} message="Memuat semesta..." />;
+        return <LoadingScreen theme={theme} message="Memuat semesta..." />;
     }
 
     // Tambahkan prop onRetry ke render error state di bawah
 
     // FASE 2: Tangani Gagal Load SSoT
     if (error) {
-        return <LoadingScreen 
-                    theme={theme} 
-                    message={error} 
-                    isError={true}
-                    onRetry={() => userId && fetchInitialData(userId)} // Retry fetch
-                />;
+        return <LoadingScreen
+            theme={theme}
+            message={error}
+            isError={true}
+            onRetry={() => userId && fetchInitialData(userId)} // Retry fetch
+        />;
     }
 
     // Fallback jika stuck (tidak loading, belum loaded, tapi tidak ada error)
     if (!isLoading && !hasLoaded) {
-         return <LoadingScreen theme={theme} message="Menyiapkan koneksi..." />;
+        return <LoadingScreen theme={theme} message="Menyiapkan koneksi..." />;
     }
 
     // 2. Tampilkan GameScreen jika sesi game aktif
     if (playingCampaign && playingCharacter) {
         return (
             <GameScreen
-              key={playingCampaign.id}
-              initialCampaign={playingCampaign} 
-              character={playingCharacter} 
-              players={playingCampaign.players}
-              onExit={handleExitGame} // Handler baru
-              userId={userId}
+                key={playingCampaign.id}
+                initialCampaign={playingCampaign}
+                character={playingCharacter}
+                players={playingCampaign.players}
+                onExit={handleExitGame} // Handler baru
+                userId={userId}
             />
         );
     }
@@ -182,15 +182,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
                         n.type === 'error'
                             ? 'bg-red-800/70 border-red-600 text-red-100'
                             : n.type === 'success'
-                            ? 'bg-emerald-800/70 border-emerald-600 text-emerald-100'
-                            : n.type === 'warning'
-                            ? 'bg-amber-800/70 border-amber-600 text-amber-100'
-                            : 'bg-slate-800/70 border-amber-800 text-amber-100';
+                                ? 'bg-emerald-800/70 border-emerald-600 text-emerald-100'
+                                : n.type === 'warning'
+                                    ? 'bg-amber-800/70 border-amber-600 text-amber-100'
+                                    : 'bg-slate-800/70 border-amber-800 text-amber-100';
 
                     const icon =
                         n.type === 'error' ? '✖' :
-                        n.type === 'success' ? '✓' :
-                        n.type === 'warning' ? '⚠' : 'ℹ';
+                            n.type === 'success' ? '✓' :
+                                n.type === 'warning' ? '⚠' : 'ℹ';
 
                     return (
                         <div
@@ -208,7 +208,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ userId, userEmail, theme, 
                     );
                 })}
             </div>
-            <ViewManager 
+            <ViewManager
                 userId={userId}
                 userEmail={userEmail}
                 theme={theme}

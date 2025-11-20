@@ -485,7 +485,7 @@ class DataService {
         // Ini menangani Race Condition: Jika trigger SQL sudah duluan membuat profil,
         // upsert akan sekadar mengupdate (atau do nothing), sehingga tidak kena error 409 Conflict.
         console.log(`[DataService] Profile missing or sync needed. Upserting for ${user.id}.`);
-        
+
         const { data: newProfile, error: upsertError } = await supabase
             .from('profiles')
             .upsert({

@@ -5,26 +5,26 @@
 
 import { create } from "zustand";
 import {
-	Campaign,
-	Character,
-	GameEvent,
-	CampaignState,
-	CharacterInventoryItem,
-	SpellDefinition,
-	AbilityScores,
-	ItemDefinition,
+    Campaign,
+    Character,
+    GameEvent,
+    CampaignState,
+    CharacterInventoryItem,
+    SpellDefinition,
+    AbilityScores,
+    ItemDefinition,
 } from "../types";
 import { getRepositories } from "../services/repository";
 import { useAppStore } from "./appStore";
 import { generationService } from "../services/ai/generationService";
 // Impor baru untuk aksi template
 import {
-	RawCharacterData,
-	findClass,
-	findRace,
-	findBackground,
-	findSpell,
-	getItemDef,
+    RawCharacterData,
+    findClass,
+    findRace,
+    findBackground,
+    findSpell,
+    getItemDef,
 } from "../data/registry";
 import { getAbilityModifier } from "../utils";
 import { renderCharacterLayout } from "../services/pixelRenderer";
@@ -35,55 +35,55 @@ import { SPRITE_PARTS } from "../data/spriteParts";
 // =================================================================
 
 interface DataState {
-	campaigns: Campaign[];
-	characters: Character[];
-	isLoading: boolean;
-	hasLoaded: boolean;
-	error: string | null;
+    campaigns: Campaign[];
+    characters: Character[];
+    isLoading: boolean;
+    hasLoaded: boolean;
+    error: string | null;
 }
 
 const initialState: DataState = {
-	campaigns: [],
-	characters: [],
-	isLoading: false,
-	hasLoaded: false,
-	error: null,
+    campaigns: [],
+    characters: [],
+    isLoading: false,
+    hasLoaded: false,
+    error: null,
 };
 
 interface DataActions {
-	// Aksi internal untuk memodifikasi state
-	_setLoading: (status: boolean) => void;
-	_setError: (error: string | null) => void;
-	_setCampaigns: (campaigns: Campaign[]) => void;
-	_setCharacters: (characters: Character[]) => void;
-	_addCampaign: (campaign: Campaign) => void;
-	_updateCampaign: (campaign: Campaign) => void;
-	_addCharacter: (character: Character) => void;
-	_updateCharacter: (character: Character) => void;
+    // Aksi internal untuk memodifikasi state
+    _setLoading: (status: boolean) => void;
+    _setError: (error: string | null) => void;
+    _setCampaigns: (campaigns: Campaign[]) => void;
+    _setCharacters: (characters: Character[]) => void;
+    _addCampaign: (campaign: Campaign) => void;
+    _updateCampaign: (campaign: Campaign) => void;
+    _addCharacter: (character: Character) => void;
+    _updateCharacter: (character: Character) => void;
 
-	// Aksi publik (thunks) yang dipanggil oleh UI/App
-	fetchInitialData: (userId: string) => Promise<void>;
-	saveCampaign: (campaign: Campaign | CampaignState) => Promise<void>;
-	updateCharacter: (character: Character) => Promise<void>;
-	saveNewCharacter: (
-		charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
-		inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
-		spellData: SpellDefinition[],
-		userId: string
+    // Aksi publik (thunks) yang dipanggil oleh UI/App
+    fetchInitialData: (userId: string) => Promise<void>;
+    saveCampaign: (campaign: Campaign | CampaignState) => Promise<void>;
+    updateCharacter: (character: Character) => Promise<void>;
+    saveNewCharacter: (
+        charData: Omit<Character, "id" | "ownerId" | "inventory" | "knownSpells">,
+        inventoryData: Omit<CharacterInventoryItem, "instanceId">[],
+        spellData: SpellDefinition[],
+        userId: string
     ) => Promise<Character>; // FASE 1 FIX: Kembalikan karakter baru
     createCampaign: (
-		campaignData: Omit<
-			Campaign,
-			| "id"
-			| "ownerId"
-			| "eventLog"
-			| "monsters"
-			| "players"
-			| "playerIds"
-			| "choices"
-			| "turnId"
-			| "initiativeOrder"
-		>,
+        campaignData: Omit<
+            Campaign,
+            | "id"
+            | "ownerId"
+            | "eventLog"
+            | "monsters"
+            | "players"
+            | "playerIds"
+            | "choices"
+            | "turnId"
+            | "initiativeOrder"
+        >,
         userId: string
     ) => Promise<Campaign>; // Kembalikan campaign untuk alur join
     getPublishedCampaigns: () => Promise<Campaign[]>;
@@ -92,42 +92,42 @@ interface DataActions {
         campaignId: string,
         characterId: string
     ) => Promise<Campaign>; // FASE 1 FIX: Kembalikan campaign
-	copyCharacterFromTemplate: (
-		templateData: RawCharacterData,
-		userId: string
-	) => Promise<Character>;
+    copyCharacterFromTemplate: (
+        templateData: RawCharacterData,
+        userId: string
+    ) => Promise<Character>;
 }
 
 type DataStore = {
-	state: DataState;
-	actions: DataActions;
+    state: DataState;
+    actions: DataActions;
 };
 
 // =================================================================
 // STORE DEFINITION
 // =================================================================
 export const useDataStore = create<DataStore>((set, get) => ({
-	// === STATE ===
-	state: initialState,
+    // === STATE ===
+    state: initialState,
 
-	// === ACTIONS ===
-	actions: {
-		// --- Aksi Internal ---
-		_setLoading: (status) =>
-			set((state) => ({ state: { ...state.state, isLoading: status } })),
-		_setError: (error) =>
-			set((state) => ({ state: { ...state.state, error } })),
-		_setCampaigns: (campaigns) =>
-			set((state) => ({ state: { ...state.state, campaigns } })),
-		_setCharacters: (characters) =>
-			set((state) => ({ state: { ...state.state, characters } })),
-		_addCampaign: (campaign) =>
-			set((state) => ({
-				state: {
-					...state.state,
-					campaigns: [...state.state.campaigns, campaign],
-				},
-			})),
+    // === ACTIONS ===
+    actions: {
+        // --- Aksi Internal ---
+        _setLoading: (status) =>
+            set((state) => ({ state: { ...state.state, isLoading: status } })),
+        _setError: (error) =>
+            set((state) => ({ state: { ...state.state, error } })),
+        _setCampaigns: (campaigns) =>
+            set((state) => ({ state: { ...state.state, campaigns } })),
+        _setCharacters: (characters) =>
+            set((state) => ({ state: { ...state.state, characters } })),
+        _addCampaign: (campaign) =>
+            set((state) => ({
+                state: {
+                    ...state.state,
+                    campaigns: [...state.state.campaigns, campaign],
+                },
+            })),
 
         // --- Aksi util publik (harus berada di level actions, bukan di dalam set() di atas) ---
         getPublishedCampaigns: async () => {
@@ -154,38 +154,38 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 throw e;
             }
         },
-		_updateCampaign: (campaign) =>
-			set((state) => ({
-				state: {
-					...state.state,
-					campaigns: state.state.campaigns.map((c) =>
-						c.id === campaign.id ? campaign : c
-					),
-				},
-			})),
-		_addCharacter: (character) =>
-			set((state) => ({
-				state: {
-					...state.state,
-					characters: [...state.state.characters, character],
-				},
-			})),
-		_updateCharacter: (character) =>
-			set((state) => ({
-				state: {
-					...state.state,
-					characters: state.state.characters.map((c) =>
-						c.id === character.id ? character : c
-					),
-				},
-			})),
+        _updateCampaign: (campaign) =>
+            set((state) => ({
+                state: {
+                    ...state.state,
+                    campaigns: state.state.campaigns.map((c) =>
+                        c.id === campaign.id ? campaign : c
+                    ),
+                },
+            })),
+        _addCharacter: (character) =>
+            set((state) => ({
+                state: {
+                    ...state.state,
+                    characters: [...state.state.characters, character],
+                },
+            })),
+        _updateCharacter: (character) =>
+            set((state) => ({
+                state: {
+                    ...state.state,
+                    characters: state.state.characters.map((c) =>
+                        c.id === character.id ? character : c
+                    ),
+                },
+            })),
 
-		// --- Aksi Publik (Thunks) ---
-		fetchInitialData: async (userId) => {
-			if (get().state.hasLoaded || get().state.isLoading) return;
+        // --- Aksi Publik (Thunks) ---
+        fetchInitialData: async (userId) => {
+            if (get().state.hasLoaded || get().state.isLoading) return;
 
-			get().actions._setLoading(true);
-			get().actions._setError(null);
+            get().actions._setLoading(true);
+            get().actions._setError(null);
 
             try {
                 const { globalData, auth, character, campaign } = getRepositories();
@@ -207,16 +207,16 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 );
                 get().actions._setCampaigns(fetchedCampaigns);
 
-				set((state) => ({ state: { ...state.state, hasLoaded: true } }));
-			} catch (error: any) {
-				console.error("Gagal memuat data:", error);
-				get().actions._setError(error.message || "Gagal memuat data semesta.");
-			} finally {
-				get().actions._setLoading(false);
-			}
-		},
+                set((state) => ({ state: { ...state.state, hasLoaded: true } }));
+            } catch (error: any) {
+                console.error("Gagal memuat data:", error);
+                get().actions._setError(error.message || "Gagal memuat data semesta.");
+            } finally {
+                get().actions._setLoading(false);
+            }
+        },
 
-		saveCampaign: async (campaign) => {
+        saveCampaign: async (campaign) => {
             try {
                 const { activeRollRequest, thinkingState, players, ...campaignToSave } =
                     campaign as CampaignState;
@@ -224,16 +224,16 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 const { campaign: campaignRepo } = getRepositories();
                 const savedCampaign = await campaignRepo.saveCampaign(campaignToSave);
 
-				// Update SSoT store
-				get().actions._updateCampaign({
-					...savedCampaign,
-					eventLog: [],
-					monsters: [],
-					players: [],
-					playerIds: campaignToSave.playerIds, // Pastikan playerIds tetap ada
-					choices: [],
-					turnId: null,
-				});
+                // Update SSoT store
+                get().actions._updateCampaign({
+                    ...savedCampaign,
+                    eventLog: [],
+                    monsters: [],
+                    players: [],
+                    playerIds: campaignToSave.playerIds, // Pastikan playerIds tetap ada
+                    choices: [],
+                    turnId: null,
+                });
 
                 // Notifikasi sukses
                 useAppStore.getState().actions.pushNotification({
@@ -254,7 +254,7 @@ export const useDataStore = create<DataStore>((set, get) => ({
             }
         },
 
-		updateCharacter: async (character) => {
+        updateCharacter: async (character) => {
             try {
                 const { character: characterRepo } = getRepositories();
                 const savedCharacter = await characterRepo.saveCharacter(character);
@@ -278,7 +278,7 @@ export const useDataStore = create<DataStore>((set, get) => ({
             }
         },
 
-		saveNewCharacter: async (charData, inventoryData, spellData, userId) => {
+        saveNewCharacter: async (charData, inventoryData, spellData, userId) => {
             try {
                 const { character: characterRepo } = getRepositories();
                 const newCharacter = await characterRepo.saveNewCharacter(
@@ -307,7 +307,7 @@ export const useDataStore = create<DataStore>((set, get) => ({
             }
         },
 
-		createCampaign: async (campaignData, userId) => {
+        createCampaign: async (campaignData, userId) => {
             try {
                 const { campaign: campaignRepo } = getRepositories();
                 const newCampaign = await campaignRepo.createCampaign(
@@ -318,15 +318,15 @@ export const useDataStore = create<DataStore>((set, get) => ({
                     newCampaign
                 );
 
-				const openingEvent: Omit<GameEvent, "id" | "timestamp"> & {
-					campaignId: string;
-				} = {
-					campaignId: newCampaign.id,
-					type: "dm_narration",
-					text: openingScene,
-					turnId: "turn-0",
-					characterId: null,
-				};
+                const openingEvent: Omit<GameEvent, "id" | "timestamp"> & {
+                    campaignId: string;
+                } = {
+                    campaignId: newCampaign.id,
+                    type: "dm_narration",
+                    text: openingScene,
+                    turnId: "turn-0",
+                    characterId: null,
+                };
                 await campaignRepo.logGameEvent(openingEvent);
 
                 get().actions._addCampaign(newCampaign);
@@ -349,19 +349,19 @@ export const useDataStore = create<DataStore>((set, get) => ({
             }
         },
 
-		addPlayerToCampaign: async (campaignId, characterId) => {
+        addPlayerToCampaign: async (campaignId, characterId) => {
             try {
                 const { campaign: campaignRepo } = getRepositories();
                 await campaignRepo.addPlayerToCampaign(campaignId, characterId);
 
-				// Update SSoT campaign lokal untuk merefleksikan player baru
-				const campaign = get().state.campaigns.find((c) => c.id === campaignId);
-				if (campaign) {
-					const updatedCampaign = {
-						...campaign,
-						playerIds: [...campaign.playerIds, characterId],
-					};
-					// Set player pertama sebagai giliran pertama jika belum ada
+                // Update SSoT campaign lokal untuk merefleksikan player baru
+                const campaign = get().state.campaigns.find((c) => c.id === campaignId);
+                if (campaign) {
+                    const updatedCampaign = {
+                        ...campaign,
+                        playerIds: [...campaign.playerIds, characterId],
+                    };
+                    // Set player pertama sebagai giliran pertama jika belum ada
                     if (
                         updatedCampaign.playerIds.length === 1 &&
                         !updatedCampaign.currentPlayerId
@@ -391,18 +391,18 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 throw e;
             }
         },
-	},
+    },
 
-	// FASE 2 REFAKTOR: Fungsi ini (copyCharacterFromTemplate) dihapus
-	// untuk menghilangkan duplikasi logika (DRY violation).
-	// Seluruh logika pembuatan karakter (manual DAN template)
-	// sekarang dikonsolidasikan di dalam `components/profile/ProfileWizard.tsx`
-	// dan alur penyimpanannya (saveNewCharacter) di atas.
-	// Alur UI "Pilih Template" (di CharacterSelectionView/ProfileWizard)
-	// sekarang akan me-pre-fill state Wizard dan memanggil `saveNewCharacter`.
-	copyCharacterFromTemplate: async (templateData, userId) => {
-		// Logika ini mati dan tidak boleh dipanggil.
-		console.error("[DEPRECATED] copyCharacterFromTemplate dipanggil. Alur ini rusak.");
-		throw new Error("Fungsi copyCharacterFromTemplate telah dihapus dan tidak digunakan lagi.");
-	},
+    // FASE 2 REFAKTOR: Fungsi ini (copyCharacterFromTemplate) dihapus
+    // untuk menghilangkan duplikasi logika (DRY violation).
+    // Seluruh logika pembuatan karakter (manual DAN template)
+    // sekarang dikonsolidasikan di dalam `components/profile/ProfileWizard.tsx`
+    // dan alur penyimpanannya (saveNewCharacter) di atas.
+    // Alur UI "Pilih Template" (di CharacterSelectionView/ProfileWizard)
+    // sekarang akan me-pre-fill state Wizard dan memanggil `saveNewCharacter`.
+    copyCharacterFromTemplate: async (templateData, userId) => {
+        // Logika ini mati dan tidak boleh dipanggil.
+        console.error("[DEPRECATED] copyCharacterFromTemplate dipanggil. Alur ini rusak.");
+        throw new Error("Fungsi copyCharacterFromTemplate telah dihapus dan tidak digunakan lagi.");
+    },
 }));
