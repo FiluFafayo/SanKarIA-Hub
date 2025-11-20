@@ -14,7 +14,7 @@ interface CampfireMenuProps {
 
 export const CampfireMenu: React.FC<CampfireMenuProps> = ({ characters = [], onSelectCharacter, onBack, onCreate }) => {
   return (
-    <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black via-black/90 to-transparent pt-20 animate-slide-up">
+    <div className="absolute inset-x-0 bottom-0 z-40 p-4 bg-gradient-to-t from-black via-black/90 to-transparent pt-20 animate-slide-up">
       <PixelCard variant="surface" className="border-t-4 border-gold">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-pixel text-gold text-sm">THE CAMPFIRE</h2>

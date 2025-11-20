@@ -149,26 +149,12 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
 
       {/* 1. CAMPFIRE (Character Select) */}
       {viewMode === 'CAMPFIRE' && (
-        <div className="relative">
-          <CampfireMenu
-            characters={characters} // Gunakan karakter dari dataStore
-            onSelectCharacter={(id) => {
-              setSelectedCharacterId(id);
-            }}
-            onBack={() => setViewMode('IDLE')}
-            onCreate={() => setViewMode('CHAR_WIZARD')}
-          />
-          {/* Refresh button */}
-          <div className="absolute top-4 right-4 z-20">
-            <button
-              onClick={() => user && dataActions.fetchInitialData(user.id)} // Panggil aksi dari store
-              disabled={isLoading} // Gunakan isLoading dari store
-              className={`px-3 py-1 text-xs font-pixel border ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'} bg-orange-800 text-white border-orange-600`}
-            >
-              {isLoading ? 'LOADING...' : 'REFRESH'}
-            </button>
-          </div>
-        </div>
+        <CampfireMenu
+          characters={characters}
+          onSelectCharacter={setSelectedCharacterId}
+          onBack={() => setViewMode('IDLE')}
+          onCreate={() => setViewMode('CHAR_WIZARD')}
+        />
       )}
 
       {/* 2. WIZARDS */}
