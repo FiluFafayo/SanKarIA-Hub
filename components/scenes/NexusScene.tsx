@@ -48,10 +48,6 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
     await authRepository.signOut();
   };
 
-  const handleLogout = async () => {
-    await authRepository.signOut();
-  };
-
   // HAPUS: Semua logika fetching data lokal (refreshCharacters, refreshCharactersWithRetry, useEffect)
   // Logika ini sekarang ditangani secara global oleh App.tsx -> useDataStore.fetchInitialData
 
