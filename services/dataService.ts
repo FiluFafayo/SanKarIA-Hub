@@ -252,15 +252,27 @@ class DataService {
         }
     }
 
-    // FIX: Helper untuk mengambil user saat ini
+    // FIX: Helper untuk mengambil user saat ini (DEBUGGED)
     public async getCurrentUser() {
-        const supabase = this.ensureSupabase();
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-            console.error("[DataService] Error getting session:", error);
+        console.log("[DataService] getCurrentUser called...");
+        try {
+            const supabase = this.ensureSupabase();
+            // Tambahkan timeout internal untuk Supabase call
+            const sessionPromise = supabase.auth.getSession();
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Supabase getSession timeout")), 4000));
+
+            const { data, error } = await Promise.race([sessionPromise, timeout]) as any;
+
+            if (error) {
+                console.error("[DataService] Error getting session:", error);
+                return null;
+            }
+            console.log("[DataService] getCurrentUser success. User:", data?.session?.user?.email || "None");
+            return data?.session?.user ?? null;
+        } catch (e) {
+            console.error("[DataService] getCurrentUser CRASH/TIMEOUT:", e);
             return null;
         }
-        return session?.user ?? null;
     }
 
     public init(url: string, anonKey: string) {

@@ -34,15 +34,17 @@ interface NavigationActions {
 }
 
 // =================================================================
-// Slice 2: Authentication (RESTORED)
+// Slice 2: Authentication (DEBUG MODE)
 // =================================================================
 interface AuthState {
-    user: any | null; // User object dari Supabase
+    user: any | null;
     isAuthLoading: boolean;
+    authLog: string[]; // Log internal untuk debugging UI
 }
 const initialAuthState: AuthState = {
     user: null,
     isAuthLoading: true,
+    authLog: [],
 };
 interface AuthActions {
     initialize: () => Promise<void>;
@@ -145,56 +147,76 @@ export const useAppStore = create<AppStore>((set, get) => ({
             navigation: { ...state.navigation, templateToPreFill: null }
         })),
 
-        // --- Authentication (REAL-TIME) ---
-        initialize: async () => {
-            // 1. Set loading state
-            set(state => ({ auth: { ...state.auth, isAuthLoading: true } }));
+        // --- Authentication (LOGGING & SAFETY VALVE) ---
+    initialize: async () => {
+        const log = (msg: string) => {
+            console.log(`[AppStore] ${msg}`);
+            set(s => ({ auth: { ...s.auth, authLog: [...s.auth.authLog, msg] } }));
+        };
 
+        log("1. Initialize started. Setting isAuthLoading=true");
+        set(state => ({ auth: { ...state.auth, isAuthLoading: true } }));
+
+        // SAFETY VALVE: Timer 5 Detik
+        // Jika initialize macet, timer ini akan meledak dan memaksa loading berhenti.
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Auth Initialization Timed Out (5s)")), 5000)
+        );
+
+        const authProcess = async () => {
             try {
-                // 2. PASANG LISTENER DULU
-                // Ini akan menangani event di MASA DEPAN (login, logout, token refresh)
+                log("2. Registering onAuthStateChange listener...");
                 dataService.onAuthStateChange(async (event, session) => {
-                    // Listener INI yang akan menangani update state SETELAH inisialisasi
-                    console.log(`[Auth] Event Triggered: ${event}`, session?.user?.email);
+                    console.log(`[AuthListener] Event: ${event}`, session?.user?.email);
                     const user = session?.user ?? null;
 
-                    // Set user-nya, TAPI JANGAN set loading: false di sini
-                    // Biarkan pengecekan manual di bawah yang mengontrol "boot sequence"
+                    // Update user state realtime
                     set(state => ({ auth: { ...state.auth, user } }));
 
                     if (user) {
-                        // [FIX] Jangan await, biarkan jalan di background agar UI tidak macet
-                        dataService.getOrCreateProfile().catch(console.error);
+                        log(`3a. User detected in listener: ${user.email}. Syncing profile (bg)...`);
+                        dataService.getOrCreateProfile().catch(e => console.error("Profile sync error:", e));
                     }
 
-                    // Jika user logout, paksa kembali ke Nexus
                     if (event === 'SIGNED_OUT') {
+                        log("User signed out via listener.");
                         get().actions.returnToNexus();
                     }
                 });
 
-                // 3. LAKUKAN PENGECEKAN AKTIF (SEKARANG)
-                // Ini adalah "snapshot" saat aplikasi boot.
-                // `getCurrentUser()` akan resolve user dari local storage/session.
+                log("4. Calling dataService.getCurrentUser()...");
                 const currentUser = await dataService.getCurrentUser();
+
                 if (currentUser) {
-                    console.log("[Auth] Initial Check Found (manual):", currentUser.email);
+                    log(`5. Initial Check Found User: ${currentUser.email}`);
                     set(state => ({ auth: { ...state.auth, user: currentUser } }));
-                    // [FIX] Unblock boot sequence
-                    dataService.getOrCreateProfile().catch(console.error);
+
+                    log("6. Triggering profile check (background)...");
+                    dataService.getOrCreateProfile().catch(e => log(`Profile Error: ${e.message}`));
+                } else {
+                    log("5. Initial Check: No User Found (Guest/Logout)");
+                    set(state => ({ auth: { ...state.auth, user: null } }));
                 }
 
-            } catch (error) {
-                console.error("[Auth] Error during initialization:", error);
-                // Jika error, set user ke null (tapi biarkan finally handle loading)
+            } catch (error: any) {
+                log(`!!! CRITICAL AUTH ERROR: ${error.message}`);
+                console.error("[Auth] Error detail:", error);
                 set(state => ({ auth: { ...state.auth, user: null } }));
-            } finally {
-                // 4. JAMINAN
-                // Apapun yang terjadi (sukses atau error), 
-                // proses boot selesai. Set loading ke false.
-                set(state => ({ auth: { ...state.auth, isAuthLoading: false } }));
             }
-        },
+        };
+
+        // Balapan: Proses Auth vs Timer 5 Detik
+        try {
+            await Promise.race([authProcess(), timeoutPromise]);
+            log("7. Initialization sequence completed normally.");
+        } catch (timeoutError: any) {
+            log(`7. ${timeoutError.message} - FORCING UNLOCK.`);
+            // Jangan throw, kita tangani dengan mematikan loading
+        } finally {
+            log("8. FINALLY: Setting isAuthLoading = false. GATES OPEN.");
+            set(state => ({ auth: { ...state.auth, isAuthLoading: false } }));
+        }
+    },
         login: async () => {
             try {
                 await dataService.signInWithGoogle();

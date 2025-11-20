@@ -8,7 +8,11 @@ import { useDataStore } from './store/dataStore';
 
 const App: React.FC = () => {
   // Global App State
-  const { user, isAuthLoading, initialize } = useAppStore();
+  // Ambil authLog juga untuk debugging visual
+  const { user, isAuthLoading, auth, initialize } = useAppStore(s => ({
+      ...s,
+      auth: s.auth // Pastikan kita bisa akses auth.authLog
+  }));
   const { actions: dataActions } = useDataStore();
 
   // UI State
@@ -30,12 +34,23 @@ const App: React.FC = () => {
 
   // Render Logic
 
-  // A. Booting / Checking Auth
+  // A. Booting / Checking Auth (DEBUG VIEW)
   if (isAuthLoading) {
      return (
-        <div className="flex flex-col items-center justify-center h-full bg-black text-gold font-retro p-8 cursor-wait">
-           <div className="mb-4 font-pixel animate-pulse text-xl">GRIMOIRE ENGINE</div>
-           <div className="text-[10px] text-faded animate-pulse">CHECKING SOUL SIGNATURE...</div>
+        <div className="flex flex-col items-center justify-center h-full bg-black text-gold font-retro p-8 cursor-wait font-mono">
+           <div className="mb-4 font-pixel animate-pulse text-xl text-center">GRIMOIRE ENGINE<br/><span className="text-xs text-red-500">DEBUG MODE</span></div>
+           <div className="text-[10px] text-faded animate-pulse mb-4">CHECKING SOUL SIGNATURE...</div>
+
+           {/* VISUAL LOGGING */}
+           <div className="w-full max-w-md bg-gray-900/50 border border-gray-800 p-2 text-[9px] text-green-400 font-mono overflow-y-auto max-h-[200px] rounded">
+               {auth?.authLog?.map((log, i) => (
+                   <div key={i} className="border-b border-gray-800/50 pb-1 mb-1 last:border-0">
+                       {`> ${log}`}
+                   </div>
+               ))}
+               <div className="animate-pulse text-green-700">_</div>
+           </div>
+           <div className="mt-4 text-[9px] text-gray-600">Auto-timeout in 5s...</div>
         </div>
      );
   }
