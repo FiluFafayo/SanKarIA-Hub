@@ -1,5 +1,5 @@
 -- =================================================================
--- SKRIP SQL FINAL (CLEAN, CREATE, SEED) - VERSI 4 (PATCHED)
+-- SKRIP SQL FINAL (CLEAN, CREATE, SEED) - VERSI 5 (FIX 403)
 -- =================================================================
 
 -- =================================================================
@@ -7,7 +7,6 @@
 -- =================================================================
 
 -- 1. Bersihkan skema 'public' dengan menghapus dan membuatnya kembali.
--- Ini akan menghapus semua tabel, fungsi, dan objek lain di dalamnya.
 DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO postgres;
@@ -15,19 +14,7 @@ GRANT ALL ON SCHEMA public TO anon;
 GRANT ALL ON SCHEMA public TO authenticated;
 GRANT ALL ON SCHEMA public TO service_role;
 
--- 2. Kosongkan skema 'auth' (DILEWATI) - Pengguna dikelola via Supabase Dashboard.
--- Blok berikut dinonaktifkan untuk menghindari error permission.
--- DO $$
--- DECLARE
---     r RECORD;
--- BEGIN
---     FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'auth') LOOP
---         EXECUTE 'TRUNCATE TABLE auth.' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
---     END LOOP;
--- END $$;
-
--- 3. Kosongkan skema 'storage' dengan menghapus semua objek dan bucket.
--- Ini akan menghapus semua file yang diunggah.
+-- 2. Reset Storage (Hapus Data Lama)
 DELETE FROM storage.objects;
 DELETE FROM storage.buckets;
 
@@ -43,15 +30,8 @@ CREATE TABLE "public"."profiles" (
     "updated_at" timestamptz DEFAULT "now"()
 );
 
--- Aktifkan RLS
 ALTER TABLE "public"."profiles" ENABLE ROW LEVEL SECURITY;
 
--- Hapus kebijakan lama (jika ada) untuk kebersihan
-DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON "public"."profiles";
-DROP POLICY IF EXISTS "Users can insert or update their own profile." ON "public"."profiles";
-DROP POLICY IF EXISTS "Users can manage their own profile." ON "public"."profiles";
-
--- Kebijakan RLS BARU yang lebih eksplisit
 CREATE POLICY "Public profiles are viewable by everyone." ON "public"."profiles"
     FOR SELECT TO authenticated, anon
     USING (true);
@@ -61,8 +41,7 @@ CREATE POLICY "Users can manage their own profile." ON "public"."profiles"
     USING ("auth"."uid"() = "id")
     WITH CHECK ("auth"."uid"() = "id");
 
--- Berikan izin eksplisit ke peran yang relevan
-GRANT USAGE ON SCHEMA "public" TO "anon", "authenticated";
+-- [FIX CRITICAL 403] Berikan izin tabel eksplisit
 GRANT SELECT ON TABLE "public"."profiles" TO "anon", "authenticated";
 GRANT INSERT, UPDATE, DELETE ON TABLE "public"."profiles" TO "authenticated";
 
@@ -70,9 +49,6 @@ GRANT INSERT, UPDATE, DELETE ON TABLE "public"."profiles" TO "authenticated";
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Debug: Log the new user data
-    RAISE NOTICE 'Creating profile for new user: %', NEW.id;
-    
     INSERT INTO "public"."profiles" ("id", "email", "full_name", "avatar_url")
     VALUES (
         NEW."id",
@@ -80,12 +56,9 @@ BEGIN
         COALESCE(NEW."raw_user_meta_data"->>'full_name', NEW."email"),
         COALESCE(NEW."raw_user_meta_data"->>'avatar_url', '')
     );
-    
-    RAISE NOTICE 'Profile created successfully for user: %', NEW.id;
     RETURN NEW;
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE WARNING 'Failed to create profile for user %: %', NEW.id, SQLERRM;
         RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -150,11 +123,18 @@ CREATE TABLE "public"."monsters" (
 );
 
 ALTER TABLE "public"."items" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Global definitions are viewable by all." ON "public"."items" FOR SELECT USING (true);
+CREATE POLICY "Global definitions are viewable by all." ON "public"."items" FOR SELECT TO authenticated, anon USING (true);
+
 ALTER TABLE "public"."spells" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Global definitions are viewable by all." ON "public"."spells" FOR SELECT USING (true);
+CREATE POLICY "Global definitions are viewable by all." ON "public"."spells" FOR SELECT TO authenticated, anon USING (true);
+
 ALTER TABLE "public"."monsters" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Global definitions are viewable by all." ON "public"."monsters" FOR SELECT USING (true);
+CREATE POLICY "Global definitions are viewable by all." ON "public"."monsters" FOR SELECT TO authenticated, anon USING (true);
+
+-- [FIX CRITICAL 403] WAJIB GRANT SELECT MANUAL
+GRANT SELECT ON TABLE "public"."items" TO "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."spells" TO "anon", "authenticated";
+GRANT SELECT ON TABLE "public"."monsters" TO "anon", "authenticated";
 
 -- =================================================================
 -- BAGIAN 3: TABEL KARAKTER (SSoT untuk Player)
@@ -169,14 +149,12 @@ CREATE TABLE "public"."characters" (
     "level" integer NOT NULL DEFAULT 1,
     "xp" integer NOT NULL DEFAULT 0,
     "avatar_url" "text",
-    -- FASE 0: TAMBAHAN KOLOM VISUAL
     "gender" "text" DEFAULT 'Pria',
     "body_type" "text" DEFAULT 'bt_normal',
     "scars" "text"[] DEFAULT '{}',
     "hair" "text" DEFAULT 'h_short_blond',
     "facial_hair" "text" DEFAULT 'ff_none',
     "head_accessory" "text" DEFAULT 'ha_none',
-    -- AKHIR TAMBAHAN
     "background" "text",
     "personality_trait" "text",
     "ideal" "text",
@@ -196,7 +174,6 @@ CREATE TABLE "public"."characters" (
     "proficient_skills" "text"[] DEFAULT '{}',
     "proficient_saving_throws" "text"[] DEFAULT '{}',
     "spell_slots" "jsonb" DEFAULT '{}',
-    -- PATCH 1: Bidang kepatuhan aturan inti D&D
     "languages" "text"[] DEFAULT '{}',
     "tool_proficiencies" "text"[] DEFAULT '{}',
     "weapon_proficiencies" "text"[] DEFAULT '{}',
@@ -209,10 +186,13 @@ CREATE TABLE "public"."characters" (
 );
 ALTER TABLE "public"."characters" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Characters are viewable by everyone." ON "public"."characters"
-    FOR SELECT USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
 CREATE POLICY "Users can manage their own characters." ON "public"."characters"
     FOR ALL USING ("auth"."uid"() = "owner_id")
     WITH CHECK ("auth"."uid"() = "owner_id");
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "public"."characters" TO "authenticated";
+GRANT SELECT ON TABLE "public"."characters" TO "anon";
 
 -- =================================================================
 -- BAGIAN 4: TABEL RELASIONAL (Karakter -> Definisi)
@@ -247,15 +227,23 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE POLICY "All character inventories/spells are viewable." ON "public"."character_inventory"
-    FOR SELECT USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
 CREATE POLICY "All character known spells are viewable." ON "public"."character_spells"
-    FOR SELECT USING (true);
+    FOR SELECT TO authenticated, anon USING (true);
+    
 CREATE POLICY "Users can manage their own character's inventory." ON "public"."character_inventory"
     FOR ALL USING ( "public"."is_character_owner"("character_id") )
     WITH CHECK ( "public"."is_character_owner"("character_id") );
+    
 CREATE POLICY "Users can manage their own character's known spells." ON "public"."character_spells"
     FOR ALL USING ( "public"."is_character_owner"("character_id") )
     WITH CHECK ( "public"."is_character_owner"("character_id") );
+
+-- [FIX CRITICAL 403]
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "public"."character_inventory" TO "authenticated";
+GRANT SELECT ON TABLE "public"."character_inventory" TO "anon";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "public"."character_spells" TO "authenticated";
+GRANT SELECT ON TABLE "public"."character_spells" TO "anon";
 
 -- =================================================================
 -- BAGIAN 5: TABEL KAMPANYE (State Sesi Permainan)
@@ -276,19 +264,16 @@ CREATE TABLE "public"."campaigns" (
     "current_player_id" "uuid" REFERENCES "public"."characters"("id") ON DELETE SET NULL,
     "initiative_order" "text"[] DEFAULT '{}',
     "long_term_memory" "text",
-    -- FASE 0: UBAH TIPE DATA WAKTU
-    "current_time" bigint DEFAULT 43200, -- (Default ke 12:00 PM dalam detik)
+    "current_time" bigint DEFAULT 43200,
     "current_weather" "text" DEFAULT 'Cerah',
     "world_event_counter" integer DEFAULT 0,
     "map_image_url" "text",
     "map_markers" "jsonb"[] DEFAULT '{}',
     "current_player_location" "text",
-    -- FASE 0: TAMBAHAN KOLOM PETA
     "exploration_grid" "jsonb" DEFAULT '[]'::jsonb,
     "fog_of_war" "jsonb" DEFAULT '[]'::jsonb,
-    "battle_state" "jsonb", -- (Bisa null)
+    "battle_state" "jsonb", 
     "player_grid_position" "jsonb" DEFAULT '{"x": 50, "y": 50}'::jsonb,
-    -- AKHIR TAMBAHAN
     "quests" "jsonb"[] DEFAULT '{}',
     "npcs" "jsonb"[] DEFAULT '{}',
     "maxPlayers" integer DEFAULT 4,
@@ -348,9 +333,9 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE POLICY "Published campaigns are viewable by everyone." ON "public"."campaigns"
-    FOR SELECT USING ("is_published" = true);
+    FOR SELECT TO authenticated, anon USING ("is_published" = true);
 CREATE POLICY "Campaign members can view their campaign." ON "public"."campaigns"
-    FOR SELECT USING ( "public"."is_campaign_member"("id") );
+    FOR SELECT TO authenticated USING ( "public"."is_campaign_member"("id") );
 CREATE POLICY "Campaign owners can manage their campaign." ON "public"."campaigns"
     FOR ALL USING ("auth"."uid"() = "owner_id")
     WITH CHECK ("auth"."uid"() = "owner_id");
@@ -364,7 +349,6 @@ CREATE POLICY "Campaign members can see related data." ON "public"."campaign_mon
 CREATE POLICY "Campaign members can see related data." ON "public"."campaign_players"
     FOR SELECT USING ( "public"."is_campaign_member"("campaign_id") );
 
--- PERBAIKAN RLS: Kebijakan ini sekarang merujuk ke owner_id yang benar
 CREATE POLICY "Campaign owners can manage campaign data." ON "public"."game_events"
     FOR ALL USING ( "auth"."uid"() = (SELECT "owner_id" FROM "public"."campaigns" WHERE "id" = "campaign_id") );
 CREATE POLICY "Campaign owners can manage campaign data." ON "public"."campaign_monsters"
@@ -374,6 +358,17 @@ CREATE POLICY "Campaign owners can manage campaign data." ON "public"."campaign_
 
 CREATE POLICY "Authenticated users can join campaigns." ON "public"."campaign_players"
     FOR INSERT WITH CHECK ("auth"."role"() = 'authenticated');
+
+-- [FIX CRITICAL 403]
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "public"."campaigns" TO "authenticated";
+GRANT SELECT ON TABLE "public"."campaigns" TO "anon";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "public"."campaign_players" TO "authenticated";
+GRANT SELECT ON TABLE "public"."campaign_players" TO "anon";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "public"."campaign_monsters" TO "authenticated";
+GRANT SELECT ON TABLE "public"."campaign_monsters" TO "anon";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "public"."game_events" TO "authenticated";
+GRANT SELECT ON TABLE "public"."game_events" TO "anon";
+
 
 -- =================================================================
 -- BAGIAN 6: SEEDING DATA GLOBAL (MANUAL)
@@ -460,45 +455,35 @@ ALTER TABLE "public"."spells" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."monsters" ENABLE ROW LEVEL SECURITY;
 
 -- =================================================================
--- BAGIAN 7: SETUP STORAGE (BARU - FIX BUCKET NOT FOUND V2)
+-- BAGIAN 7: SETUP STORAGE
 -- =================================================================
--- Versi ini menghapus 'ALTER TABLE "storage"."objects"' yang menyebabkan error 42501.
--- Kita berasumsi RLS di storage.objects sudah aktif by default.
 
--- 1. Buat bucket 'assets' dan set 'public'
--- Ini memperbaiki error "Bucket not found"
 INSERT INTO "storage"."buckets"
     ("id", "name", "public")
 VALUES
     ('assets', 'assets', true)
 ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 
--- 2. Kebijakan RLS untuk bucket 'assets'
--- Hapus policy lama jika ada (untuk idempotency)
 DROP POLICY IF EXISTS "Public Read Access" ON "storage"."objects";
 DROP POLICY IF EXISTS "Authenticated Upload" ON "storage"."objects";
 DROP POLICY IF EXISTS "Owner Update" ON "storage"."objects";
 DROP POLICY IF EXISTS "Owner Delete" ON "storage"."objects";
 
--- Siapapun boleh MEMBACA (SELECT) file dari bucket 'assets' (karena public)
 CREATE POLICY "Public Read Access"
     ON "storage"."objects" FOR SELECT
     USING ( "bucket_id" = 'assets' );
 
--- Hanya pengguna TERAUTENTIKASI (login) yang boleh MENG-UPLOAD (INSERT)
 CREATE POLICY "Authenticated Upload"
     ON "storage"."objects" FOR INSERT
     TO "authenticated"
     WITH CHECK ( "bucket_id" = 'assets' );
 
--- Hanya PEMILIK file yang boleh MENG-UPDATE file-nya
 CREATE POLICY "Owner Update"
     ON "storage"."objects" FOR UPDATE
     TO "authenticated"
     USING ( "bucket_id" = 'assets' AND "auth"."uid"() = "owner" )
     WITH CHECK ( "bucket_id" = 'assets' AND "auth"."uid"() = "owner" );
 
--- Hanya PEMILIK file yang boleh MENG-HAPUS file-nya
 CREATE POLICY "Owner Delete"
     ON "storage"."objects" FOR DELETE
     TO "authenticated"
