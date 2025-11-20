@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { CampfireMenu } from '../nexus/CampfireMenu';
 import { DungeonGate } from '../nexus/DungeonGate';
-import { CharacterWizard } from '../nexus/CharacterWizard';
+import { CharacterWizard } from '../nexus/CharacterWizard'; // Import wizard
 import { CampaignWizard } from '../nexus/CampaignWizard';
 import { useAppStore } from '../../store/appStore';
 import { useDataStore } from '../../store/dataStore'; // GANTI DENGAN DATASTORE
@@ -47,6 +47,19 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   const handleLogout = async () => {
     await authRepository.signOut();
   };
+
+  // BARU: Efek untuk menangani kasus "tidak ada karakter"
+  useEffect(() => {
+    // Kondisi: tidak sedang loading, user sudah login, TAPI array karakter kosong
+    if (!isLoading && user && characters.length === 0) {
+      console.log('[NexusScene] No characters found after loading, opening wizard...');
+      setIsCreatingCharacter(true); // Otomatis buka wizard
+      pushNotification({
+        type: 'info',
+        message: 'Selamat datang, Petualang! Ciptakan jiwa pertamamu untuk memulai.',
+      });
+    }
+  }, [isLoading, user, characters, pushNotification]);
 
   // HAPUS: Semua logika fetching data lokal (refreshCharacters, refreshCharactersWithRetry, useEffect)
   // Logika ini sekarang ditangani secara global oleh App.tsx -> useDataStore.fetchInitialData
