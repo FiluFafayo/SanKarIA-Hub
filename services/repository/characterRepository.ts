@@ -242,14 +242,22 @@ export const characterRepository = {
     }
 
     const { data: charData, error: charError } = await supabase
-      .from('characters')
-      .select('*')
-      .eq('owner_id', currentUserId);
+            .from('characters')
+            .select('*')
+            .eq('owner_id', currentUserId);
 
-    console.log('[DEBUG] Character query result:', { charData, charError });
+          console.log('[DEBUG] Character query result:', { charData, charError, queryUserId: currentUserId });
 
-    if (charError) throw charError;
-    if (!charData || charData.length === 0) return [];
+          if (charError) {
+            console.error('[DEBUG] Character query error:', charError);
+            throw charError;
+          }
+          if (!charData || charData.length === 0) {
+            console.log('[DEBUG] No characters found for user:', currentUserId);
+            return [];
+          }
+          
+          console.log('[DEBUG] Found', charData.length, 'characters for user:', currentUserId);
 
     const charIds = (charData as DbCharacter[]).map((c) => c.id);
 

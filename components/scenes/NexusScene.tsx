@@ -6,6 +6,7 @@ import { CharacterWizard } from '../nexus/CharacterWizard';
 import { CampaignWizard } from '../nexus/CampaignWizard';
 import { useAppStore } from '../../store/appStore';
 import { characterRepository } from '../../services/repository/characterRepository';
+import { dataService } from '../../services/dataService';
 import { Character } from '../../types';
 
 interface NexusSceneProps {
@@ -23,23 +24,84 @@ const BackgroundLayer = () => (
 export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   const [viewMode, setViewMode] = useState<'IDLE' | 'CAMPFIRE' | 'GATE' | 'CHAR_WIZARD' | 'CAMP_WIZARD'>('IDLE');
   const [myCharacters, setMyCharacters] = useState<Character[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { user, setSelectedCharacterId, selectedCharacterId } = useAppStore();
 
   // 1. Fetch Real Data
   const refreshCharacters = async () => {
     if (user) {
       console.log('[DEBUG] refreshCharacters called with user:', user);
-      const chars = await characterRepository.getMyCharacters(user.id);
-      console.log('[DEBUG] Characters fetched:', chars);
-      setMyCharacters(chars);
-      if (chars.length > 0 && !selectedCharacterId) {
-        setSelectedCharacterId(chars[0].id);
+      try {
+        const chars = await characterRepository.getMyCharacters(user.id);
+        console.log('[DEBUG] Characters fetched:', chars);
+        setMyCharacters(chars);
+        if (chars.length > 0 && !selectedCharacterId) {
+          setSelectedCharacterId(chars[0].id);
+        }
+        return true;
+      } catch (error) {
+        console.error('[DEBUG] Error fetching characters:', error);
+        return false;
       }
+    } else {
+      console.log('[DEBUG] refreshCharacters called but no user available');
+      return false;
+    }
+  };
+
+  // Retry mechanism untuk refresh characters dengan delay
+  const refreshCharactersWithRetry = async (maxRetries = 3, delayMs = 1000) => {
+    setIsRefreshing(true);
+    try {
+      for (let i = 0; i < maxRetries; i++) {
+        console.log(`[DEBUG] refreshCharactersWithRetry attempt ${i + 1}/${maxRetries}`);
+        
+        // Jika user tidak tersedia di state, coba ambil dari auth service
+        let currentUser = user;
+        if (!currentUser) {
+          console.log('[DEBUG] User not available in state, trying to get from auth service...');
+          try {
+            const { data: { session } } = await dataService.getClient().auth.getSession();
+            if (session?.user) {
+              currentUser = session.user;
+              console.log('[DEBUG] Got user from auth service:', currentUser);
+            }
+          } catch (authError) {
+            console.error('[DEBUG] Failed to get user from auth service:', authError);
+          }
+        }
+        
+        if (currentUser) {
+          try {
+            const chars = await characterRepository.getMyCharacters(currentUser.id);
+            console.log('[DEBUG] Characters fetched:', chars);
+            setMyCharacters(chars);
+            if (chars.length > 0 && !selectedCharacterId) {
+              setSelectedCharacterId(chars[0].id);
+            }
+            return true;
+          } catch (error) {
+            console.error('[DEBUG] Error fetching characters:', error);
+          }
+        }
+        
+        if (i < maxRetries - 1) {
+          console.log(`[DEBUG] Waiting ${delayMs}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+      console.error('[DEBUG] refreshCharacters failed after all retries');
+      return false;
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    refreshCharacters();
+    if (user) {
+      console.log('[DEBUG] User changed, refreshing characters...');
+      refreshCharactersWithRetry(3, 1000);
+    }
   }, [user]);
 
   return (
@@ -93,23 +155,38 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
 
       {/* 1. CAMPFIRE (Character Select) */}
       {viewMode === 'CAMPFIRE' && (
-        <CampfireMenu
-          characters={myCharacters}
-          onSelectCharacter={(id) => {
-            setSelectedCharacterId(id);
-          }}
-          onBack={() => setViewMode('IDLE')}
-          onCreate={() => setViewMode('CHAR_WIZARD')}
-        />
+        <div className="relative">
+          <CampfireMenu
+            characters={myCharacters}
+            onSelectCharacter={(id) => {
+              setSelectedCharacterId(id);
+            }}
+            onBack={() => setViewMode('IDLE')}
+            onCreate={() => setViewMode('CHAR_WIZARD')}
+          />
+          {/* Refresh button */}
+          <div className="absolute top-4 right-4 z-20">
+            <button
+              onClick={() => refreshCharactersWithRetry(3, 1000)}
+              disabled={isRefreshing}
+              className={`px-3 py-1 text-xs font-pixel border ${isRefreshing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'} bg-orange-800 text-white border-orange-600`}
+            >
+              {isRefreshing ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* 2. WIZARDS */}
       {viewMode === 'CHAR_WIZARD' && (
          <CharacterWizard 
             onCancel={() => setViewMode('CAMPFIRE')}
-            onComplete={() => {
-               refreshCharacters();
+            onComplete={async () => {
+               console.log('[DEBUG] CharacterWizard onComplete called');
+               const success = await refreshCharactersWithRetry(3, 1000);
                setViewMode('CAMPFIRE');
+               // Note: Character selection will be handled by the refreshCharacters function
+               // which calls setSelectedCharacterId if there are characters and no character is selected
             }}
          />
       )}
