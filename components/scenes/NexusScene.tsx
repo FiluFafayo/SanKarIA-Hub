@@ -51,6 +51,15 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
     await authRepository.signOut();
   };
 
+  // [FIX CRITICAL] Pemicu Fetch Data: Tanpa ini, aplikasi stuck di "Memuat Jiwa..."
+  useEffect(() => {
+    // Hanya fetch jika user ada, data belum loaded, dan tidak sedang loading
+    if (user && !hasLoaded && !isLoading) {
+      console.log('[NexusScene] Memulai penarikan data jiwa untuk:', user.id);
+      dataActions.fetchInitialData(user.id);
+    }
+  }, [user, hasLoaded, isLoading, dataActions]);
+
   // BARU: Efek untuk menangani kasus "tidak ada karakter"
   useEffect(() => {
     // Kondisi: tidak sedang loading, user sudah login, TAPI array karakter kosong

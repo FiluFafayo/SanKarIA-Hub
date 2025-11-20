@@ -163,7 +163,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
                     set(state => ({ auth: { ...state.auth, user } }));
 
                     if (user) {
-                        await dataService.getOrCreateProfile();
+                        // [FIX] Jangan await, biarkan jalan di background agar UI tidak macet
+                        dataService.getOrCreateProfile().catch(console.error);
                     }
 
                     // Jika user logout, paksa kembali ke Nexus
@@ -179,7 +180,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
                 if (currentUser) {
                     console.log("[Auth] Initial Check Found (manual):", currentUser.email);
                     set(state => ({ auth: { ...state.auth, user: currentUser } }));
-                    await dataService.getOrCreateProfile();
+                    // [FIX] Unblock boot sequence
+                    dataService.getOrCreateProfile().catch(console.error);
                 }
 
             } catch (error) {
