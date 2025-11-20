@@ -60,19 +60,8 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
     }
   }, [user, hasLoaded, isLoading, error, dataActions]);
 
-  // BARU: Efek untuk menangani kasus "tidak ada karakter"
-  useEffect(() => {
-    // Kondisi: tidak sedang loading, user sudah login, TAPI array karakter kosong
-    if (!isLoading && user && characters.length === 0) {
-      console.log('[NexusScene] No characters found after loading, opening wizard...');
-      // [FIX] Gunakan setViewMode yang valid, bukan variabel hantu
-      setViewMode('CHAR_WIZARD');
-      pushNotification({
-        type: 'info',
-        message: 'Selamat datang, Petualang! Ciptakan jiwa pertamamu untuk memulai.',
-      });
-    }
-  }, [isLoading, user, characters, pushNotification]);
+  // [REMOVED] Auto-redirect ke Wizard dihapus.
+  // User harus melihat Nexus dulu (Game Feel), baru klik Campfire secara manual.
 
   // HAPUS: Semua logika fetching data lokal (refreshCharacters, refreshCharactersWithRetry, useEffect)
   // Logika ini sekarang ditangani secara global oleh App.tsx -> useDataStore.fetchInitialData
