@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { GameLayout } from './components/layout/GameLayout';
 import { NexusScene } from './components/scenes/NexusScene';
 import { BattleScene } from './components/scenes/BattleScene';
+import { ExplorationScene } from './components/scenes/ExplorationScene';
 import { GrimoireLogin } from './components/nexus/GrimoireLogin';
 import { useAppStore } from './store/appStore';
 import { useDataStore } from './store/dataStore';
@@ -65,7 +66,7 @@ const App: React.FC = () => {
   const authLog = auth.authLog || []; // Fallback array kosong
 
   // 2. State Lokal Mesin (The Grimoire State Machine)
-  const [appState, setAppState] = useState<'BOOT' | 'NEXUS' | 'BATTLE'>('BOOT');
+  const [appState, setAppState] = useState<'BOOT' | 'NEXUS' | 'EXPLORATION' | 'BATTLE'>('BOOT');
   const [isBootStuck, setIsBootStuck] = useState(false);
 
   // EFFECT 1: Boot Sequence (Auth)
@@ -102,13 +103,12 @@ const App: React.FC = () => {
     }
 
     // C. Jika User Ada -> NEXUS (Scene Mode) 
-    // (Hanya pindah ke NEXUS jika kita masih di BOOT. Jika user sudah di BATTLE, jangan tendang balik)
     if (user && appState === 'BOOT') {
         setAppState('NEXUS');
     }
 
     // D. Jika User Logout saat main -> Tendang ke NEXUS
-    if (!user && appState === 'BATTLE') {
+    if (!user && (appState === 'BATTLE' || appState === 'EXPLORATION')) {
         setAppState('NEXUS');
     }
 
@@ -156,16 +156,23 @@ const App: React.FC = () => {
                     // Pastikan data sudah siap sebelum menampilkan NexusScene agar tidak glitch
                     (dataState.hasLoaded || dataState.characters.length >= 0) && (
                         <NexusScene 
-                            onStartGame={() => setAppState('BATTLE')} 
+                            onStartGame={() => setAppState('EXPLORATION')} 
                         />
                     )
                 )
             )}
 
-            {/* B. BATTLE SCENE */}
+            {/* B. EXPLORATION SCENE */}
+            {appState === 'EXPLORATION' && user && (
+                <ExplorationScene 
+                    onEncounter={() => setAppState('BATTLE')}
+                />
+            )}
+
+            {/* C. BATTLE SCENE */}
             {appState === 'BATTLE' && user && (
                 <BattleScene 
-                    onExit={() => setAppState('NEXUS')}
+                    onExit={() => setAppState('EXPLORATION')}
                 />
             )}
         </>
