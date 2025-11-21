@@ -180,7 +180,18 @@ CREATE TABLE "public"."characters" (
     "class_features" "jsonb" DEFAULT '[]'::jsonb,
     "proficient_skills" "text"[] DEFAULT '{}',
     "proficient_saving_throws" "text"[] DEFAULT '{}',
+    
+    -- [PATCH v2.1] Kolom Tambahan untuk Sistem D&D 5e Lengkap
+    "armor_proficiencies" "text"[] DEFAULT '{}',
+    "weapon_proficiencies" "text"[] DEFAULT '{}',
+    "tool_proficiencies" "text"[] DEFAULT '{}',
     "languages" "text"[] DEFAULT '{}',
+    "senses" "jsonb" DEFAULT '{}',
+    "passive_perception" integer DEFAULT 10,
+    "inspiration" boolean DEFAULT false,
+    "feature_uses" "jsonb" DEFAULT '{}',
+    -- [END PATCH]
+
     "spell_slots" "jsonb" DEFAULT '{}', -- { "1": { "max": 2, "spent": 0 } }
     "prepared_spells" "jsonb" DEFAULT '[]'::jsonb
 );
