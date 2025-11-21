@@ -154,72 +154,73 @@ export const useAppStore = create<AppStore>((set, get) => ({
         // --- Authentication (LOGGING & SAFETY VALVE) ---
         initialize: async () => {
             const log = (msg: string) => {
+                // [FASE 0] Reduce Log Noise: Only log to console, keep state clean
                 console.log(`[AppStore] ${msg}`);
-                set(s => ({ auth: { ...s.auth, authLog: [...s.auth.authLog, msg] } }));
+                // set(s => ({ auth: { ...s.auth, authLog: [...s.auth.authLog, msg] } })); // Disable verbose state log
             };
 
-            log("1. Initialize started. Setting isAuthLoading=true");
+            if (!get().auth.isAuthLoading) {
+                log("Initialize skipped (already loaded/loading).");
+                return;
+            }
+
+            log("1. Initialize started.");
             set(state => ({ auth: { ...state.auth, isAuthLoading: true } }));
 
-            // SAFETY VALVE: Timer 5 Detik
-            // Jika initialize macet, timer ini akan meledak dan memaksa loading berhenti.
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Auth Initialization Timed Out (5s)")), 5000)
+            // [FASE 0] SAFETY VALVE: Resolve instead of Reject
+            const timeoutPromise = new Promise((resolve) =>
+                setTimeout(() => {
+                    log("Auth Init Timeout (4s). Forcing Open.");
+                    resolve("TIMEOUT");
+                }, 4000)
             );
 
             const authProcess = async () => {
                 try {
-                    log("2. Registering onAuthStateChange listener...");
+                    log("2. Registering Listener...");
                     dataService.onAuthStateChange(async (event, session) => {
-                        console.log(`[AuthListener] Event: ${event}`, session?.user?.email);
-                        const user = session?.user ?? null;
+                        // [FASE 0] Deduplication Logic
+                        const currentUser = get().auth.user;
+                        const incomingUser = session?.user ?? null;
+                        
+                        // Ignore if state is identical
+                        if (currentUser?.id === incomingUser?.id && event !== 'SIGNED_OUT') return;
 
-                        // Update user state realtime
-                        set(state => ({ auth: { ...state.auth, user } }));
-
-                        if (user) {
-                            log(`3a. User detected in listener: ${user.email}. Syncing profile (bg)...`);
-                            dataService.getOrCreateProfile().catch(e => console.error("Profile sync error:", e));
-                        }
-
-                        if (event === 'SIGNED_OUT') {
-                            log("User signed out via listener.");
-                            get().actions.returnToNexus();
+                        console.log(`[AuthListener] ${event} | User: ${incomingUser?.email ?? 'None'}`);
+                        
+                        if (event === 'SIGNED_OUT' || !incomingUser) {
+                            if (currentUser) {
+                                set(state => ({ auth: { ...state.auth, user: null } }));
+                                get().actions.returnToNexus();
+                            }
+                        } else {
+                            set(state => ({ auth: { ...state.auth, user: incomingUser } }));
+                            // Sync profile idempotent
+                            dataService.getOrCreateProfile().catch(() => {});
                         }
                     });
 
-                    log("4. Calling dataService.getCurrentUser()...");
-                    const currentUser = await dataService.getCurrentUser();
-
+                    const currentUser = await dataService.getCurrentUser(); // Safe call now
+                    
                     if (currentUser) {
-                        log(`5. Initial Check Found User: ${currentUser.email}`);
+                        log(`3. Found User: ${currentUser.email}`);
                         set(state => ({ auth: { ...state.auth, user: currentUser } }));
-
-                        log("6. Triggering profile check (background)...");
-                        dataService.getOrCreateProfile().catch(e => log(`Profile Error: ${e.message}`));
+                        dataService.getOrCreateProfile().catch(() => {});
                     } else {
-                        log("5. Initial Check: No User Found (Guest/Logout)");
+                        log("3. Guest Mode Active.");
                         set(state => ({ auth: { ...state.auth, user: null } }));
                     }
 
                 } catch (error: any) {
-                    log(`!!! CRITICAL AUTH ERROR: ${error.message}`);
-                    console.error("[Auth] Error detail:", error);
+                    log(`Auth Process Handled Error: ${error.message}`);
                     set(state => ({ auth: { ...state.auth, user: null } }));
                 }
             };
 
-            // Balapan: Proses Auth vs Timer 5 Detik
-            try {
-                await Promise.race([authProcess(), timeoutPromise]);
-                log("7. Initialization sequence completed normally.");
-            } catch (timeoutError: any) {
-                log(`7. ${timeoutError.message} - FORCING UNLOCK.`);
-                // Jangan throw, kita tangani dengan mematikan loading
-            } finally {
-                log("8. FINALLY: Setting isAuthLoading = false. GATES OPEN.");
-                set(state => ({ auth: { ...state.auth, isAuthLoading: false } }));
-            }
+            await Promise.race([authProcess(), timeoutPromise]);
+            
+            log("4. Initialization Done. Opening Gates.");
+            set(state => ({ auth: { ...state.auth, isAuthLoading: false } }));
         },
         login: async () => {
             try {

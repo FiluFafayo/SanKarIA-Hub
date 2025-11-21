@@ -254,23 +254,31 @@ class DataService {
 
     // FIX: Helper untuk mengambil user saat ini (DEBUGGED)
     public async getCurrentUser() {
-        console.log("[DataService] getCurrentUser called...");
+        // [FASE 0] Refactor: Fail-safe Session Check
+        // Mencegah crash saat token refresh gagal atau koneksi lambat.
         try {
             const supabase = this.ensureSupabase();
-            // Tambahkan timeout internal untuk Supabase call
             const sessionPromise = supabase.auth.getSession();
-            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Supabase getSession timeout")), 4000));
+            
+            // Gunakan RESOLVE pada timeout, bukan REJECT, agar alur try/catch tidak terputus kasar
+            const timeout = new Promise((resolve) => 
+                setTimeout(() => resolve({ data: { session: null }, error: { message: "Timeout (3s) - Defaulting to Guest" } }), 3000)
+            );
 
             const { data, error } = await Promise.race([sessionPromise, timeout]) as any;
 
             if (error) {
-                console.error("[DataService] Error getting session:", error);
+                // Level WARN saja, jangan ERROR. Ini kondisi normal jika session habis.
+                console.warn(`[DataService] Session check: ${error.message || 'No active session'}`);
                 return null;
             }
-            console.log("[DataService] getCurrentUser success. User:", data?.session?.user?.email || "None");
-            return data?.session?.user ?? null;
-        } catch (e) {
-            console.error("[DataService] getCurrentUser CRASH/TIMEOUT:", e);
+            
+            const user = data?.session?.user ?? null;
+            console.log(`[DataService] User status: ${user ? user.email : 'Guest Mode'}`);
+            return user;
+        } catch (e: any) {
+            // Tangkap error tak terduga (misal: supabase client belum init)
+            console.warn(`[DataService] getCurrentUser handled exception: ${e.message}`);
             return null;
         }
     }
