@@ -94,7 +94,7 @@ export const SoulSheetModal: React.FC<SoulSheetModalProps> = ({ character, onSel
              <div className="flex flex-wrap gap-1">
                 {character.inventory.slice(0, 6).map((inv, idx) => (
                     <span key={idx} className="text-[10px] px-2 py-1 bg-black/50 border border-wood/40 text-faded rounded">
-                        {inv.item.name} {inv.quantity > 1 ? \`x\${inv.quantity}\` : ''}
+                        {inv.item.name} {inv.quantity > 1 ? `x${inv.quantity}` : ''}
                     </span>
                 ))}
                 {character.inventory.length > 6 && (
