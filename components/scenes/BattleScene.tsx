@@ -61,17 +61,15 @@ export const BattleScene: React.FC<BattleSceneProps> = ({ onExit }) => {
   }, [campaign, _setRuntimeCampaignState, onExit]);
 
   // 5. Local State UI
-  const [viewMode, setViewMode] = useState<ViewMode>('TACTICAL');
+  const [viewMode, setViewMode] = useState<ViewMode>('TACTICAL'); // Default ke Grid agar pemain sadar posisi
   const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
-  const [targetId, setTargetId] = useState<string | null>(null); // SISTEM TARGETING
+  const [targetId, setTargetId] = useState<string | null>(null); // State Target Serangan
   
   // Data Derivatif
-  // Cari unit yang ditarget (Prioritas: Target Manual -> Monster Pertama Hidup)
-  const targetedMonster = useMemo(() => {
-      if (targetId) return campaign.monsters.find(m => m.instanceId === targetId);
-      return campaign.monsters.find(m => m.currentHp > 0);
-  }, [targetId, campaign.monsters]);
-
+  // Jika ada target terpilih di peta, gunakan itu untuk visual Theater. Jika tidak, monster pertama.
+  const targetUnit = useMemo(() => campaign.battleState?.units.find(u => u.id === targetId), [campaign.battleState, targetId]);
+  const activeMonster = useMemo(() => campaign.monsters.find(m => m.instanceId === targetId) || campaign.monsters[0], [campaign.monsters, targetId]);
+  const currentEnemy = activeMonster;
   const isMyTurn = campaign.currentPlayerId === playingCharacter.id;
   
   // Filter Logs
@@ -89,17 +87,19 @@ export const BattleScene: React.FC<BattleSceneProps> = ({ onExit }) => {
       // Mapping ID tombol ke Fungsi Combat System
       switch (selectedActionId) {
           case 'ATTACK_MAIN':
+             // Cari senjata equip pertama
              const weapon = playingCharacter.inventory.find(i => i.isEquipped && i.item.type === 'weapon');
              
-             if (!targetedMonster) {
-                 campaignActions.logEvent({type: 'system', text: 'Pilih target musuh di peta terlebih dahulu!'}, campaign.turnId || '');
-                 return; 
-             }
-
              if (weapon) {
-                 combatSystem.handlePlayerAttack(targetedMonster.instanceId, weapon);
+                 if (targetId) {
+                     combatSystem.handlePlayerAttack(targetId, weapon);
+                     // Reset target setelah serang? Opsional. Biarkan lock agar bisa serang lagi.
+                 } else {
+                     // Fallback: Peringatkan user
+                     campaignActions.logEvent({type: 'system', text: '⚠ Pilih target di Peta/Grid terlebih dahulu!'}, campaign.turnId || '');
+                 }
              } else {
-                 campaignActions.logEvent({type: 'system', text: 'Anda tidak memegang senjata!'}, campaign.turnId || '');
+                 campaignActions.logEvent({type: 'system', text: 'Tidak ada senjata yang digunakan!'}, campaign.turnId || '');
              }
              break;
           case 'DASH':
@@ -169,42 +169,38 @@ export const BattleScene: React.FC<BattleSceneProps> = ({ onExit }) => {
         {viewMode === 'THEATER' && (
              <div className="w-full h-full relative bg-[#050505] flex items-center justify-center">
                 <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_center,_#1a1921_0%,_#000000_100%)]" />
-                {targetedMonster ? (
+                {currentEnemy ? (
                     <div className="relative z-10 animate-[float_4s_ease-in-out_infinite] flex flex-col items-center">
                          {/* HP Bar Musuh */}
                          <div className="w-40 h-4 bg-black border border-wood mb-2 relative rounded overflow-hidden">
                             <div 
                                 className="h-full bg-red-700 transition-all duration-500" 
-                                style={{ width: `${(targetedMonster.currentHp / targetedMonster.definition.maxHp) * 100}%` }}
+                                style={{ width: `${(currentEnemy.currentHp / currentEnemy.definition.maxHp) * 100}%` }}
                             />
                             <span className="absolute inset-0 text-[10px] text-white flex items-center justify-center drop-shadow-md">
-                                {targetedMonster.currentHp} / {targetedMonster.definition.maxHp} HP
+                                {currentEnemy.currentHp} / {currentEnemy.definition.maxHp} HP
                             </span>
                         </div>
                         
-                        {/* Visual Musuh */}
-                        <div className="w-64 h-64 border-4 border-red-900/50 shadow-[0_0_50px_rgba(200,0,0,0.2)] overflow-hidden bg-black rounded-lg relative">
+                        {/* Visual Musuh (AI / Placeholder) */}
+                        <div className="w-64 h-64 border-4 border-red-900/50 shadow-[0_0_50px_rgba(200,0,0,0.2)] overflow-hidden bg-black rounded-lg">
+                             {/* FASE 6: Gunakan image dari NPC data jika ada */}
+                             {/* Placeholder monster */}
                              <div className="w-full h-full flex items-center justify-center text-8xl">👹</div>
-                             {/* Target Indicator */}
-                             {targetId === targetedMonster.instanceId && (
-                                 <div className="absolute top-2 right-2 text-red-500 text-xl animate-pulse">🎯</div>
-                             )}
                         </div>
 
                         <span className="mt-4 bg-red-950/80 text-red-200 font-pixel text-sm px-4 py-1 border border-red-800 rounded">
-                            {targetedMonster.name}
+                            {currentEnemy.name}
                         </span>
                         {/* Status Effects Badge */}
                         <div className="flex gap-1 mt-2">
-                            {targetedMonster.conditions.map(c => (
+                            {currentEnemy.conditions.map(c => (
                                 <span key={c} className="text-[8px] bg-purple-900 text-purple-200 px-1 rounded border border-purple-700">{c}</span>
                             ))}
                         </div>
                     </div>
                 ) : (
-                    <div className="text-faded font-pixel animate-pulse">
-                        {campaign.monsters.length > 0 ? "PILIH TARGET..." : "MENUNGGU MUSUH..."}
-                    </div>
+                    <div className="text-faded font-pixel animate-pulse">MENUNGGU MUSUH...</div>
                 )}
              </div>
         )}
@@ -258,40 +254,47 @@ export const BattleScene: React.FC<BattleSceneProps> = ({ onExit }) => {
          </div>
 
          {/* B. Execution Bar */}
-         <div className="p-3 bg-surface border-t border-wood flex gap-3 justify-center items-center flex-col">
-             {/* Target Info (Polish: Feedback Visual) */}
-             {isMyTurn && targetedMonster && (
-                 <div className="w-full flex justify-between items-center mb-2 px-2">
-                     <span className="text-[10px] text-faded">TARGET:</span>
-                     <span className="text-xs text-red-400 font-bold font-pixel">{targetedMonster.name} ({targetedMonster.currentHp} HP)</span>
+         <div className="relative p-3 bg-surface border-t border-wood flex gap-3 justify-center items-center">
+             {/* Target Indicator Overlay */}
+             {targetId && targetUnit && (
+                 <div className="absolute -top-8 left-0 right-0 bg-[#1a0b0b] border-t border-red-900/50 py-1 px-4 flex justify-between items-center animate-in slide-in-from-bottom-2">
+                     <div className="flex items-center gap-2">
+                         <span className="text-[10px] text-red-400 font-pixel tracking-widest">TARGET:</span>
+                         <span className="text-xs text-parchment font-bold">{targetUnit.name}</span>
+                         <span className="text-[10px] bg-red-900 text-white px-1 rounded">{targetUnit.hp} HP</span>
+                     </div>
+                     <button 
+                        onClick={() => setTargetId(null)} 
+                        className="text-red-500 hover:text-red-300 text-xs px-2"
+                     >
+                        ✕
+                     </button>
                  </div>
              )}
 
-             <div className="flex w-full gap-3 items-center">
-                 {isMyTurn ? (
-                     <>
-                        <div className="flex-1">
-                            {selectedActionId ? (
-                                 <RuneButton 
-                                    label="EKSEKUSI AKSI" 
-                                    variant="primary" 
-                                    className="w-full animate-pulse" 
-                                    onClick={handlePerformAction}
-                                    disabled={selectedActionId === 'ATTACK_MAIN' && !targetedMonster}
-                                />
-                            ) : (
-                                <div className="text-center text-[10px] text-faded font-pixel uppercase tracking-widest">
-                                    PILIH KARTU AKSI
-                                </div>
-                            )}
-                        </div>
-                        <RuneButton 
-                            label="END" 
-                            variant="secondary" 
-                            onClick={() => campaignActions.endTurn()}
-                        />
-                     </>
-                 ) : (
+             {isMyTurn ? (
+                 <>
+                    <div className="flex-1">
+                        {selectedActionId ? (
+                             <RuneButton 
+                                label="EKSEKUSI AKSI" 
+                                variant="primary" 
+                                className="w-full animate-pulse" 
+                                onClick={handlePerformAction}
+                            />
+                        ) : (
+                            <div className="text-center text-[10px] text-faded font-pixel uppercase tracking-widest">
+                                PILIH KARTU AKSI DI ATAS
+                            </div>
+                        )}
+                    </div>
+                    <RuneButton 
+                        label="AKHIRI GILIRAN" 
+                        variant="secondary" 
+                        onClick={() => campaignActions.endTurn()}
+                    />
+                 </>
+             ) : (
                  <div className="w-full text-center py-2 bg-black/30 border border-dashed border-wood/30 rounded">
                      <span className="text-faded text-xs font-pixel animate-pulse">
                         MENUNGGU GILIRAN MUSUH...
