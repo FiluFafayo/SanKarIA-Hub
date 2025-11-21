@@ -790,6 +790,9 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                     <div className="flex flex-col gap-3 overflow-y-auto max-h-[400px] pr-2">
                         {(['light', 'gray', 'dark'] as const).map((type) => {
                             const opt = soulSuggestions[type];
+                            // [FIX CRITICAL] Cegah crash jika AI mengembalikan data parsial/rusak
+                            if (!opt) return null;
+
                             const isSelected = selectedSoul?.type === type;
                             
                             let borderClass = 'border-wood';
