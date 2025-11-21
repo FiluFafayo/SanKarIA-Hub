@@ -62,7 +62,8 @@ interface DataActions {
     _updateCharacter: (character: Character) => void;
 
     // Aksi publik (thunks) yang dipanggil oleh UI/App
-    fetchInitialData: (userId: string) => Promise<void>;
+    // [FASE 2] Tambahkan parameter forceRefresh
+    fetchInitialData: (userId: string, forceRefresh?: boolean) => Promise<void>;
     saveCampaign: (campaign: Campaign | CampaignState) => Promise<void>;
     updateCharacter: (character: Character) => Promise<void>;
     saveNewCharacter: (
@@ -181,8 +182,12 @@ export const useDataStore = create<DataStore>((set, get) => ({
             })),
 
         // --- Aksi Publik (Thunks) ---
-        fetchInitialData: async (userId) => {
-            if (get().state.hasLoaded || get().state.isLoading) return;
+        fetchInitialData: async (userId, forceRefresh = false) => {
+            // [FASE 2] Logika Cache Override
+            // Jika forceRefresh = true, abaikan cek hasLoaded/isLoading
+            if (!forceRefresh && (get().state.hasLoaded || get().state.isLoading)) {
+                return;
+            }
 
             get().actions._setLoading(true);
             get().actions._setError(null);

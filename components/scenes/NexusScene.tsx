@@ -166,9 +166,10 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
           onCancel={() => setViewMode('CAMPFIRE')}
           onComplete={async () => {
             console.log('[DEBUG] CharacterWizard onComplete called');
-            // [FASE 1] Force Refresh: Memaksa sinkronisasi data agar karakter baru tampil
+            // [FASE 2] Force Refresh: Kirim flag 'true' untuk menjebol cache store
             if (user) {
-                await dataActions.fetchInitialData(user.id);
+                console.log('[Nexus] Force refreshing character list...');
+                await dataActions.fetchInitialData(user.id, true);
             }
             setViewMode('CAMPFIRE');
           }}
