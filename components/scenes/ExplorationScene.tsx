@@ -8,6 +8,8 @@ import { LogDrawer } from '../grimoire/LogDrawer';
 import { StatBar } from '../grimoire/StatBar';
 import { AvatarFrame } from '../grimoire/AvatarFrame';
 import { RuneButton } from '../grimoire/RuneButton';
+import { InventoryDrawer } from '../grimoire/InventoryDrawer'; // FASE 5
+import { CharacterSheetDrawer } from '../grimoire/CharacterSheetDrawer'; // FASE 5
 
 interface ExplorationSceneProps {
   onEncounter: () => void; // Callback jika state berubah jadi combat
@@ -55,6 +57,7 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
 
   // 5. Local State untuk UI
   const [inputVal, setInputVal] = useState("");
+  const [activeDrawer, setActiveDrawer] = useState<'NONE' | 'INVENTORY' | 'CHARACTER'>('NONE'); // FASE 5
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll log (bisa dipindah ke LogDrawer sebenernya, tapi manual trigger lebih aman)
@@ -167,15 +170,35 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
             />
         </div>
 
-        {/* Drawer Access (Fase 5 Placeholder) */}
-        <div className="absolute top-0 right-0 transform -translate-y-1/2 flex gap-2 px-4">
-             <button className="w-10 h-10 rounded-full bg-wood border-2 border-gold text-xl flex items-center justify-center hover:scale-110 transition-transform shadow-lg" title="Inventory">
+        {/* Drawer Access (Fase 5: Connected) */}
+        <div className="absolute top-0 right-0 transform -translate-y-1/2 flex gap-2 px-4 z-30">
+             <button 
+                onClick={() => setActiveDrawer('INVENTORY')}
+                className="w-10 h-10 rounded-full bg-wood border-2 border-gold text-xl flex items-center justify-center hover:scale-110 transition-transform shadow-lg active:scale-95" 
+                title="Inventory"
+             >
                 🎒
              </button>
-             <button className="w-10 h-10 rounded-full bg-wood border-2 border-gold text-xl flex items-center justify-center hover:scale-110 transition-transform shadow-lg" title="Character">
+             <button 
+                onClick={() => setActiveDrawer('CHARACTER')}
+                className="w-10 h-10 rounded-full bg-wood border-2 border-gold text-xl flex items-center justify-center hover:scale-110 transition-transform shadow-lg active:scale-95" 
+                title="Character"
+             >
                 📜
              </button>
         </div>
+
+        {/* FASE 5: THE GRIMOIRES (Modal/Drawer Injection) */}
+        <InventoryDrawer 
+            isOpen={activeDrawer === 'INVENTORY'} 
+            onClose={() => setActiveDrawer('NONE')}
+            inventory={playingCharacter.inventory}
+        />
+        <CharacterSheetDrawer
+            isOpen={activeDrawer === 'CHARACTER'}
+            onClose={() => setActiveDrawer('NONE')}
+            character={playingCharacter}
+        />
 
         {/* Full Log Drawer (Optional Overlap) */}
         <LogDrawer logs={formattedLogs} />
