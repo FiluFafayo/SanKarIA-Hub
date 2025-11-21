@@ -1,5 +1,5 @@
 // src/components/scenes/BattleScene.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useCampaign } from '../../hooks/useCampaign';
 import { useCombatSystem } from '../../hooks/useCombatSystem';
@@ -9,22 +9,31 @@ import { StatBar } from '../grimoire/StatBar';
 import { AvatarFrame } from '../grimoire/AvatarFrame';
 import { RuneButton } from '../grimoire/RuneButton';
 import { SkillCard } from '../battle/SkillCard';
-import { CharacterInventoryItem } from '../../types';
+import { CharacterInventoryItem, SpellDefinition } from '../../types';
+
+// Ikon SVG Sederhana
+const IconSword = () => <span>⚔️</span>;
+const IconEye = () => <span>👁️</span>;
+const IconGrid = () => <span>▦</span>;
 
 interface BattleSceneProps {
-  onExit: () => void;
+  onExit: () => void; // Callback saat combat selesai/kabur
 }
 
+type ViewMode = 'THEATER' | 'TACTICAL';
+
 export const BattleScene: React.FC<BattleSceneProps> = ({ onExit }) => {
-  // 1. Inisialisasi Data dari Store (SSoT)
-  const { playingCampaign, playingCharacter } = useGameStore(s => s.runtime);
+  // 1. Ambil Initial State dari Store (SSoT)
+  const { playingCampaign, playingCharacter, runtimeSettings } = useGameStore(s => s.runtime);
   const _setRuntimeCampaignState = useGameStore(s => s.actions._setRuntimeCampaignState);
   const _setRuntimeCharacterState = useGameStore(s => s.actions._setRuntimeCharacterState);
 
-  // Guard: Data tidak lengkap
-  if (!playingCampaign || !playingCharacter) return <div className="p-10 text-red-500">FATAL: BATTLE DATA MISSING</div>;
+  // Guard Clause
+  if (!playingCampaign || !playingCharacter) {
+    return <div className="p-10 text-red-500 font-pixel">FATAL: DATA BATTLE HILANG.</div>;
+  }
 
-  // 2. Inisialisasi Logic Engine (Local Reducer)
+  // 2. Inisialisasi Logic Engine (Reducer Lokal)
   const { campaign, campaignActions } = useCampaign(playingCampaign, playingCampaign.players);
 
   // 3. Inisialisasi Combat System
@@ -33,170 +42,248 @@ export const BattleScene: React.FC<BattleSceneProps> = ({ onExit }) => {
     character: playingCharacter,
     players: campaign.players,
     campaignActions,
-    onCharacterUpdate: (char) => {
-        _setRuntimeCharacterState(char); // Sync karakter ke global
-        campaignActions.updateCharacterInCampaign(char); // Sync ke reducer lokal
+    onCharacterUpdate: (updatedChar) => {
+        _setRuntimeCharacterState(updatedChar);
+        // Kita juga perlu update karakter di dalam campaign state lokal agar sinkron
+        campaignActions.updateCharacterInCampaign(updatedChar);
     }
   });
 
-  // 4. Sinkronisasi State Campaign ke Global Store (Optimistic Update)
+  // 4. Sinkronisasi Reducer -> Global Store
   useEffect(() => {
     _setRuntimeCampaignState(campaign);
     
-    // Jika state kembali ke exploration (misal: combat selesai), keluar dari scene ini
+    // Deteksi Akhir Kombat: Jika state berubah kembali ke 'exploration'
     if (campaign.gameState === 'exploration') {
-        onExit(); 
+        console.log("[BattleScene] Combat selesai, kembali ke Eksplorasi.");
+        onExit();
     }
   }, [campaign, _setRuntimeCampaignState, onExit]);
 
-  // 5. Local UI State
-  const [selectedAction, setSelectedAction] = useState<'ATTACK' | 'DASH' | 'DISENGAGE' | 'DODGE' | null>(null);
-
-  // Format Logs untuk Drawer
-  const formattedLogs = campaign.eventLog.map(l => ({
+  // 5. Local State UI
+  const [viewMode, setViewMode] = useState<ViewMode>('TACTICAL'); // Default ke Grid agar pemain sadar posisi
+  const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
+  
+  // Data Derivatif
+  const currentEnemy = campaign.monsters[0]; // Target visual utama untuk Theater mode
+  const isMyTurn = campaign.currentPlayerId === playingCharacter.id;
+  
+  // Filter Logs
+  const formattedLogs = campaign.eventLog.slice().reverse().map(l => ({
     sender: l.type === 'player_action' ? 'Anda' : (l.type === 'system' ? 'System' : 'DM'),
     message: l.text || "",
-    type: (l.type === 'system' || l.type === 'roll_result') ? 'system' : 'chat'
-  })).reverse();
+    type: (l.type === 'system' || l.type === 'roll_result') ? 'system' : 'chat' as 'system'|'chat'
+  }));
 
-  // Cek Giliran
-  const isMyTurn = campaign.currentPlayerId === playingCharacter.id;
-  const activeUnitId = campaign.battleState?.activeUnitId;
-  const isMyUnitActive = activeUnitId === playingCharacter.id;
+  // --- HANDLERS ---
+  
+  const handlePerformAction = async () => {
+      if (!selectedActionId) return;
 
-  // Handler: Tap pada Unit di Peta
-  const handleTargetTap = (targetId: string) => {
-      if (!isMyTurn) return;
-
-      if (selectedAction === 'ATTACK') {
-          // Cari senjata yang sedang dipakai
-          const weapon = playingCharacter.inventory.find(i => i.isEquipped && i.item.type === 'weapon');
-          if (weapon) {
-             combatSystem.handlePlayerAttack(targetId, weapon);
-             setSelectedAction(null); // Reset seleksi setelah serang
-          } else {
-             campaignActions.logEvent({ type: 'system', text: 'Anda tidak memegang senjata!' }, campaign.turnId || 'temp');
-          }
+      // Mapping ID tombol ke Fungsi Combat System
+      switch (selectedActionId) {
+          case 'ATTACK_MAIN':
+             // Cari senjata equip pertama
+             const weapon = playingCharacter.inventory.find(i => i.isEquipped && i.item.type === 'weapon');
+             // Jika tidak ada senjata, gunakan Unarmed Strike (perlu mock item atau handle logic)
+             // Untuk sekarang, kita cari unit target pertama musuh (Logic sederhana)
+             const target = campaign.monsters.find(m => m.currentHp > 0);
+             if (weapon && target) {
+                 combatSystem.handlePlayerAttack(target.instanceId, weapon);
+             } else {
+                 campaignActions.logEvent({type: 'system', text: 'Tidak ada senjata atau target!'}, campaign.turnId || '');
+             }
+             break;
+          case 'DASH':
+             await combatSystem.handleDash();
+             break;
+          case 'DISENGAGE':
+             await combatSystem.handleDisengage();
+             break;
+          case 'DODGE':
+             await combatSystem.handleDodge();
+             break;
+          case 'HIDE':
+             await combatSystem.handleHide();
+             break;
+          case 'SECOND_WIND':
+             await combatSystem.handleSecondWind();
+             break;
+          default:
+             // Cek apakah ini Spell ID?
+             console.warn("Aksi tidak dikenal:", selectedActionId);
       }
+      setSelectedActionId(null);
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-void relative overflow-hidden">
+    <div className="flex flex-col h-full w-full relative bg-void overflow-hidden">
       
-      {/* --- LAYER 1: VISUAL MAP (TOP) --- */}
-      <div className="flex-1 relative bg-black border-b-4 border-wood overflow-hidden">
-        {campaign.battleState ? (
-            <BattleMapRenderer
-                battleState={campaign.battleState}
-                campaignActions={campaignActions}
-                currentUserId={playingCharacter.id}
-                // Hubungkan logika gerak + OA
-                onMoveUnit={(id, path, cost) => {
-                    if (isMyTurn) combatSystem.handleMovementWithOA(id, path, cost);
-                }}
-                // Hubungkan logika target (Attack)
-                onTargetTap={handleTargetTap}
-            />
-        ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-faded animate-pulse gap-2">
-                <div className="text-4xl">⚔️</div>
-                <div className="font-pixel text-xs">MENYIAPKAN MEDAN TEMPUR...</div>
-            </div>
+      {/* --- LAYER 1: BATTLE VIEWPORT (TOP 60%) --- */}
+      <div className="flex-[3] relative bg-black border-b-4 border-wood overflow-hidden">
+        
+        {/* View Toggle */}
+        <div className="absolute top-2 right-2 z-50 flex gap-2">
+            <button 
+                onClick={() => setViewMode('THEATER')}
+                className={`p-2 rounded border ${viewMode === 'THEATER' ? 'bg-gold text-black border-gold' : 'bg-black/50 text-faded border-wood'}`}
+                title="Theater of Mind"
+            >
+                <IconEye />
+            </button>
+            <button 
+                onClick={() => setViewMode('TACTICAL')}
+                className={`p-2 rounded border ${viewMode === 'TACTICAL' ? 'bg-gold text-black border-gold' : 'bg-black/50 text-faded border-wood'}`}
+                title="Tactical Grid"
+            >
+                <IconGrid />
+            </button>
+        </div>
+
+        {/* MODE: TACTICAL GRID */}
+        {viewMode === 'TACTICAL' && (
+            campaign.battleState ? (
+                <BattleMapRenderer 
+                    battleState={campaign.battleState}
+                    campaignActions={campaignActions}
+                    currentUserId={playingCharacter.id}
+                    onMoveUnit={combatSystem.handleMovementWithOA}
+                    // Integrasi Tap Target di Peta untuk set target serangan (Next Step)
+                    onTargetTap={(unitId) => console.log("Target tapped:", unitId)}
+                />
+            ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-faded font-pixel">
+                    MENYIAPKAN MEDAN TEMPUR...
+                </div>
+            )
         )}
 
-        {/* HUD Overlay */}
-        <div className="absolute top-0 left-0 right-0 p-2 bg-gradient-to-b from-black/90 to-transparent z-20 flex justify-between items-start pointer-events-none">
-             <div className="flex gap-2 pointer-events-auto">
-                <AvatarFrame 
+        {/* MODE: THEATER OF MIND */}
+        {viewMode === 'THEATER' && (
+             <div className="w-full h-full relative bg-[#050505] flex items-center justify-center">
+                <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_center,_#1a1921_0%,_#000000_100%)]" />
+                {currentEnemy ? (
+                    <div className="relative z-10 animate-[float_4s_ease-in-out_infinite] flex flex-col items-center">
+                         {/* HP Bar Musuh */}
+                         <div className="w-40 h-4 bg-black border border-wood mb-2 relative rounded overflow-hidden">
+                            <div 
+                                className="h-full bg-red-700 transition-all duration-500" 
+                                style={{ width: `${(currentEnemy.currentHp / currentEnemy.definition.maxHp) * 100}%` }}
+                            />
+                            <span className="absolute inset-0 text-[10px] text-white flex items-center justify-center drop-shadow-md">
+                                {currentEnemy.currentHp} / {currentEnemy.definition.maxHp} HP
+                            </span>
+                        </div>
+                        
+                        {/* Visual Musuh (AI / Placeholder) */}
+                        <div className="w-64 h-64 border-4 border-red-900/50 shadow-[0_0_50px_rgba(200,0,0,0.2)] overflow-hidden bg-black rounded-lg">
+                             {/* FASE 6: Gunakan image dari NPC data jika ada */}
+                             {/* Placeholder monster */}
+                             <div className="w-full h-full flex items-center justify-center text-8xl">👹</div>
+                        </div>
+
+                        <span className="mt-4 bg-red-950/80 text-red-200 font-pixel text-sm px-4 py-1 border border-red-800 rounded">
+                            {currentEnemy.name}
+                        </span>
+                        {/* Status Effects Badge */}
+                        <div className="flex gap-1 mt-2">
+                            {currentEnemy.conditions.map(c => (
+                                <span key={c} className="text-[8px] bg-purple-900 text-purple-200 px-1 rounded border border-purple-700">{c}</span>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-faded font-pixel animate-pulse">MENUNGGU MUSUH...</div>
+                )}
+             </div>
+        )}
+
+        {/* Overlay Status Player (Selalu Muncul) */}
+        <div className="absolute top-2 left-2 z-40 flex gap-2 items-start pointer-events-none">
+             <div className="pointer-events-auto">
+                 <AvatarFrame 
                     name={playingCharacter.name} 
                     imageUrl={playingCharacter.avatar_url} 
-                    size="sm"
+                    size="md" 
                     status={isMyTurn ? "turn" : "online"}
+                    hpPercentage={(playingCharacter.currentHp / playingCharacter.maxHp) * 100}
                 />
-                <div className="flex flex-col justify-center">
-                    <StatBar label="HP" current={playingCharacter.currentHp} max={playingCharacter.maxHp} color="blood" />
-                    <div className={`text-[10px] font-pixel mt-1 px-2 py-0.5 rounded border ${isMyTurn ? 'bg-green-900/50 text-green-400 border-green-500 animate-pulse' : 'bg-black/50 text-faded border-gray-700'}`}>
-                        {isMyTurn ? "GILIRAN ANDA" : `GILIRAN: ${activeUnitId ? '...' : 'MENUNGGU'}`}
-                    </div>
-                </div>
              </div>
-             
-             {/* Tombol Kabur (Darurat) */}
-             <button 
-                onClick={() => {
-                    // Paksa state kembali ke exploration lewat action (agar bersih)
-                    campaignActions.setGameState('exploration');
-                    // onExit dipanggil oleh useEffect
-                }} 
-                className="pointer-events-auto bg-red-950/80 border border-red-600 text-red-200 px-3 py-1 text-[10px] font-pixel hover:bg-red-900 transition-colors"
-             >
-                🏳️ FLEE
-             </button>
+             <div className="flex flex-col bg-black/60 p-2 rounded border border-wood/30 backdrop-blur-sm">
+                 <StatBar label="HP" current={playingCharacter.currentHp} max={playingCharacter.maxHp} color="blood" />
+                 <div className="flex gap-2 mt-1">
+                     <span className="text-[10px] text-blue-300 font-mono">AC: {playingCharacter.armorClass}</span>
+                     <span className="text-[10px] text-green-300 font-mono">SPD: {playingCharacter.speed}</span>
+                 </div>
+             </div>
         </div>
       </div>
 
-      {/* --- LAYER 2: TACTICAL DECK (BOTTOM) --- */}
-      <div className="h-[35%] bg-surface flex flex-col border-t-4 border-wood relative z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
+      {/* --- LAYER 2: CONTROL DECK (BOTTOM 40%) --- */}
+      <div className="flex-[2] bg-[#15141a] relative z-20 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] flex flex-col border-t border-wood">
          
-         {/* Info Bar: Selected Action */}
-         <div className="bg-black/80 text-center py-1 border-b border-white/10 min-h-[24px]">
-             {selectedAction === 'ATTACK' && <span className="text-red-400 text-[10px] font-pixel animate-pulse">PILIH TARGET DI PETA UNTUK MENYERANG</span>}
-             {!isMyTurn && <span className="text-faded text-[10px] font-pixel">MENUNGGU GILIRAN LAWAN...</span>}
-         </div>
-
-         {/* Card Carousel */}
-         <div className="flex-1 overflow-x-auto p-2 flex items-center gap-2 scrollbar-hide">
-            {/* 1. ATTACK CARD */}
+         {/* A. Action Carousel */}
+         <div className="flex-1 overflow-x-auto flex items-center gap-3 px-4 py-2 scrollbar-hide snap-x bg-[#0a0a0a]">
+            {/* 1. Attack Card */}
             <SkillCard 
-                name="ATTACK" 
-                cost="1 ACT" 
+                name="Attack" 
+                cost="Action" 
                 type="attack" 
                 description="Serang musuh dengan senjata utama."
-                isSelected={selectedAction === 'ATTACK'}
-                onClick={() => isMyTurn && setSelectedAction(selectedAction === 'ATTACK' ? null : 'ATTACK')}
+                isSelected={selectedActionId === 'ATTACK_MAIN'} 
+                onClick={() => setSelectedActionId('ATTACK_MAIN')} 
             />
             
-            {/* 2. DASH */}
-            <SkillCard 
-                name="DASH" 
-                cost="1 ACT" 
-                type="utility" 
-                description="Gandakan kecepatan gerak."
-                onClick={() => isMyTurn && combatSystem.handleDash()}
-            />
+            {/* 2. Common Actions */}
+            <SkillCard name="Dash" cost="Action" type="utility" isSelected={selectedActionId === 'DASH'} onClick={() => setSelectedActionId('DASH')} />
+            <SkillCard name="Disengage" cost="Action" type="utility" isSelected={selectedActionId === 'DISENGAGE'} onClick={() => setSelectedActionId('DISENGAGE')} />
+            <SkillCard name="Dodge" cost="Action" type="utility" isSelected={selectedActionId === 'DODGE'} onClick={() => setSelectedActionId('DODGE')} />
+            <SkillCard name="Hide" cost="Action" type="utility" isSelected={selectedActionId === 'HIDE'} onClick={() => setSelectedActionId('HIDE')} />
 
-            {/* 3. DISENGAGE */}
-            <SkillCard 
-                name="DISENGAGE" 
-                cost="1 ACT" 
-                type="utility" 
-                description="Gerak tanpa memicu serangan kesempatan."
-                onClick={() => isMyTurn && combatSystem.handleDisengage()}
-            />
-
-            {/* 4. DODGE */}
-            <SkillCard 
-                name="DODGE" 
-                cost="1 ACT" 
-                type="utility" 
-                description="Fokus menghindar. Musuh Disadvantage saat menyerang."
-                onClick={() => isMyTurn && combatSystem.handleDodge()}
-            />
+            {/* 3. Class Specific (Contoh Fighter) */}
+            {playingCharacter.class === 'Fighter' && (
+                 <SkillCard name="Second Wind" cost="Bonus" type="heal" isSelected={selectedActionId === 'SECOND_WIND'} onClick={() => setSelectedActionId('SECOND_WIND')} />
+            )}
          </div>
 
-         {/* Action Trigger / End Turn */}
-         <div className="p-3 bg-[#15141a] border-t border-wood flex gap-2">
-            <RuneButton 
-                label="AKHIRI GILIRAN" 
-                variant={isMyTurn ? "primary" : "secondary"}
-                disabled={!isMyTurn}
-                onClick={campaignActions.endTurn}
-                className="w-full shadow-lg"
-            />
+         {/* B. Execution Bar */}
+         <div className="p-3 bg-surface border-t border-wood flex gap-3 justify-center items-center">
+             {isMyTurn ? (
+                 <>
+                    <div className="flex-1">
+                        {selectedActionId ? (
+                             <RuneButton 
+                                label="EKSEKUSI AKSI" 
+                                variant="primary" 
+                                className="w-full animate-pulse" 
+                                onClick={handlePerformAction}
+                            />
+                        ) : (
+                            <div className="text-center text-[10px] text-faded font-pixel uppercase tracking-widest">
+                                PILIH KARTU AKSI DI ATAS
+                            </div>
+                        )}
+                    </div>
+                    <RuneButton 
+                        label="AKHIRI GILIRAN" 
+                        variant="secondary" 
+                        onClick={() => campaignActions.endTurn()}
+                    />
+                 </>
+             ) : (
+                 <div className="w-full text-center py-2 bg-black/30 border border-dashed border-wood/30 rounded">
+                     <span className="text-faded text-xs font-pixel animate-pulse">
+                        MENUNGGU GILIRAN MUSUH...
+                     </span>
+                 </div>
+             )}
          </div>
 
-         {/* Log Drawer (Hidden by default, can pull up) */}
-         <LogDrawer logs={formattedLogs} />
+         {/* C. Log Drawer (Compact) */}
+         <div className="h-32 relative">
+             <LogDrawer logs={formattedLogs} />
+         </div>
+         
       </div>
     </div>
   );
