@@ -678,6 +678,41 @@ class GenerationService {
         }
         return geminiService.makeApiCall(call);
     }
+
+    // BARU: FASE 1 - The Oracle (Incantation Auto-Complete)
+    async suggestIncantation(currentTheme: string): Promise<{ title: string; description: string; villain: string }> {
+        const prompt = `Anda adalah The Oracle, entitas kuno yang membantu Dungeon Master menulis takdir.
+        Pengguna ingin membuat kampanye D&D dengan tema: "${currentTheme || 'Acak'}".
+        
+        Lengkapi 'Mantra Penciptaan' ini dengan ide yang kreatif, unik, dan memancing imajinasi.
+        
+        Berikan output JSON:
+        {
+            "title": "Judul Kampanye (Singkat, Keren, Bahasa Indonesia)",
+            "description": "Premis cerita (2 kalimat).",
+            "villain": "Nama & Gelar Musuh Utama (misal: 'Xarathos, Raja Abumera')"
+        }`;
+
+        const call = async (client: any) => {
+            const response = await client.models.generateContent({
+                model: geminiService.getTextModelName(),
+                contents: prompt,
+                config: { responseMimeType: "application/json" }
+            });
+            return JSON.parse(response.text);
+        };
+        
+        // Fallback jika offline/error
+        try {
+            return await geminiService.makeApiCall(call);
+        } catch (e) {
+            return {
+                title: "Bayang-bayang Terlupakan",
+                description: "Dunia di mana matahari berhenti terbit, dan kota-kota terakhir bertahan dengan cahaya sihir yang memudar.",
+                villain: "Umbra, Penelan Cahaya"
+            };
+        }
+    }
 }
 
 export const generationService = new GenerationService();
