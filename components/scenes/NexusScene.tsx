@@ -4,6 +4,7 @@ import { CampfireMenu } from '../nexus/CampfireMenu';
 import { DungeonGate } from '../nexus/DungeonGate';
 import { CharacterWizard } from '../nexus/CharacterWizard'; // Import wizard
 import { CampaignWizard } from '../nexus/CampaignWizard';
+import { SoulSheetModal } from '../nexus/SoulSheetModal'; // [FASE 3] Impor Modal Inspeksi
 import { useAppStore } from '../../store/appStore';
 import { useDataStore } from '../../store/dataStore'; // GANTI DENGAN DATASTORE
 import { Character } from '../../types';
@@ -34,6 +35,7 @@ const LoadingIndicator = () => (
 
 export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   const [viewMode, setViewMode] = useState<'IDLE' | 'CAMPFIRE' | 'GATE' | 'CHAR_WIZARD' | 'CAMP_WIZARD'>('IDLE');
+  const [inspectingCharacter, setInspectingCharacter] = useState<Character | null>(null); // [FASE 3] State Inspeksi
 
   // HAPUS: State lokal untuk karakter dan status refresh
   // const [myCharacters, setMyCharacters] = useState<Character[]>([]);
@@ -152,12 +154,32 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
 
       {/* 1. CAMPFIRE (Character Select) */}
       {viewMode === 'CAMPFIRE' && (
-        <CampfireMenu
-          characters={characters}
-          onSelectCharacter={setSelectedCharacterId}
-          onBack={() => setViewMode('IDLE')}
-          onCreate={() => setViewMode('CHAR_WIZARD')}
-        />
+        <>
+          <CampfireMenu
+            characters={characters}
+            onSelectCharacter={(id) => {
+                // [FASE 3] Intercept seleksi untuk inspeksi
+                const char = characters.find(c => c.id === id);
+                if (char) setInspectingCharacter(char);
+            }}
+            onBack={() => setViewMode('IDLE')}
+            onCreate={() => setViewMode('CHAR_WIZARD')}
+          />
+          
+          {/* [FASE 3] Modal Inspeksi Jiwa */}
+          {inspectingCharacter && (
+            <SoulSheetModal
+                character={inspectingCharacter}
+                onClose={() => setInspectingCharacter(null)}
+                onSelect={() => {
+                    setSelectedCharacterId(inspectingCharacter.id);
+                    setInspectingCharacter(null); // Tutup modal
+                    // Opsional: Langsung kembali ke IDLE atau biarkan user di Campfire
+                    // UX Choice: Tetap di Campfire agar user tahu "Sudah terpilih"
+                }}
+            />
+          )}
+        </>
       )}
 
       {/* 2. WIZARDS */}
