@@ -19,11 +19,13 @@ interface NavigationState {
     currentView: View;
     campaignToJoinOrStart: Campaign | null;
     templateToPreFill: RawCharacterData | null;
+    selectedCharacterId: string | null; // [FASE 0] State Foundation Fixed
 }
 const initialNavigationState: NavigationState = {
     currentView: 'nexus',
     campaignToJoinOrStart: null,
     templateToPreFill: null,
+    selectedCharacterId: null, // [FASE 0] Default value
 };
 interface NavigationActions {
     navigateTo: (view: Location) => void;
@@ -31,6 +33,7 @@ interface NavigationActions {
     startJoinFlow: (campaign: Campaign) => void;
     startTemplateFlow: (template: RawCharacterData) => void;
     clearTemplateToPreFill: () => void;
+    setSelectedCharacterId: (id: string | null) => void; // [FASE 0] Action Definition
 }
 
 // =================================================================
@@ -142,6 +145,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
         })),
         clearTemplateToPreFill: () => set(state => ({
             navigation: { ...state.navigation, templateToPreFill: null }
+        })),
+        // [FASE 0] Implementasi Action
+        setSelectedCharacterId: (id) => set(state => ({
+            navigation: { ...state.navigation, selectedCharacterId: id }
         })),
 
         // --- Authentication (LOGGING & SAFETY VALVE) ---

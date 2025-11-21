@@ -39,10 +39,13 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
   // const [myCharacters, setMyCharacters] = useState<Character[]>([]);
   // const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // GUNAKAN SSoT dari store
-  const { auth, setSelectedCharacterId, selectedCharacterId, actions } = useAppStore();
-  const user = auth.user; // Akses manual
-  const { pushNotification } = actions;
+  // [FASE 0] FIX: Menggunakan selector granular untuk menghindari "undefined" dan re-render massal
+  const auth = useAppStore(s => s.auth);
+  const selectedCharacterId = useAppStore(s => s.navigation.selectedCharacterId);
+  const setSelectedCharacterId = useAppStore(s => s.actions.setSelectedCharacterId);
+  const pushNotification = useAppStore(s => s.actions.pushNotification);
+  
+  const user = auth.user;
 
   const { state: dataState, actions: dataActions } = useDataStore();
   const { characters, isLoading, hasLoaded, error } = dataState;
