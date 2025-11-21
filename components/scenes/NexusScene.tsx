@@ -166,7 +166,10 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
           onCancel={() => setViewMode('CAMPFIRE')}
           onComplete={async () => {
             console.log('[DEBUG] CharacterWizard onComplete called');
-            // Cukup kembali ke Campfire, data akan otomatis ter-update oleh store
+            // [FASE 1] Force Refresh: Memaksa sinkronisasi data agar karakter baru tampil
+            if (user) {
+                await dataActions.fetchInitialData(user.id);
+            }
             setViewMode('CAMPFIRE');
           }}
         />
