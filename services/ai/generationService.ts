@@ -223,6 +223,39 @@ class GenerationService {
         return geminiService.makeApiCall(call);
     }
 
+    // BARU: FASE 2 - The Oracle (AI Auto-Complete untuk Wizard)
+    async suggestCampaignDetails(theme: string): Promise<{ title: string; description: string; dmPersonality: string }> {
+        const prompt = `Anda adalah Oracle, penasihat Dungeon Master.
+        Berikan saran SATU ide kampanye D&D 5e yang unik dan menarik berdasarkan tema: "${theme}".
+        
+        Berikan output JSON (tanpa markdown) dengan format:
+        {
+            "title": "Judul Kampanye (Indonesia, Keren, Singkat)",
+            "description": "Sinopsis singkat (2-3 kalimat) yang memancing rasa ingin tahu.",
+            "dmPersonality": "Saran kepribadian DM yang cocok (misal: 'Misterius & Kejam' atau 'Heroik & Bersemangat')"
+        }`;
+
+        const call = async (client: any) => {
+            const response = await client.models.generateContent({
+                model: geminiService.getTextModelName(),
+                contents: prompt,
+                config: { responseMimeType: "application/json" }
+            });
+            return JSON.parse(response.text);
+        };
+        // Fallback jika gagal/offline
+        try {
+            return await geminiService.makeApiCall(call);
+        } catch (e) {
+            console.warn("Oracle diam membisu...", e);
+            return {
+                title: "Lembah Harapan Pupus",
+                description: "Sebuah lembah yang tertutup kabut abadi, di mana para petualang masuk namun tak pernah keluar.",
+                dmPersonality: "Misterius & Melankolis"
+            };
+        }
+    }
+
     // (Poin 5) Modifikasi untuk mengembalikan detik, bukan string
     async generateWorldEvent(campaign: Campaign): Promise<{ event: string, secondsToAdd: number, nextWeather: WorldWeather }> {
         const { currentTime, currentWeather } = campaign;
