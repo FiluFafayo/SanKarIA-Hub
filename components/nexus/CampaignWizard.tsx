@@ -1,5 +1,6 @@
 // components/nexus/CampaignWizard.tsx
 import React, { useState } from 'react';
+import { PixelCard } from '../grimoire/PixelCard';
 import { RuneButton } from '../grimoire/RuneButton';
 import { useAppStore } from '../../store/appStore';
 import { campaignRepository } from '../../services/repository/campaignRepository';
@@ -13,40 +14,37 @@ interface CampaignWizardProps {
   onCancel: () => void;
 }
 
-// Arsitektur State Machine untuk Wizard
-type WizardStep = 'MODE_SELECT' | 'THEME_SELECT' | 'SCALE_SELECT' | 'DETAILS_INPUT' | 'REVIEW';
+// Wizard Step Definition - Mengadopsi flow CharacterWizard
+type WizardStep = 'METHOD' | 'LIBRARY' | 'THEME' | 'SCALE' | 'CONCEPT' | 'REVIEW';
 
 const THEMES = ['Fantasy', 'Dark Fantasy', 'Sci-Fi', 'Cyberpunk', 'Eldritch Horror', 'Steampunk'];
-
 const SCALES = [
-    { id: 'One-Shot', label: 'Kisah Tunggal', desc: 'Linear. Tamat 1-2 sesi. Cocok untuk pemula.' },
-    { id: 'Endless Saga', label: 'Hikayat Tanpa Akhir', desc: 'Open World. Multi-peta. Membutuhkan komitmen jangka panjang.' }
+    { id: 'One-Shot', label: 'Kisah Tunggal', desc: 'Satu peta, linear, 1-2 sesi. Cocok untuk pemula.' },
+    { id: 'Endless Saga', label: 'Hikayat Tanpa Akhir', desc: 'Open World, Procedural Generation, Cerita Bercabang.' }
 ];
 
 export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCancel }) => {
   const { user } = useAppStore();
-  const [step, setStep] = useState<WizardStep>('MODE_SELECT');
+  const [step, setStep] = useState<WizardStep>('METHOD');
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // Data State
   const [formData, setFormData] = useState({
     title: '',
     theme: 'Fantasy',
     scale: 'One-Shot',
-    villain: '',
-    description: '',
-    selectedTemplate: null as Campaign | null
+    villain: '', 
+    description: ''
   });
+
+  // State untuk preview Template yang dipilih
+  const [selectedTemplate, setSelectedTemplate] = useState<Partial<Campaign> | null>(null);
 
   // --- LOGIC: ORACLE AI ---
   const invokeOracle = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
-        // Safety check: Default theme jika kosong
-        const themeToUse = formData.theme || 'Fantasy';
-        const suggestion = await generationService.suggestIncantation(themeToUse);
-        
+        const suggestion = await generationService.suggestIncantation(formData.theme);
         setFormData(prev => ({
             ...prev,
             title: suggestion.title,
@@ -54,23 +52,15 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
             villain: suggestion.villain
         }));
     } catch (e) {
-        console.error("[FATAL] Oracle malfunction:", e);
-        // Fallback manual jika AI mati
-        setFormData(prev => ({
-             ...prev,
-             description: prev.description || "Dunia ini tertutup kabut misteri..."
-        }));
+        console.error("Oracle gagal:", e);
     } finally {
         setIsProcessing(false);
     }
   };
 
   // --- LOGIC: MANIFESTATION ---
-  const commitToDatabase = async () => {
-    if (!user) {
-        alert("ERROR: User identity lost. Relogin required.");
-        return;
-    }
+  const manifestWorld = async (isTemplate: boolean) => {
+    if (!user) return;
     setIsProcessing(true);
     try {
         const defaultRules: CampaignRules = {
@@ -81,49 +71,41 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
             maxPartySize: 4,
         };
 
-        let finalPayload: any = {};
+        let finalData: any = {};
 
-        if (formData.selectedTemplate) {
-            // Clone Template
-            finalPayload = {
-                ...formData.selectedTemplate,
+        if (isTemplate && selectedTemplate) {
+            // Mode Library
+            finalData = {
+                ...selectedTemplate,
                 joinCode: generateJoinCode(),
                 ownerId: user.id,
                 isPublished: true,
-                duration: formData.selectedTemplate.duration || 'One-Shot'
+                duration: selectedTemplate.duration || 'One-Shot'
             };
         } else {
-            // Custom World
-            finalPayload = {
-                title: formData.title || `World of ${formData.theme}`,
+            // Mode Incantation
+            finalData = {
+                title: formData.title,
                 description: formData.description,
                 theme: formData.theme.toLowerCase(),
                 duration: formData.scale,
                 mainGenre: formData.theme,
                 subGenre: 'RPG',
-                
-                // DM Config
                 dmPersonality: "Adil & Adaptif", 
                 dmNarrationStyle: 'Langsung & Percakapan',
                 responseLength: 'Standar',
                 rulesConfig: defaultRules,
-                
-                // Visuals & Meta
-                cover_url: `https://picsum.photos/seed/${(formData.title || 'void').replace(/\s/g, '-')}/800/600`,
+                cover_url: `https://picsum.photos/seed/${formData.title.replace(/\s/g, '-')}/800/600`,
                 joinCode: generateJoinCode(),
                 isPublished: false,
                 maxPlayers: 4,
                 isNSFW: false,
-                
-                // State Initialization
                 gameState: 'exploration',
                 currentPlayerId: null,
                 longTermMemory: `Tema: ${formData.theme}. Konflik Awal: ${formData.villain}.`,
                 currentTime: 43200,
                 currentWeather: 'Cerah',
                 worldEventCounter: 0,
-                
-                // Atlas Protocol Placeholders
                 mapImageUrl: '',
                 mapMarkers: [],
                 quests: [],
@@ -135,246 +117,285 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
             };
         }
 
-        const result = await campaignRepository.createCampaign(finalPayload, user.id);
-        if (result) onComplete(result.id);
+        const newCampaign = await campaignRepository.createCampaign(finalData, user.id);
+        if (newCampaign) onComplete(newCampaign.id);
     } catch (error) {
-        console.error("[FATAL] Database Rejection:", error);
-        alert("Gagal menciptakan dunia. Cek konsol.");
+        console.error("Gagal menciptakan dimensi:", error);
+        // Dalam arsitektur paranoid, alert adalah dosa, tapi untuk MVP kita biarkan dulu
+        alert("Ritual gagal. Dewa Dice sedang marah.");
     } finally {
         setIsProcessing(false);
     }
   };
 
-  // --- RENDERERS PER STEP ---
-
-  const renderHeader = (title: string, subtitle: string) => (
-      <div className="shrink-0 px-6 py-4 border-b border-wood bg-black/80 backdrop-blur">
-          <div className="flex justify-between items-start">
-            <div>
-                <h2 className="font-pixel text-gold text-xl tracking-wider">{title}</h2>
-                <p className="font-retro text-faded text-xs">{subtitle}</p>
-            </div>
-            <button 
-                onClick={onCancel} 
-                className="p-2 -mr-2 text-faded hover:text-red-400 active:scale-95 transition-transform"
-            >
-                ✕
-            </button>
-          </div>
-      </div>
-  );
-
-  const renderModeSelect = () => (
-      <div className="flex flex-col gap-4 p-6 h-full justify-center">
-          {/* Option 1: Template */}
-          <button 
-              onClick={() => {
-                  // Skip setup steps for templates, go to a template picker (simplified here to 'just pick one')
-                  // Untuk efisiensi, kita anggap user memilih template langsung memicu review/list
-                  // Di implementasi ini, saya buat simple list selection di step ini
-              }}
-              className="hidden" // Hidden logic placeholder
-          />
-          
-          <div className="grid gap-4">
-            <h3 className="text-center font-pixel text-parchment mb-2">PILIH METODE PENCIPTAAN</h3>
-            
-            <button 
-                onClick={() => setStep('THEME_SELECT')}
-                className="group relative overflow-hidden border-2 border-wood bg-black/50 p-6 text-left hover:border-gold hover:bg-gold/10 transition-all rounded-lg active:scale-[0.98]"
-            >
-                <div className="font-pixel text-lg text-gold mb-1">✍️ TULIS MANTRA BARU</div>
-                <p className="font-retro text-xs text-faded">Ciptakan dunia unik dari nol dengan bantuan Oracle AI.</p>
-            </button>
-
-            <div className="relative py-2 flex items-center">
-                <div className="flex-grow border-t border-wood/30"></div>
-                <span className="shrink-0 px-2 text-[10px] text-faded font-pixel">ATAU GUNAKAN BUKU LAMA</span>
-                <div className="flex-grow border-t border-wood/30"></div>
-            </div>
-
-            {/* Template List Direct Access */}
-            <div className="flex flex-col gap-3 max-h-[40vh] overflow-y-auto custom-scrollbar">
-                {DEFAULT_CAMPAIGNS.map((tpl, idx) => (
-                    <button 
-                        key={idx}
-                        onClick={() => {
-                            setFormData(prev => ({ ...prev, selectedTemplate: tpl }));
-                            commitToDatabase(); // Direct execution for templates
-                        }}
-                        className="flex items-center gap-4 border border-wood/50 p-3 rounded hover:bg-wood/20 transition-colors text-left"
+  // --- HELPER: RENDER CONTENT BY STEP ---
+  const renderContent = () => {
+    switch (step) {
+        case 'METHOD':
+            return (
+                <div className="flex flex-col gap-4 animate-fade-in">
+                    <p className="text-parchment font-retro text-center text-sm mb-2">
+                        Bagaimana dunia ini akan terbentuk?
+                    </p>
+                    
+                    <div 
+                        onClick={() => setStep('LIBRARY')}
+                        className="p-4 border-2 border-wood cursor-pointer hover:bg-white/5 transition-all group relative overflow-hidden"
                     >
-                        <div 
-                            className="w-12 h-12 bg-cover rounded border border-wood shrink-0" 
-                            style={{ backgroundImage: `url(${tpl.cover_url || tpl.image})` }} 
-                        />
-                        <div>
-                            <div className="font-pixel text-sm text-parchment">{tpl.title}</div>
-                            <div className="text-[10px] text-faded">{tpl.mainGenre} • {tpl.duration}</div>
+                        <div className="flex items-center gap-4 z-10 relative">
+                            <div className="text-3xl">📖</div>
+                            <div>
+                                <h3 className="font-pixel text-gold group-hover:text-white">PERPUSTAKAAN (TEMPLATE)</h3>
+                                <p className="text-xs text-faded font-retro">Pilih dari kisah legendaris yang sudah tertulis.</p>
+                            </div>
                         </div>
-                    </button>
-                ))}
-            </div>
-          </div>
-      </div>
-  );
+                    </div>
 
-  const renderThemeSelect = () => (
-      <div className="p-4 grid grid-cols-2 gap-3 overflow-y-auto pb-24">
-          {THEMES.map(t => (
-              <button
-                key={t}
-                onClick={() => {
-                    setFormData(prev => ({ ...prev, theme: t }));
-                    setStep('SCALE_SELECT');
-                }}
-                className={`
-                    h-24 flex flex-col items-center justify-center border-2 rounded-lg transition-all
-                    ${formData.theme === t 
-                        ? 'border-gold bg-gold/20 text-gold' 
-                        : 'border-wood/50 bg-black/30 text-faded hover:border-wood hover:text-parchment'}
-                `}
-              >
-                  <span className="font-pixel text-sm text-center">{t}</span>
-              </button>
-          ))}
-      </div>
-  );
-
-  const renderScaleSelect = () => (
-      <div className="p-6 flex flex-col gap-4">
-          {SCALES.map(s => (
-              <button
-                key={s.id}
-                onClick={() => {
-                    setFormData(prev => ({ ...prev, scale: s.id }));
-                    setStep('DETAILS_INPUT');
-                }}
-                className={`
-                    p-6 border-2 rounded-lg text-left transition-all
-                    ${formData.scale === s.id
-                        ? 'border-gold bg-gold/10' 
-                        : 'border-wood/50 bg-black/30 hover:bg-wood/10'}
-                `}
-              >
-                  <div className="flex justify-between items-center mb-2">
-                      <span className={`font-pixel text-lg ${formData.scale === s.id ? 'text-gold' : 'text-parchment'}`}>
-                          {s.label}
-                      </span>
-                      {formData.scale === s.id && <span className="text-gold">✓</span>}
-                  </div>
-                  <p className="font-retro text-sm text-faded leading-relaxed">
-                      {s.desc}
-                  </p>
-              </button>
-          ))}
-      </div>
-  );
-
-  const renderDetailsInput = () => (
-      <div className="p-6 flex flex-col gap-6 overflow-y-auto pb-24">
-          
-          {/* Judul */}
-          <div className="flex flex-col gap-2">
-              <label className="font-pixel text-xs text-gold uppercase">Judul Dunia</label>
-              <input 
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  placeholder="Contoh: Negeri di Atas Awan"
-                  className="bg-black/50 border border-wood p-4 text-parchment font-retro rounded focus:border-gold outline-none"
-              />
-          </div>
-
-          {/* Villain */}
-          <div className="flex flex-col gap-2">
-              <label className="font-pixel text-xs text-gold uppercase">Sumber Konflik / Musuh</label>
-              <input 
-                  type="text"
-                  value={formData.villain}
-                  onChange={(e) => setFormData({...formData, villain: e.target.value})}
-                  placeholder="Contoh: Raja Iblis yang Bangkit"
-                  className="bg-black/50 border border-wood p-4 text-parchment font-retro rounded focus:border-gold outline-none"
-              />
-          </div>
-
-          {/* AI Assistant */}
-          <div className="p-4 bg-cyan-900/10 border border-cyan-900/50 rounded-lg flex flex-col gap-3">
-                <div className="flex justify-between items-center">
-                    <span className="font-pixel text-xs text-cyan-400">ORACLE ASSISTANCE</span>
-                    <button 
-                        onClick={invokeOracle}
-                        disabled={isProcessing}
-                        className="text-[10px] bg-cyan-900 text-cyan-100 px-3 py-1 rounded border border-cyan-500 hover:bg-cyan-700"
+                    <div 
+                        onClick={() => setStep('THEME')}
+                        className="p-4 border-2 border-dashed border-wood cursor-pointer hover:bg-gold/10 hover:border-gold transition-all group"
                     >
-                        {isProcessing ? "Menerawang..." : "✨ Generate Ide"}
-                    </button>
+                        <div className="flex items-center gap-4">
+                            <div className="text-3xl group-hover:animate-pulse">✨</div>
+                            <div>
+                                <h3 className="font-pixel text-faded group-hover:text-gold">RITUAL PENCIPTAAN (CUSTOM)</h3>
+                                <p className="text-xs text-faded font-retro">Tulis mantramu sendiri dengan bantuan Oracle.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <textarea 
-                    value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    placeholder="Deskripsi dunia akan muncul di sini..."
-                    className="w-full h-24 bg-transparent border-none text-sm text-cyan-100/80 font-retro resize-none focus:outline-none"
-                />
-          </div>
-      </div>
-  );
+            );
+
+        case 'LIBRARY':
+            return (
+                <div className="flex flex-col gap-2 animate-fade-in">
+                    {!selectedTemplate ? (
+                        <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
+                            {DEFAULT_CAMPAIGNS.map((tpl, idx) => (
+                                <div 
+                                    key={idx} 
+                                    onClick={() => setSelectedTemplate(tpl)}
+                                    className="p-3 border-2 border-wood cursor-pointer flex gap-3 hover:bg-white/5"
+                                >
+                                    <img src={tpl.cover_url || tpl.image} className="w-16 h-16 object-cover border border-wood/50" />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-pixel text-gold text-sm truncate">{tpl.title}</div>
+                                        <div className="flex gap-1 mt-1">
+                                            <span className="text-[9px] bg-wood/30 px-1 rounded text-faded border border-wood/30">{tpl.mainGenre}</span>
+                                            <span className="text-[9px] bg-wood/30 px-1 rounded text-faded border border-wood/30">{tpl.duration}</span>
+                                        </div>
+                                        <p className="font-retro text-[10px] text-faded mt-1 line-clamp-1">{tpl.description}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-4 animate-fade-in">
+                            <div className="p-3 bg-black/50 border-2 border-wood">
+                                <div className="h-32 w-full bg-cover bg-center border-b border-wood mb-3 relative" style={{ backgroundImage: `url(${selectedTemplate.cover_url || selectedTemplate.image})` }}>
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent" />
+                                    <h3 className="absolute bottom-2 left-2 font-pixel text-lg text-gold drop-shadow-md">{selectedTemplate.title}</h3>
+                                </div>
+                                <p className="text-xs text-parchment font-retro text-justify mb-4">{selectedTemplate.description}</p>
+                                <div className="grid grid-cols-2 gap-2 text-[10px] text-faded">
+                                    <div className="bg-wood/10 p-2 border border-wood/30">
+                                        <span className="text-gold block">Genre:</span> {selectedTemplate.mainGenre}
+                                    </div>
+                                    <div className="bg-wood/10 p-2 border border-wood/30">
+                                        <span className="text-gold block">Skala:</span> {selectedTemplate.duration}
+                                    </div>
+                                </div>
+                            </div>
+                            <RuneButton label="Pilih Buku Lain" variant="secondary" onClick={() => setSelectedTemplate(null)} fullWidth />
+                        </div>
+                    )}
+                    <div className="flex gap-2 mt-4 relative z-20">
+                        <RuneButton label="KEMBALI" variant="secondary" onClick={() => selectedTemplate ? setSelectedTemplate(null) : setStep('METHOD')} fullWidth />
+                        <RuneButton label="BUKA BUKU INI" fullWidth disabled={!selectedTemplate || isProcessing} onClick={() => manifestWorld(true)} />
+                    </div>
+                </div>
+            );
+
+        case 'THEME':
+            return (
+                <>
+                    <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2 animate-fade-in">
+                        {THEMES.map((t) => (
+                            <div
+                                key={t}
+                                onClick={() => setFormData({...formData, theme: t})}
+                                className={`p-3 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.theme === t ? 'border-gold bg-gold/10' : 'border-wood'}`}
+                            >
+                                <div className="font-pixel text-md text-parchment">{t}</div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex gap-2 mt-4 relative z-20">
+                        <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('METHOD')} fullWidth />
+                        <RuneButton label="LANJUT" fullWidth onClick={() => setStep('SCALE')} />
+                    </div>
+                </>
+            );
+
+        case 'SCALE':
+            return (
+                <>
+                     <div className="flex flex-col gap-4 animate-fade-in">
+                        {SCALES.map((s) => (
+                            <div
+                                key={s.id}
+                                onClick={() => setFormData({...formData, scale: s.id})}
+                                className={`p-4 border-2 cursor-pointer transition-colors ${formData.scale === s.id ? 'border-gold bg-gold/10' : 'border-wood hover:bg-white/5'}`}
+                            >
+                                <div className="font-pixel text-gold text-sm mb-1">{s.label}</div>
+                                <div className="font-retro text-xs text-faded">{s.desc}</div>
+                                {s.id === 'Endless Saga' && (
+                                    <div className="mt-2 text-[9px] bg-red-900/30 text-red-300 px-2 py-1 border border-red-900/50 inline-block rounded">
+                                        ⚠️ EXPERIMENTAL: Procedural Engine
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex gap-2 mt-4 relative z-20">
+                        <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('THEME')} fullWidth />
+                        <RuneButton label="LANJUT" fullWidth onClick={() => setStep('CONCEPT')} />
+                    </div>
+                </>
+            );
+
+        case 'CONCEPT':
+            return (
+                <div className="flex flex-col gap-3 animate-fade-in">
+                    <div className="p-3 bg-black/40 border border-wood rounded space-y-3">
+                        <div>
+                            <label className="text-[10px] text-gold font-pixel block mb-1">NAMA DUNIA</label>
+                            <input 
+                                type="text" 
+                                value={formData.title}
+                                onChange={(e) => setFormData({...formData, title: e.target.value})}
+                                className="w-full bg-black border border-wood p-2 text-parchment font-pixel text-sm focus:border-gold outline-none"
+                                placeholder="Contoh: Eldoria"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] text-gold font-pixel block mb-1">ANCAMAN UTAMA</label>
+                            <input 
+                                type="text" 
+                                value={formData.villain}
+                                onChange={(e) => setFormData({...formData, villain: e.target.value})}
+                                className="w-full bg-black border border-wood p-2 text-parchment font-retro text-sm focus:border-gold outline-none"
+                                placeholder="Contoh: Raja Iblis yang bangkit..."
+                            />
+                        </div>
+                        <div className="relative">
+                            <label className="text-[10px] text-gold font-pixel block mb-1">DESKRIPSI SINGKAT</label>
+                            <textarea 
+                                value={formData.description}
+                                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                                className="w-full bg-black border border-wood p-2 text-faded font-retro text-xs focus:border-gold outline-none h-24 resize-none"
+                                placeholder="Dunia ini hancur karena..."
+                            />
+                            <button 
+                                onClick={invokeOracle}
+                                disabled={isProcessing}
+                                className="absolute bottom-2 right-2 text-[9px] bg-cyan-900/80 border border-cyan-700 text-cyan-200 px-2 py-1 hover:bg-cyan-700 rounded flex items-center gap-1"
+                            >
+                                {isProcessing ? <span className="animate-spin">⚙️</span> : <span>✨</span>} ORACLE
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="flex gap-2 mt-2 relative z-20">
+                        <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('SCALE')} fullWidth />
+                        <RuneButton label="LANJUT" fullWidth disabled={!formData.title} onClick={() => setStep('REVIEW')} />
+                    </div>
+                </div>
+            );
+
+        case 'REVIEW':
+             return (
+                <div className="flex flex-col gap-4 animate-fade-in">
+                    <div className="text-center mb-2">
+                        <h3 className="font-pixel text-gold text-lg">KONFIRMASI RITUAL</h3>
+                        <p className="font-retro text-xs text-faded">Apakah mantramu sudah benar?</p>
+                    </div>
+
+                    <div className="bg-surface border-2 border-gold p-4 shadow-lg relative overflow-hidden">
+                        <div className="absolute top-0 right-0 bg-gold text-black text-[9px] font-bold px-2 py-1">
+                            {formData.scale.toUpperCase()}
+                        </div>
+                        
+                        <h4 className="font-pixel text-parchment text-md mb-1">{formData.title}</h4>
+                        <div className="text-[10px] text-gold mb-3 italic">{formData.theme} RPG</div>
+                        
+                        <p className="font-retro text-xs text-faded mb-3 line-clamp-4">
+                            "{formData.description}"
+                        </p>
+                        
+                        <div className="border-t border-wood/30 pt-2 mt-2">
+                            <p className="text-[10px] text-red-400">
+                                <span className="font-bold">KONFLIK:</span> {formData.villain || "Belum terdeteksi..."}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-2 relative z-20">
+                        <RuneButton label="UBAH MANTRA" variant="secondary" onClick={() => setStep('CONCEPT')} fullWidth />
+                        <RuneButton 
+                            label={isProcessing ? "MEMBUKA DIMENSI..." : "MANIFESTASIKAN"} 
+                            variant="danger" 
+                            disabled={isProcessing} 
+                            onClick={() => manifestWorld(false)} 
+                            fullWidth 
+                        />
+                    </div>
+                </div>
+            );
+            
+        default: return null;
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-surface flex flex-col text-parchment animate-fade-in">
-        
-        {/* 1. DYNAMIC HEADER */}
-        {step === 'MODE_SELECT' && renderHeader("THE LIBRARY", "Pilih takdirmu.")}
-        {step === 'THEME_SELECT' && renderHeader("TEMA DUNIA", "Nuansa apa yang kau cari?")}
-        {step === 'SCALE_SELECT' && renderHeader("SKALA WAKTU", "Seberapa panjang kisah ini?")}
-        {step === 'DETAILS_INPUT' && renderHeader("DETAIL MANTRA", "Ucapkan nama duniamu.")}
-
-        {/* 2. SCROLLABLE CONTENT AREA */}
-        <div className="flex-grow overflow-y-auto bg-gradient-to-b from-black/20 to-black/80">
-            {step === 'MODE_SELECT' && renderModeSelect()}
-            {step === 'THEME_SELECT' && renderThemeSelect()}
-            {step === 'SCALE_SELECT' && renderScaleSelect()}
-            {step === 'DETAILS_INPUT' && renderDetailsInput()}
-        </div>
-
-        {/* 3. SAFE ZONE NAVIGATION (BOTTOM BAR) */}
-        {step !== 'MODE_SELECT' && (
-            <div className="shrink-0 p-4 bg-black border-t border-wood pb-safe flex gap-4">
-                <button 
-                    onClick={() => {
-                        if (step === 'THEME_SELECT') setStep('MODE_SELECT');
-                        if (step === 'SCALE_SELECT') setStep('THEME_SELECT');
-                        if (step === 'DETAILS_INPUT') setStep('SCALE_SELECT');
-                    }}
-                    disabled={isProcessing}
-                    className="px-6 py-3 border border-wood text-faded font-pixel text-xs rounded hover:bg-wood/20"
-                >
-                    KEMBALI
-                </button>
-                
-                <button 
-                    onClick={() => {
-                        if (step === 'DETAILS_INPUT') {
-                            commitToDatabase();
-                        } else {
-                            // Logic next step handled in render methods mostly, but failsafe here
-                        }
-                    }}
-                    disabled={isProcessing || (step === 'DETAILS_INPUT' && !formData.title)}
-                    className={`
-                        flex-grow py-3 font-pixel text-sm rounded shadow-lg transition-all
-                        ${isProcessing 
-                            ? 'bg-wood cursor-wait text-faded' 
-                            : 'bg-gold text-black hover:bg-yellow-500 shadow-gold/20'}
-                    `}
-                >
-                    {isProcessing 
-                        ? "MEMPROSES..." 
-                        : step === 'DETAILS_INPUT' ? "MANIFESTASIKAN!" : "LANJUT"
-                    }
+    <div className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+      <PixelCard className="w-full max-w-md border-gold shadow-pixel-glow bg-surface flex flex-col max-h-[90vh]">
+        {/* HEADER */}
+        <div className="border-b-2 border-wood pb-4 mb-4 shrink-0">
+            <div className="flex justify-between items-center">
+                <h2 className="font-pixel text-gold text-lg md:text-xl tracking-wider">
+                    {step === 'METHOD' && "PILIHAN TAKDIR"}
+                    {step === 'LIBRARY' && "PERPUSTAKAAN KUNO"}
+                    {step === 'THEME' && "TEMA DUNIA"}
+                    {step === 'SCALE' && "SKALA WAKTU"}
+                    {step === 'CONCEPT' && "GULUNGAN MANTRA"}
+                    {step === 'REVIEW' && "MANIFESTASI"}
+                </h2>
+                <button onClick={onCancel} className="text-xs text-faded hover:text-red-400 font-pixel border border-wood px-2 py-1 hover:bg-red-900/30 transition-colors">
+                    X
                 </button>
             </div>
-        )}
+            {/* Progress Indicator (Only for Incantation) */}
+            {['THEME', 'SCALE', 'CONCEPT', 'REVIEW'].includes(step) && (
+                <div className="flex gap-1 mt-2">
+                    {['THEME', 'SCALE', 'CONCEPT', 'REVIEW'].map((s, i) => {
+                         const steps = ['THEME', 'SCALE', 'CONCEPT', 'REVIEW'];
+                         const currentIdx = steps.indexOf(step);
+                         const isActive = i <= currentIdx;
+                         return (
+                             <div key={s} className={`h-1 flex-1 rounded ${isActive ? 'bg-gold' : 'bg-wood/30'}`} />
+                         );
+                    })}
+                </div>
+            )}
+        </div>
+
+        {/* CONTENT */}
+        <div className="flex-grow overflow-y-auto custom-scrollbar pr-1">
+            {renderContent()}
+        </div>
+
+      </PixelCard>
     </div>
   );
 };
