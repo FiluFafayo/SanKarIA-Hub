@@ -1,6 +1,7 @@
 import { dataService } from '../dataService';
 import { Character, CharacterInventoryItem, SpellDefinition, AbilityScores, CharacterFeature, Skill, Ability } from '../../types';
 import { decode } from 'base64-arraybuffer'; // BARU: Impor decoder
+import { CharacterArc } from '../../types'; // Import tipe baru
 
 type DbCharacter = {
   id: string;
@@ -519,4 +520,24 @@ export const characterRepository = {
         throw new Error("Gagal meng-upload blueprint karakter.");
     }
   },
+
+  // BARU: FASE 2 - Menyimpan Takdir Rahasia (The Oath)
+  async saveCharacterArc(arc: CharacterArc): Promise<void> {
+    const supabase = dataService.getClient();
+    
+    const { error } = await supabase.from('character_arcs').insert({
+        character_id: arc.characterId,
+        campaign_id: arc.campaignId,
+        public_goal: arc.publicGoal,
+        secret_agenda: arc.secretAgenda,
+        true_desire: arc.trueDesire,
+        loyalty_score: arc.loyaltyScore,
+        breaking_point: arc.breakingPoint
+    });
+
+    if (error) {
+        console.error("[Repo] Gagal menyimpan Character Arc:", error);
+        // Jangan throw error fatal, karena ini fitur tambahan. Cukup log saja.
+    }
+  }
 };

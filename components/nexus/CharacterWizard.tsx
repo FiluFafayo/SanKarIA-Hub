@@ -49,8 +49,11 @@ import { SPRITE_PARTS } from '../../data/spriteParts'; // BARU: Impor data sprit
 // import { characterRepository } from '../../services/repository/characterRepository';
 import { HfInference } from '@huggingface/inference';
 
-type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'VISUAL' | 'EQUIPMENT' | 'STATS' | 'REVIEW'; // BARU: Tambah step 'VISUAL'
+type WizardStep = 'NAME' | 'RACE' | 'CLASS' | 'BACKGROUND' | 'SOUL' | 'VISUAL' | 'EQUIPMENT' | 'STATS' | 'REVIEW';
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8];
+
+// Type untuk opsi Soul Arc
+type SoulOption = { agenda: string; desire: string; trigger: string };
 
 export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, onCancel }) => {
   const [step, setStep] = useState<WizardStep>('NAME');
@@ -62,6 +65,11 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
   const [selectedEquipment, setSelectedEquipment] = useState<Record<number, EquipmentChoice['options'][0]>>({});
   const [statsMethod, setStatsMethod] = useState<'STANDARD' | 'POINT_BUY' | 'MANUAL'>('STANDARD');
   const [generatedAvatarUrl, setGeneratedAvatarUrl] = useState<string | null>(null);
+  
+  // State untuk The Soul Phase
+  const [soulSuggestions, setSoulSuggestions] = useState<{ light: SoulOption; dark: SoulOption; gray: SoulOption } | null>(null);
+  const [selectedSoul, setSelectedSoul] = useState<SoulOption & { type: 'light' | 'dark' | 'gray' } | null>(null);
+  const [isWhispering, setIsWhispering] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [visualPromptOptions, setVisualPromptOptions] = useState<string[] | null>(null);
   const [promptVariantIndex, setPromptVariantIndex] = useState(2);
@@ -164,6 +172,32 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
       if (selectedSpells.length < max) setSelectedSpells(prev => [...prev, spellName]);
     }
   };
+
+  // LOGIC: THE WHISPER (Generate Secret Agenda)
+  const invokeTheWhisper = async () => {
+    if (isWhispering || soulSuggestions) return;
+    setIsWhispering(true);
+    try {
+        const result = await generationService.suggestSecretAgenda({
+            name: formData.name,
+            race: formData.raceId,
+            class: formData.classId,
+            background: formData.backgroundName
+        });
+        setSoulSuggestions(result);
+    } catch (e) {
+        console.error("The Whisper diam membisu:", e);
+    } finally {
+        setIsWhispering(false);
+    }
+  };
+
+  // Effect: Trigger Whisper saat masuk fase SOUL
+  useEffect(() => {
+      if (step === 'SOUL' && !soulSuggestions) {
+          invokeTheWhisper();
+      }
+  }, [step]);
 
   // Helper: Get Item Details for UI
   const getItemDetails = (name: string) => {
@@ -387,7 +421,37 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
       });
 
       // [Fase 1 Fix] Hapus parameter ownerId, biarkan backend mengambil dari sesi
-      await characterRepository.saveNewCharacter(characterData, inventory, spells);
+      const newChar = await characterRepository.saveNewCharacter(characterData, inventory, spells);
+      
+      // [FASE 2] Simpan Character Arc (Secret Agenda)
+      if (selectedSoul && newChar && newChar.id) {
+          // Kita butuh campaignId, tapi di Wizard ini belum tentu ada campaign context.
+          // Solusi: Gunakan dummy UUID atau biarkan NULL jika SQL mengizinkan.
+          // ATAU: Simpan sebagai 'unassigned' arc.
+          // Untuk sekarang, kita asumsikan karakter ini akan di-assign nanti, 
+          // jadi kita simpan Arc-nya dengan referensi characterId saja.
+          // TAPI: Skema SQL menuntut campaign_id NOT NULL.
+          // WORKAROUND: Kita skip insert DB untuk Arc di sini jika belum join campaign.
+          // Arc akan disimpan di LocalStorage sementara atau di metadata karakter?
+          // IDEALNYA: Character Wizard ini dipanggil DALAM konteks Campaign (saat join).
+          // JIKA dipanggil dari Profile, Arc ini sifatnya 'potensial'.
+          
+          // KEPUTUSAN: Untuk saat ini, kita simpan di 'notes' atau field metadata karakter dulu
+          // atau kita abaikan save ke tabel 'character_arcs' sampai dia join campaign.
+          // TAPI, agar data tidak hilang, kita bisa append ke `background` atau `personalityTrait` sebagai hidden text.
+          
+          // UPDATE: Karena kita Arsitek Paranoid, kita sadar tabel `character_arcs` butuh `campaign_id`.
+          // Karakter yang dibuat di Profile (belum join campaign) TIDAK BISA punya entri di `character_arcs`.
+          // Solusi: Simpan data Soul ini di `true_desire` (jika kolom ada di char) atau append ke `personality_trait`.
+          // Saya akan append ke `personality_trait` dengan penanda khusus agar nanti bisa di-parse saat join campaign.
+          
+          const secretData = `\n\n[SECRET_ARC]\nTYPE: ${selectedSoul.type}\nAGENDA: ${selectedSoul.agenda}\nDESIRE: ${selectedSoul.desire}\nTRIGGER: ${selectedSoul.trigger}`;
+          
+          // Update karakter barusan dengan secret data ini
+          const updatedChar = { ...newChar, personalityTrait: newChar.personalityTrait + secretData };
+          await characterRepository.saveCharacter(updatedChar);
+      }
+
       onComplete();
     } catch (e) {
       console.error("Failed to summon soul:", e);
@@ -468,6 +532,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
           {step === 'RACE' && "ASAL USUL (RAS)"}
           {step === 'CLASS' && "TAKDIR (KELAS)"}
           {step === 'BACKGROUND' && "LATAR BELAKANG"}
+          {step === 'SOUL' && "BISIKAN JIWA (RAHASIA)"}
           {step === 'VISUAL' && "PENAMPAKAN (VISUAL)"}
           {step === 'STATS' && "ATRIBUT KEKUATAN"}
         </h2>
@@ -701,13 +766,86 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
             )}
             <div className="flex gap-2 mt-4 relative z-20">
               <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('CLASS')} fullWidth />
-              <RuneButton label="LANJUT" fullWidth disabled={!formData.backgroundName} onClick={() => setStep('VISUAL')} />
+              <RuneButton label="LANJUT" fullWidth disabled={!formData.backgroundName} onClick={() => setStep('SOUL')} />
             </div>
           </>
         )}
 
+        {/* STEP BARU: SOUL PHASE (THE WHISPER) */}
+        {step === 'SOUL' && (
+            <div className="flex flex-col gap-4 animate-fade-in">
+                <div className="text-center border-b border-wood/30 pb-2">
+                   <h3 className="font-pixel text-lg text-gold mb-1">CERMIN KEGELAPAN</h3>
+                   <p className="text-parchment font-retro text-xs italic">
+                       "Aku melihat apa yang kau sembunyikan di balik mata itu..."
+                   </p>
+                </div>
+
+                {isWhispering ? (
+                    <div className="h-[300px] flex flex-col items-center justify-center gap-4">
+                        <div className="w-12 h-12 border-4 border-t-gold border-wood rounded-full animate-spin"></div>
+                        <p className="font-pixel text-faded text-xs animate-pulse">MEMBACA MASA LALU...</p>
+                    </div>
+                ) : soulSuggestions ? (
+                    <div className="flex flex-col gap-3 overflow-y-auto max-h-[400px] pr-2">
+                        {(['light', 'gray', 'dark'] as const).map((type) => {
+                            const opt = soulSuggestions[type];
+                            const isSelected = selectedSoul?.type === type;
+                            
+                            let borderClass = 'border-wood';
+                            let bgClass = 'bg-black/40';
+                            let titleColor = 'text-faded';
+
+                            if (isSelected) {
+                                if (type === 'light') { borderClass = 'border-cyan-500'; bgClass = 'bg-cyan-900/20'; titleColor = 'text-cyan-400'; }
+                                if (type === 'gray') { borderClass = 'border-gray-400'; bgClass = 'bg-gray-700/20'; titleColor = 'text-gray-300'; }
+                                if (type === 'dark') { borderClass = 'border-red-600'; bgClass = 'bg-red-900/20'; titleColor = 'text-red-500'; }
+                            }
+
+                            return (
+                                <div 
+                                    key={type}
+                                    onClick={() => setSelectedSoul({ ...opt, type })}
+                                    className={`p-3 border-2 cursor-pointer transition-all ${borderClass} ${bgClass} hover:bg-white/5 relative`}
+                                >
+                                    <div className={`font-pixel text-xs mb-1 uppercase flex justify-between items-center ${titleColor}`}>
+                                        <span>JALUR {type === 'light' ? 'PENGORBANAN' : type === 'gray' ? 'DILEMA' : 'AMBISI'}</span>
+                                        {isSelected && <span className="text-[10px]">✅ TERPILIH</span>}
+                                    </div>
+                                    <p className="font-retro text-parchment text-xs mb-2">"{opt.agenda}"</p>
+                                    <div className="text-[10px] text-faded border-t border-white/10 pt-1 mt-1">
+                                        <span className="text-gold">Trigger:</span> {opt.trigger}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="text-center text-red-500 font-pixel">
+                        GAGAL MENDENGAR BISIKAN.
+                        <button onClick={invokeTheWhisper} className="block mx-auto mt-2 text-gold underline">COBA LAGI</button>
+                    </div>
+                )}
+
+                <div className="flex gap-2 mt-2 relative z-20">
+                    <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('BACKGROUND')} fullWidth />
+                    <RuneButton 
+                        label="IKAT SUMPAH" 
+                        fullWidth 
+                        disabled={!selectedSoul} 
+                        onClick={() => setStep('VISUAL')} 
+                    />
+                </div>
+            </div>
+        )}
+
         {/* BARU: Step Visual Kustomisasi */}
         {step === 'VISUAL' && (
+            <div className="flex flex-col gap-4 animate-fade-in">
+            <div className="flex gap-2 mt-2 relative z-20">
+              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('SOUL')} fullWidth />
+              <RuneButton label="LANJUT" fullWidth onClick={() => setStep('EQUIPMENT')} />
+            </div>
           <div className="flex flex-col gap-4 animate-fade-in">
             <div className="text-center border-b border-wood/30 pb-2">
               <h3 className="font-pixel text-lg text-gold mb-1">KUSTOMISASI</h3>

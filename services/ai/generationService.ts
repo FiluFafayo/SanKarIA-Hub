@@ -713,6 +713,51 @@ class GenerationService {
             };
         }
     }
+
+    // BARU: FASE 2 - The Whisper (Secret Agenda Generator)
+    async suggestSecretAgenda(data: { name: string; race: string; class: string; background: string }): Promise<{
+        light: { agenda: string; desire: string; trigger: string };
+        dark: { agenda: string; desire: string; trigger: string };
+        gray: { agenda: string; desire: string; trigger: string };
+    }> {
+        const prompt = `Anda adalah 'The Whisper', suara hati terdalam dari karakter RPG ini.
+        Identitas: ${data.name} (${data.race} ${data.class}, Background: ${data.background}).
+
+        Berikan 3 RAHASIA GELAP/KOMPLEKS yang mungkin mereka sembunyikan dari party mereka (teman petualang).
+        Rahasia ini harus memicu potensi KONFLIK atau DRAMA di masa depan.
+        
+        1. LIGHT (Devosi/Pengorbanan): Niat baik tapi berbahaya.
+        2. DARK (Ambisi/Dendam): Egois atau jahat.
+        3. GRAY (Dilema/Hutang Budi): Terpaksa melakukan sesuatu.
+
+        Output JSON Format:
+        {
+            "light": { "agenda": "...", "desire": "...", "trigger": "Jika party menyakiti [X], aku akan berkhianat." },
+            "dark": { "agenda": "...", "desire": "...", "trigger": "..." },
+            "gray": { "agenda": "...", "desire": "...", "trigger": "..." }
+        }
+        Bahasa Indonesia.`;
+
+        const call = async (client: any) => {
+            const response = await client.models.generateContent({
+                model: geminiService.getTextModelName(),
+                contents: prompt,
+                config: { responseMimeType: "application/json" }
+            });
+            return JSON.parse(response.text);
+        };
+
+        try {
+            return await geminiService.makeApiCall(call);
+        } catch (e) {
+            // Fallback generic
+            return {
+                light: { agenda: "Melindungi artefak suci keluarga.", desire: "Menebus dosa masa lalu.", trigger: "Jika artefak dicuri." },
+                dark: { agenda: "Mencari kekuatan terlarang.", desire: "Menjadi dewa.", trigger: "Jika ada yang menghalangi ritual." },
+                gray: { agenda: "Membayar hutang pada sindikat.", desire: "Kebebasan.", trigger: "Jika sindikat menagih nyawa." }
+            };
+        }
+    }
 }
 
 export const generationService = new GenerationService();

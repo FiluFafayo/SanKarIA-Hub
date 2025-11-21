@@ -271,6 +271,19 @@ export interface ActiveEffect {
 // Ini adalah gabungan dari data di tabel 'characters', 
 // 'character_inventory', dan 'character_spells'.
 // Ini adalah SSoT untuk Karakter, persisten di semua campaign.
+export interface CharacterArc {
+    id?: string;
+    characterId: string;
+    campaignId: string;
+    publicGoal: string;
+    secretAgenda: string;
+    trueDesire: string;
+    loyaltyScore: number;
+    breakingPoint: string;
+    milestones?: string[];
+    isCompleted?: boolean;
+}
+
 export interface Character {
     id: string;
     ownerId: string; // 'owner_id' dari 'profiles'
