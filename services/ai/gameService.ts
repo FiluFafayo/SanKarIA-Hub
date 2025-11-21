@@ -179,6 +179,32 @@ const TOOLS: FunctionDeclaration[] = [
             },
             required: ['npcId', 'characterId', 'change', 'reason']
         }
+    },
+    // FASE 3: ATLAS PROTOCOL TOOLS
+    {
+        name: 'travel_to_location',
+        description: "Memindahkan party ke lokasi/peta baru. Panggil ini saat pemain memutuskan untuk pergi ke tempat lain (misal: Masuk Dungeon, Pergi ke Kota Sebelah).",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                locationName: { type: Type.STRING, description: "Nama lokasi tujuan (misal: 'Goa Kristal', 'Ibukota')." },
+                travelTimeDays: { type: Type.NUMBER, description: "Lama perjalanan dalam hari (0 jika instan)." },
+                encounterChance: { type: Type.STRING, enum: ['Safe', 'Low', 'High'], description: "Risiko perjalanan." }
+            },
+            required: ['locationName']
+        }
+    },
+    {
+        name: 'advance_story_node',
+        description: "Menandai kemajuan signifikan dalam cerita (Checkpoint). Panggil saat bos kalah, rahasia besar terungkap, atau pemain mencapai tujuan utama.",
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                nodeTitle: { type: Type.STRING, description: "Judul babak baru cerita (misal: 'Kebangkitan Raja Iblis')." },
+                summary: { type: Type.STRING, description: "Ringkasan apa yang baru saja diselesaikan." }
+            },
+            required: ['nodeTitle', 'summary']
+        }
     }
 ];
 
@@ -192,6 +218,11 @@ class GameService {
 
         // (Poin 4) Konteks Quest/NPC diperkaya
         const questContext = `Misi Aktif: ${JSON.stringify(campaign.quests.filter(q => q.status === 'active').map(q => ({ title: q.title, id: q.id }))) || 'Tidak ada'}`;
+        
+        // FASE 3: Konteks Atlas & Grand Line
+        const locationContext = `Lokasi Aktif: ${campaign.activeMapId ? `Peta ID: ${campaign.activeMapId}` : campaign.currentPlayerLocation || 'Tidak diketahui'}`;
+        const storyContext = `Babak Cerita: ${campaign.currentStoryNodeId || 'Awal Petualangan'}`;
+
         // (Poin 4) Kirim opini NPC (tapi BUKAN rahasia)
         const npcContext = `Konteks NPC: ${JSON.stringify(campaign.npcs.map(n => ({ id: n.id, name: n.name, disposition: n.disposition, location: n.location, opinion: n.opinion || {} }))) || 'Tidak ada NPC'}`;
 
@@ -222,7 +253,9 @@ class GameService {
         return `KONTEKS KAMPANYE:
         - ${turnTrace}
         - Cerita Jangka Panjang: ${campaign.longTermMemory}
-        - State Dunia: ${worldState}. Lokasi Saat Ini: ${campaign.currentPlayerLocation || 'Tidak diketahui'}.
+        - State Dunia: ${worldState}.
+        - ${locationContext}
+        - ${storyContext}
         - ${questContext}
         - ${npcContext}
         
@@ -278,7 +311,8 @@ class GameService {
         4.  ATURAN EKSPLORASI: Jika 'exploration', Anda WAJIB mengisi 'choices' (selalu 3 pilihan).
         5.  PILIHAN KE-3: Pilihan 1 & 2 harus logis. Pilihan 3 harus sedikit 'brilian', berbahaya, atau acak/kreatif.
         6.  ALAT SEKUNDER: Anda BISA memanggil 'add_items', 'update_quest', 'log_npc', atau 'award_xp' BERSAMAAN dengan mekanik utama.
-        7.  JANGAN panggil 'spawn_monsters' BERSAMAAN dengan 'choices' or 'rollRequest'.`;
+        7.  TRAVEL & STORY: Jika pemain berpindah tempat, GUNAKAN 'travel_to_location'. Jika babak cerita selesai, GUNAKAN 'advance_story_node'.
+        8.  JANGAN panggil 'spawn_monsters' BERSAMAAN dengan 'choices' or 'rollRequest'.`;
 
         const prompt = this.buildPrompt(campaign, players, playerAction, actingCharacterId); // (Poin 6)
 

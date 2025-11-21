@@ -530,11 +530,36 @@ export interface Campaign {
     explorationGrid: number[][]; // (Skala Zoom-Out, 10000+)
     fogOfWar: boolean[][]; // Grid paralel untuk fog of war
 
+    // --- FASE 3: THE ATLAS ENGINE ---
+    activeMapId?: string; // ID dari entry di tabel 'world_maps'
+    currentStoryNodeId?: string; // ID dari entry di tabel 'story_nodes'
+    availableMaps?: { id: string; name: string }[]; // Cache daftar peta yang terbuka (untuk Travel UI)
+    // -------------------------------
+
     // Battle State (BARU)
     battleState: BattleState | null; // Null jika tidak sedang kombat
     
     // Posisi Pemain di Peta Eksplorasi (BARU: FASE 5)
     playerGridPosition: { x: number; y: number };
+}
+
+// BARU: Definisi Atlas Protocol
+export interface WorldMap {
+    id: string;
+    campaignId: string;
+    name: string;
+    gridData: number[][];
+    fogData: boolean[][];
+    markers: MapMarker[];
+    isActive: boolean;
+}
+
+export interface StoryNode {
+    id: string;
+    title: string;
+    description?: string;
+    status: 'locked' | 'available' | 'active' | 'completed' | 'skipped';
+    type: 'main_arc' | 'side_story' | 'character_arc';
 }
 
 // =================================================================

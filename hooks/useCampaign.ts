@@ -119,11 +119,24 @@ type Action =
 		};
 	}
 	| { type: "SET_FOG_OF_WAR"; payload: boolean[][] } // BARU: Fase 5
-	| { type: "CLEAR_BATTLE_STATE" } // BARU
-	| {
-		type: "ADVANCE_TIME";
-		payload: number; // Detik yang ditambahkan
-	}
+    | { type: "CLEAR_BATTLE_STATE" } // BARU
+    // FASE 3: THE ATLAS ENGINE ACTIONS
+    | { 
+        type: "LOAD_MAP"; 
+        payload: { 
+            mapId: string; 
+            name: string; 
+            grid: number[][]; 
+            fog: boolean[][]; 
+            markers: MapMarker[];
+            imageUrl?: string;
+        } 
+    }
+    | { type: "UPDATE_STORY_NODE"; payload: string } // Set current node ID
+    | {
+        type: "ADVANCE_TIME";
+        payload: number; // Detik yang ditambahkan
+    }
 	| {
 		// (Poin 7) Aksi baru untuk XP
 		type: "AWARD_XP";
@@ -437,9 +450,29 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
 			};
 
 		case "SET_FOG_OF_WAR": // BARU: Fase 5
-			return { ...state, fogOfWar: action.payload };
+            return { ...state, fogOfWar: action.payload };
 
-		case "MOVE_UNIT": {
+        // FASE 3: Reducer Atlas Engine
+        case "LOAD_MAP": {
+            return {
+                ...state,
+                activeMapId: action.payload.mapId,
+                // Ganti data peta aktif
+                explorationGrid: action.payload.grid,
+                fogOfWar: action.payload.fog,
+                mapMarkers: action.payload.markers,
+                mapImageUrl: action.payload.imageUrl || state.mapImageUrl, // Pertahankan lama jika baru null, atau ganti
+                // Reset posisi player ke tengah (atau titik spawn khusus nanti)
+                playerGridPosition: { x: 50, y: 50 },
+                // Reset battle state saat pindah peta
+                battleState: null, 
+            };
+        }
+        case "UPDATE_STORY_NODE": {
+            return { ...state, currentStoryNodeId: action.payload };
+        }
+
+        case "MOVE_UNIT": {
 			// Diadaptasi dari P2 (ai-native...)
 			if (!state.battleState) return state;
 			const { unitId, newPosition, cost } = action.payload;
@@ -550,10 +583,17 @@ export const useCampaign = (
 			cost: number;
 		}) => dispatch({ type: "MOVE_UNIT", payload: payload });
 		const clearBattleState = () => dispatch({ type: "CLEAR_BATTLE_STATE" }); // BARU
-		const setFogOfWar = (fog: boolean[][]) =>
-			dispatch({ type: "SET_FOG_OF_WAR", payload: fog }); // BARU: Fase 5
+        const setFogOfWar = (fog: boolean[][]) =>
+            dispatch({ type: "SET_FOG_OF_WAR", payload: fog }); // BARU: Fase 5
 
-		// (Poin 5) Ganti implementasi action
+        // FASE 3: Action Helpers
+        const loadMap = (mapData: { mapId: string; name: string; grid: number[][]; fog: boolean[][]; markers: MapMarker[]; imageUrl?: string }) => 
+            dispatch({ type: "LOAD_MAP", payload: mapData });
+        
+        const updateStoryNode = (nodeId: string) => 
+            dispatch({ type: "UPDATE_STORY_NODE", payload: nodeId });
+
+        // (Poin 5) Ganti implementasi action
 		const advanceTime = (seconds: number) =>
 			dispatch({ type: "ADVANCE_TIME", payload: seconds });
 		const setWeather = (weather: WorldWeather) =>
@@ -588,12 +628,16 @@ export const useCampaign = (
 			setBattleGrid,
 			setBattleMapImage,
 			setBattleUnits,
-			setActiveBattleUnit,
-			moveUnit,
-			clearBattleState, // BARU
-			setFogOfWar, // BARU
+            setActiveBattleUnit,
+            moveUnit,
+            clearBattleState, // BARU
+            setFogOfWar, // BARU
+            
+            // FASE 3
+            loadMap,
+            updateStoryNode,
 
-			// (Poin 5) Ganti
+            // (Poin 5) Ganti
 			advanceTime,
 			setWeather,
 			awardXp, // (Poin 7)
