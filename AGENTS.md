@@ -1,124 +1,131 @@
-# AGENTS.md - Protokol Arsitektur Grimoire v1.1
+# AGENTS.md - Protokol Arsitektur Grimoire v1.2 (Full Context)
 **Dokumen Referensi:** Post-Mortem v0.x & Manifesto v1.x
-**Status:** AKTIF (Stabil Pasca "Fase Final")
+**Status:** RILIS STABIL (Fase Konstruksi Selesai - Masuk Runtime Testing)
 **Penjaga Protokol:** Arsitek Sistem & Lead QA Paranoid
 
 ---
 
-## 1. PENDAHULUAN: AUDIT SISTEM LAMA (v0.x)
+## 1. HISTORI & KONTEKS: MENGAPA KITA ADA DI SINI?
 
-Dokumen ini dibuat setelah keputusan radikal untuk melakukan **"Nuclear Reset"** pada keseluruhan UI/UX SanKarIA Hub. Untuk memahami mengapa reset ini diperlukan, kita harus jujur menganalisis arsitektur lama.
+Bagian ini dipertahankan agar AI di masa depan memahami alasan di balik keputusan arsitektur saat ini.
 
-### 1.1. Filosofi Sistem Lama (v0.x)
+### 1.1. Audit Post-Mortem Sistem Lama (v0.x "Nexus Sanctum")
 Sistem lama adalah **"Web App yang Dipaksakan Menjadi VTT"**.
-Fokus utamanya adalah fungsionalitas backend (AI DM, Supabase Sync) dengan frontend yang "cukup baik".
+* **Filosofi:** Fokus fungsionalitas backend (Supabase Sync) dengan frontend generik.
+* **Arsitektur:** `ViewManager.tsx` yang menukar-nukar halaman penuh (Full Page Swap).
+* **UI Kit:** ShadCN/UI (Flat, Modern, Desktop-first). Sangat tidak cocok untuk game fantasi.
+* **Kelemahan Fatal (Alasan Nuclear Reset):**
+    1.  **Game Feel Nol:** Terasa seperti membuka dashboard admin/Jira, bukan game.
+    2.  **UI Bloat:** `GameScreen.tsx` adalah monster monolitik yang tidak responsif di mobile.
+    3.  **Dead-End Logic:** Navigasi berbasis URL memecah imersi dan state sering hilang saat refresh.
 
-### 1.2. Arsitektur & Teknologi Lama (v0.x)
-* **UI Framework:** React + Vite.
-* **UI Kit:** **ShadCN/UI** (Modern, Flat, Desktop-first).
-* **Layout:** Arsitektur "Web App" klasik.
-    * `AppLayout.tsx`: Mengatur Sidebar, Header, dan Content Area.
-    * `ViewManager.tsx`: Mengatur "halaman" mana yang tampil.
-* **State:** Zustand (`appStore`, `gameStore`) + React Context.
-* **Navigasi:** Berbasis URL/View-swapping. User merasa "pindah halaman web".
-
-### 1.3. Kelemahan Fatal (Alasan "Nuclear Reset")
-1.  **Game Feel = 0:** Terasa seperti membuka *dashboard* admin atau Jira.
-2.  **UI Bloat (Desktop-First):** `GameScreen.tsx` adalah monster monolitik 3-kolom.
-3.  **Navigasi Rusak:** Menggunakan *bottom nav* yang memecah imersi.
-4.  **Inkonsistensi Visual:** Bentrok antara Pixel Art AI dan Flat UI.
+### 1.2. Konsepsi Sistem Baru (v1.x "Grimoire Engine")
+* **Filosofi:** **"Game-First, Mobile-First, Retro-Soul."**
+* **Arsitektur:** **Scene-based State Machine** (BOOT -> NEXUS -> EXPLORATION <-> BATTLE).
+* **UI Kit:** **"Grimoire UI"** (Custom, Pixel-art borders, Skeuomorphic).
+* **Prinsip:** "Information on Demand, Thumb Zone Priority". Data sekunder (Sheet/Tas) disembunyikan di Drawer, layar utama untuk Visual Dunia.
 
 ---
 
-## 2. KONSEPSI SISTEM BARU (v1.x "Grimoire")
+## 2. ARSITEKTUR STATE MACHINE (CORE v1.2)
 
-Ini adalah arsitektur yang sedang kita bangun.
+Jantung aplikasi bukan lagi Router, melainkan State Machine di `App.tsx` yang diawasi ketat.
 
-### 2.1. Filosofi Sistem Baru (v1.x)
-**"Game-First, Mobile-First."**
-Kita membuat *game client*. Estetika adalah **Retro RPG (Slay the Spire-style)**: semi-skeuomorphic, pixel-border, hangat, dan fokus.
-
-### 2.2. Arsitektur & Teknologi Baru (v1.x)
-* **UI Kit:** **"Grimoire UI"** (Custom, Hand-made).
-    * `PixelCard`, `RuneButton`, `StatBar`, `AvatarFrame`, `LogDrawer`.
-* **Layout:** **Scene-based State Machine.**
-    * `App.tsx` menjadi *controller* utama (`BOOT`, `NEXUS`, `BATTLE`, `EXPLORATION`).
-    * `GameLayout.tsx`: Viewport **Portrait 9:16**.
-* **Navigasi:**
-    * Tidak ada *page routing*. Interaksi terjadi dalam *Scene*.
-    * Informasi sekunder diakses via **Drawers** atau **Modal**.
-* **Core Principle:** **"Information on Demand, Thumb Zone Priority"**.
+### 2.1. The Four States
+1.  **BOOT:**
+    * Inisialisasi Auth (Supabase Gotrue).
+    * Inisialisasi Data SSoT (Single Source of Truth) dari DB.
+    * *Visual:* "Grimoire Loading Screen" (bukan log teks kasar).
+2.  **NEXUS (The Hub):**
+    * Pilih Karakter (Campfire).
+    * Buat/Gabung Campaign (Dungeon Gate).
+    * *Logic:* Memastikan user memiliki `playingCharacter` dan `playingCampaign` sebelum diizinkan lanjut.
+3.  **EXPLORATION (The World):**
+    * **Wadah:** `ExplorationScene.tsx`.
+    * **Fungsi:** Roleplay bebas, Navigasi Peta (Grid/Fog), Interaksi NPC.
+    * **Watcher:** Memantau `campaign.gameState`. Jika berubah jadi 'combat', otomatis lempar ke BATTLE.
+4.  **BATTLE (The War Room):**
+    * **Wadah:** `BattleScene.tsx`.
+    * **Fungsi:** Mode Taktis (Initiative, Action Economy, HP Management).
+    * **Fitur:** Dual-View (Theater of Mind vs Tactical Grid).
+    * **Exit:** Saat musuh habis, state dikembalikan ke EXPLORATION.
 
 ---
 
-## 3. STATUS IMPLEMENTASI & PERBANDINGAN (v0.x vs v1.x)
+## 3. KOMPARASI IMPLEMENTASI: NEXUS SANCTUM (LAMA) VS GRIMOIRE (BARU)
 
-*Update v1.1: Wizard & Rules Engine Completed*
+Tabel ini menunjukkan evolusi fitur.
+*Status Update: Semua fitur kritikal Fase 0-6 kini berstatus **SELESAI**.*
 
-| Fitur | Sistem Lama (v0.x) | Sistem Baru (v1.x "Grimoire") | Status Implementasi (v1.x) |
+| Fitur | Sistem Lama (v0.x Nexus Sanctum) | Sistem Baru (v1.x Grimoire Engine) | Status Terkini (v1.2) |
 | :--- | :--- | :--- | :--- |
-| **Arsitektur Layout** | `AppLayout` + `ViewManager`. | `GameLayout` + `App.tsx`. | **SELESAI (Fase 0)** |
-| **UI Kit** | ShadCN/UI. | Grimoire UI Kit. | **SELESAI (Fase 1)** |
-| **Menu Utama** | `NexusSanctum.tsx`. | `NexusScene.tsx`. | **SELESAI (Fase 2)** |
-| **Character Wizard** | `CreateCharacterWizard.tsx`. | `CharacterWizard.tsx` (Static Assets, 5e Logic). | **TERVALIDASI (Fase 0 & 1)** |
-| **Campaign Wizard** | `CreateCampaignView.tsx`. | `CampaignWizard.tsx` (3-Step, Rules Config). | **TERVALIDASI (Fase Final)** |
-| **Gameplay HUD** | `GameScreen.tsx`. | `BattleScene.tsx` (3 zona mobile-first). | **SELESAI (Fase 3)** |
-| **Akses Chat/Log** | Panel terpisah. | `LogDrawer.tsx`. | **SELESAI (Fase 1 & 3)** |
-| **Logika Combat** | `useCombatSystem`. | `useCombatSystem` (Re-wired). | **SELESAI (Fase 3.5)** |
-| **Logika Eksplorasi** | `useExplorationSystem`. | Belum ada `ExplorationScene.tsx`. | **BELUM IMPLEMENTASI** |
-| **Visual Eksplorasi** | `ExplorationMap.tsx`. | Belum ada `ExplorationScene.tsx`. | **BELUM IMPLEMENTASI** |
-| **Character Sheet** | Panel InfoPanel. | Belum ada (Drawer/Modal baru dibutuhkan). | **BELUM IMPLEMENTASI** |
-| **Inventory** | Panel InfoPanel. | Belum ada (Drawer/Modal baru dibutuhkan). | **BELUM IMPLEMENTASI** |
+| **Engine Layout** | `AppLayout` + `ViewManager` (Web-style) | `GameLayout` + `App.tsx` (Game Loop) | **SELESAI** |
+| **Visual Style** | ShadCN (Flat/Corporate) | Grimoire Kit (Pixel/Retro/RPG) | **SELESAI** |
+| **Navigasi** | Sidebar/Bottom Nav konvensional | Scene Transition & Drawers | **SELESAI** |
+| **Character Creation** | Wizard panjang membosankan | `CharacterWizard` (Imersif, Step-by-step) | **SELESAI** |
+| **Mode Eksplorasi** | Halaman statis / Teks saja | `ExplorationScene` + Peta Grid + Fog of War | **SELESAI** |
+| **Mode Combat** | `GameScreen` (Teks berat, membingungkan) | `BattleScene` (Visual, Dual-Mode, Targeting) | **SELESAI** |
+| **Inventory** | List teks biasa di panel info | `InventoryDrawer` (Grid Item, Filter Equip) | **SELESAI** |
+| **Character Sheet** | Panel info yang selalu terlihat (makan tempat) | `CharacterSheetDrawer` (Tab Stats/Skill/Spell) | **SELESAI** |
+| **Roleplay Input** | Chatbox biasa | Input Teks Sentral + PTT (Voice - *Planned*) | **SELESAI** |
+| **AI Dungeon Master** | Chatbot terpisah | **Invisible Service** yang mengontrol narasi & aturan | **SELESAI** |
 
 ---
 
-## 4. AGEN & PERSONA (WAJIB DIPATUHI)
+## 4. PROTOKOL AGEN (SOP TERBARU)
+
+Agen AI yang membaca dokumen ini harus mengadopsi persona berikut saat memodifikasi kode.
 
 ### Agent 1: THE ARCHITECT (System & QA)
-**Tugas:** Menjaga struktur folder, refactoring, dan keamanan kode.
-**SOP:**
-* Fokus pada *decoupling*. UI tidak boleh tahu soal AI.
-* Pantau *circular dependency* (Contoh kasus: `classes.ts` vs `defaultCharacters.ts`).
+**Tugas:** Menjaga Stabilitas & Integritas Data.
+* **Aturan Emas:** "Jangan biarkan User terjebak di State mati."
+* **Fokus:**
+    * Sinkronisasi State: Pastikan `campaignActions` selalu meng-update Store global.
+    * Validasi Transisi: Cek data (HP, Inventory) saat pindah dari Explore ke Combat dan sebaliknya.
+    * Clean UI: Jangan biarkan error teknis (seperti Clock Skew) merusak imersi pemain. Tampilkan Loading Screen.
 
-### Agent 2: THE DUNGEON MASTER (AI Game Logic)
-**Tugas:** Menangani narasi, NPC, dan alur cerita.
-**SOP:**
-* `gameService` adalah "Otak".
-* Patuhi `CampaignRules` (Level Awal, XP/Milestone) yang tersimpan di database.
+### Agent 2: THE DUNGEON MASTER (AI Logic)
+**Tugas:** Menjaga Jiwa RPG & Narasi.
+* **Aturan Emas:** "Angka boleh kaku, tapi cerita harus cair."
+* **Fokus:**
+    * Interpretasi Niat: Ubah input teks pemain ("Aku salto di atas meja") menjadi mekanik game (Dex Check) yang relevan.
+    * Flavor Text: Gunakan `LogDrawer` untuk mendeskripsikan hasil, bukan cuma angka.
 
-### Agent 3: THE RULE LAWYER (DnD 5e Mechanics)
-**Tugas:** Validasi aturan.
-**SOP:**
-* `services/rulesEngine.ts` adalah kitab suci.
-* Karakter baru WAJIB memiliki Skill, Spell (jika Caster), dan Equipment yang legal.
+### Agent 3: THE RULE LAWYER (5e Mechanics)
+**Tugas:** Menjaga Keseimbangan & Aturan Main.
+* **Aturan Emas:** "Adil itu kejam."
+* **Fokus:**
+    * Action Economy: Pastikan pemain tidak menyerang 2x jika cuma punya 1 Action.
+    * Resource Management: Kurangi Spell Slot & Item Count secara akurat.
+    * Validasi Target: Serangan harus punya target yang valid (HP > 0, Jarak cukup).
 
-### Agent 4: THE ARTIFICER (UI/UX & Frontend)
-**Tugas:** Menyusun tampilan Grimoire UI.
-**SOP:**
-* **DILARANG KERAS** menggunakan tag HTML telanjang.
-* **Asset Protocol:** Gunakan `getStaticAvatar()` untuk ras standar. Jangan memanggil AI Image Generation untuk aset statis demi performa & biaya.
-* Styling WAJIB menggunakan palet Tailwind kustom (`bg-surface`, `border-wood`).
+### Agent 4: THE ARTIFICER (UI/UX)
+**Tugas:** Menjaga Estetika & Kenyamanan (Thumb Zone).
+* **Aturan Emas:** "Layar HP itu kecil."
+* **Fokus:**
+    * Gunakan Drawer/Modal untuk informasi sekunder.
+    * Tombol aksi utama harus besar dan mudah dijangkau jempol kanan/kiri bawah.
+    * Hindari scroll panjang di tengah pertarungan.
 
 ---
 
-## 5. ROADMAP SISA (CRITICAL PATH)
+## 5. ROADMAP MASA DEPAN (v1.3+)
 
-Fitur kritis yang masih hilang dan harus diimplementasikan:
+Fase konstruksi fundamental (Fase 0-6) telah dinyatakan **SELESAI**. Kita sekarang bergerak ke fase *Polish & Expansion*.
 
-1.  **FASE 4: EKSPLORASI**
-    * Buat `ExplorationScene.tsx`.
-    * Integrasikan `useExplorationSystem`.
-    * Tampilkan visual peta di "Stage Area".
+1.  **FASE 7: SENSORY FEEDBACK (Audio & Haptics)**
+    * Menambahkan BGM (Ambient/Combat).
+    * SFX untuk interaksi UI dan Dice Roll.
+    * Getaran (Haptics) untuk device mobile.
 
-2.  **FASE 5: THE GRIMOIRES (Buku Mantra & Tas)**
-    * Buat `CharacterSheetDrawer.tsx` (Modal/Drawer).
-    * Buat `InventoryDrawer.tsx` (Modal/Drawer).
-    * *Dependency:* Data karakter kini sudah lengkap (Fase 1 Fix), tinggal menampilkannya.
+2.  **FASE 8: REALTIME MULTIPLAYER (The Gathering)**
+    * Validasi sinkronisasi posisi player lain di `ExplorationMap`.
+    * Sinkronisasi inisiatif dan giliran combat antar klien.
 
-3.  **FASE 6: VISUAL COMBAT (Upgrade Opsional)**
-    * Integrasikan ulang `BattleMapRenderer.tsx`.
-    * Toggle "Theater of the Mind" vs "Tactical Grid".
+3.  **FASE 9: KONTEN & KEDALAMAN**
+    * Implementasi Level Up yang lengkap (Feats, Subclass).
+    * Perluasan database Item dan Monster.
 
-4.  **FASE 7: MULTIPLAYER RE-SYNC**
-    * Validasi sinkronisasi Realtime di `BattleScene`.
-    * Pastikan HP & Log Party terupdate live.
+4.  **FASE 10: OPTIMASI PERFORMA**
+    * Code splitting untuk Scene yang berat.
+    * Caching aset gambar yang agresif.
