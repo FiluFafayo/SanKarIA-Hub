@@ -9,33 +9,25 @@ import { GrimoireLogin } from './components/nexus/GrimoireLogin';
 import { useAppStore } from './store/appStore';
 import { useDataStore } from './store/dataStore';
 
-// --- KOMPONEN DEBUG/BOOT (Hardened) ---
-const BootScreen: React.FC<{ logs: string[]; isStuck: boolean }> = ({ logs, isStuck }) => (
-  <div className="flex flex-col items-center justify-center h-full bg-black text-gold font-retro p-8 cursor-wait font-mono z-50 relative">
-    <div className="mb-4 font-pixel animate-pulse text-xl text-center">
-      GRIMOIRE ENGINE <span className="text-xs text-red-500 block">PARANOID BOOT</span>
+// --- KOMPONEN LOADING (Clean UI) ---
+const GrimoireLoading: React.FC = () => (
+  <div className="flex flex-col items-center justify-center h-full w-full bg-[#050505] z-[100] fixed inset-0">
+    <div className="relative mb-8">
+        <div className="w-24 h-24 rounded-full border-4 border-wood bg-black flex items-center justify-center shadow-[0_0_30px_#d4af37] animate-pulse z-10 relative">
+            <span className="text-4xl filter drop-shadow-[0_0_10px_rgba(212,175,55,0.5)]">🧙‍♂️</span>
+        </div>
+        <div className="absolute inset-0 border-4 border-gold/30 rounded-full animate-ping"></div>
     </div>
     
-    {/* Status Indicator */}
-    <div className="text-[10px] text-faded animate-pulse mb-4 flex flex-col items-center gap-2">
-       <span>MEMVERIFIKASI TANDA TANGAN JIWA...</span>
-       {isStuck && <span className="text-red-500 font-bold bg-red-900/20 px-2 py-1 border border-red-800">TIMEOUT DETECTED - RETRYING...</span>}
-    </div>
-
-    {/* Visual Logger (CCTV) */}
-    <div className="w-full max-w-md bg-gray-900/50 border border-gray-800 p-2 text-[9px] text-green-400 font-mono overflow-y-auto h-[200px] rounded shadow-inner">
-       {logs.map((log, i) => (
-           <div key={i} className="border-b border-gray-800/50 pb-1 mb-1 last:border-0 break-words">
-               <span className="opacity-50 mr-2">[{i}]</span>{log}
-           </div>
-       ))}
-       <div className="animate-pulse text-green-700">_</div>
+    <h2 className="text-gold font-cinzel text-2xl tracking-[0.3em] mb-2 text-shadow-lg">GRIMOIRE ENGINE</h2>
+    
+    <div className="w-48 h-1 bg-wood/30 rounded-full overflow-hidden relative">
+        <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-transparent via-gold to-transparent w-1/2 h-full animate-loading-bar"></div>
     </div>
     
-    {/* Loading Bar Fake-but-Cool */}
-    <div className="w-full max-w-[200px] h-1 bg-gray-800 mt-4 relative overflow-hidden">
-      <div className="absolute inset-y-0 left-0 bg-gold h-full w-[50%] animate-loading-bar shadow-[0_0_10px_#d4af37]"></div>
-    </div>
+    <p className="text-faded font-pixel text-[10px] mt-4 tracking-widest animate-pulse opacity-70">
+        MEMBUKA GERBANG...
+    </p>
   </div>
 );
 
@@ -63,7 +55,7 @@ const App: React.FC = () => {
   // Unpack untuk kemudahan (Direct Access)
   const user = auth.user;
   const isAuthLoading = auth.isAuthLoading;
-  const authLog = auth.authLog || []; // Fallback array kosong
+  // const authLog = auth.authLog || []; // Log visual dihapus dari UI
 
   // 2. State Lokal Mesin (The Grimoire State Machine)
   const [appState, setAppState] = useState<'BOOT' | 'NEXUS' | 'EXPLORATION' | 'BATTLE'>('BOOT');
@@ -119,11 +111,9 @@ const App: React.FC = () => {
   return (
     <GameLayout>
       
-      {/* LAYER 1: BOOT SCREEN (Blocking) */}
+      {/* LAYER 1: LOADING SCREEN (Blocking) */}
       {isAuthLoading && (
-        <div className="absolute inset-0 z-[100]">
-            <BootScreen logs={authLog} isStuck={isBootStuck} />
-        </div>
+        <GrimoireLoading />
       )}
 
       {/* LAYER 2: DATA ERROR (Blocking) */}
