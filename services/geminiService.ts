@@ -132,16 +132,17 @@ class GeminiService {
                 : [];
 
             const textPriority = [
-                'gemini-1.5-flash',
-                'gemini-1.5-flash-latest',
-                'gemini-1.5-pro',
-                'gemini-flash',
-                'gemini-pro',
+                'gemini-2.0-flash',
+                'gemini-flash-latest',
+                // 'gemini-1.5-pro',
+                // 'gemini-flash',
+                // 'gemini-pro',
             ];
             const imagePriority = [
-                'gemini-2.0-flash-preview-image-generation',
-                'gemini-2.0-flash-lite-preview',
-                'imagen-3.0',
+                'gemini-2.5-flash-image-preview',
+                'gemini-2.5-flash-image',
+                // 'gemini-2.0-flash-lite-preview',
+                'imagen-4.0-generate-preview-06-06',
             ];
 
             this.resolvedTextModel = textPriority.find((n) => names.includes(n)) || this.resolvedTextModel;
@@ -152,11 +153,11 @@ class GeminiService {
     }
 
     public getTextModelName(): string {
-        return this.resolvedTextModel || 'gemini-1.5-flash';
+        return this.resolvedTextModel || 'gemini-2.0-flash';
     }
 
     public getImageModelName(): string {
-        return this.resolvedImageModel || 'gemini-2.0-flash-preview-image-generation';
+        return this.resolvedImageModel || 'gemini-2.5-flash-image-preview';
     }
 
     // Fungsi ini tetap di sini karena ini adalah utilitas murni, bukan logika game.
@@ -168,7 +169,7 @@ class GeminiService {
             // Buat klien tes terisolasi
             const testClient = new GoogleGenAI({ apiKey: key });
             const response = await testClient.models.generateContent({
-                model: 'gemini-1.5-flash',
+                model: 'gemini-2.0-flash',
                 contents: 'Test'
             });
 

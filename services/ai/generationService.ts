@@ -367,7 +367,7 @@ class GenerationService {
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
-                model: 'gemini-2.0-flash-preview-image-generation',
+                model: 'gemini-2.5-flash-image-preview',
                 contents: { parts: [imagePart, textPart] },
                 config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
             });
