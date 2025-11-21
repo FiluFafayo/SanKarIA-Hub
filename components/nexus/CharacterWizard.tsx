@@ -841,11 +841,6 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
 
         {/* BARU: Step Visual Kustomisasi */}
         {step === 'VISUAL' && (
-            <div className="flex flex-col gap-4 animate-fade-in">
-            <div className="flex gap-2 mt-2 relative z-20">
-              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('SOUL')} fullWidth />
-              <RuneButton label="LANJUT" fullWidth onClick={() => setStep('EQUIPMENT')} />
-            </div>
           <div className="flex flex-col gap-4 animate-fade-in">
             <div className="text-center border-b border-wood/30 pb-2">
               <h3 className="font-pixel text-lg text-gold mb-1">KUSTOMISASI</h3>
@@ -855,7 +850,6 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
             </div>
 
             <div className="flex flex-col gap-3 overflow-y-auto max-h-[350px] pr-2">
-
               {/* Opsi Rambut */}
               <div className="border border-wood p-2 bg-black/40">
                 <p className="font-pixel text-xs text-gold mb-2">RAMBUT</p>
@@ -870,7 +864,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                 </div>
               </div>
 
-              {/* Opsi Jenggot/Kumis (Facial Hair) */}
+              {/* Opsi Jenggot/Kumis */}
               <div className="border border-wood p-2 bg-black/40">
                 <p className="font-pixel text-xs text-gold mb-2">FITUR WAJAH (JENGGOT/KUMIS)</p>
                 <div className="grid grid-cols-3 gap-1">
@@ -898,7 +892,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                 </div>
               </div>
 
-              {/* Opsi Luka (Scars) */}
+              {/* Opsi Luka */}
               <div className="border border-wood p-2 bg-black/40">
                 <p className="font-pixel text-xs text-gold mb-2">LUKA (Bisa pilih lebih dari 1)</p>
                 <div className="grid grid-cols-3 gap-1">
@@ -918,10 +912,11 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                   ))}
                 </div>
               </div>
-
             </div>
+
+            {/* BUTTONS Correctly Placed */}
             <div className="flex gap-2 mt-2 relative z-20">
-              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('BACKGROUND')} fullWidth />
+              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('SOUL')} fullWidth />
               <RuneButton label="LANJUT" fullWidth onClick={() => setStep('EQUIPMENT')} />
             </div>
           </div>
