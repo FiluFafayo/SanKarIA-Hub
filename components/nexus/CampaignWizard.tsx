@@ -4,6 +4,7 @@ import { PixelCard } from '../grimoire/PixelCard';
 import { RuneButton } from '../grimoire/RuneButton';
 import { useAppStore } from '../../store/appStore';
 import { useGameStore } from '../../store/gameStore';
+import { useDataStore } from '../../store/dataStore';
 import { campaignRepository } from '../../services/repository/campaignRepository';
 import { generationService } from '../../services/ai/generationService';
 import { Campaign, CampaignRules } from '../../types';
@@ -191,12 +192,18 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                  fogOfWar: newCampaign.activeMapData?.fogData || newCampaign.fogOfWar
              };
 
-             // FORCE SET STATE: Kunci data ke memori sebelum navigasi
+             // FORCE SET STATE: Kunci data ke memori Runtime (untuk GameScreen)
              useGameStore.getState().actions._setRuntimeCampaignState(initialRuntimeState as any);
+
+             // [FASE 1 FIX] SYNC DATASTORE (Global Registry)
+             // Ini wajib dilakukan agar App.tsx (Gateway) tidak menganggap data 'corrupt' 
+             // karena ID belum ada di daftar kampanye global.
+             console.log("Step 4.6: Syncing Global DataStore Registry...");
+             useDataStore.getState().actions._addCampaign(newCampaign);
 
              console.log("Step 5: Calling onComplete callback with ID:", newCampaign.id);
              onComplete(newCampaign.id);
-             console.log("✅ [CampaignWizard] Ritual Success. SSoT Secured.");
+             console.log("✅ [CampaignWizard] Ritual Success. Double SSoT Secured.");
         } else {
              throw new Error(`Campaign Created but invalid return structure: ${JSON.stringify(newCampaign)}`);
         }
