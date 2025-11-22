@@ -633,67 +633,154 @@ GRANT ALL ON TABLE "public"."campaign_memory" TO "authenticated";
 -- =================================================================
 -- Seeding data dasar D&D 5e untuk memastikan sistem tidak kosong.
 
+-- ITEMS (COMPREHENSIVE SRD 5e)
 INSERT INTO "public"."items" (name, type, rarity, base_ac, armor_type, damage_dice, damage_type, description, cost_gp, weight_lb) VALUES
--- Armor
+-- Armor (Light)
 ('Padded Armor', 'armor', 'common', 11, 'light', NULL, NULL, 'Stealth disadvantage.', 5, 8),
 ('Leather Armor', 'armor', 'common', 11, 'light', NULL, NULL, NULL, 10, 10),
 ('Studded Leather', 'armor', 'common', 12, 'light', NULL, NULL, NULL, 45, 13),
+-- Armor (Medium)
 ('Hide Armor', 'armor', 'common', 12, 'medium', NULL, NULL, NULL, 10, 12),
 ('Chain Shirt', 'armor', 'common', 13, 'medium', NULL, NULL, NULL, 50, 20),
 ('Scale Mail', 'armor', 'common', 14, 'medium', NULL, NULL, 'Stealth disadvantage.', 50, 45),
 ('Breastplate', 'armor', 'common', 14, 'medium', NULL, NULL, NULL, 400, 20),
 ('Half Plate', 'armor', 'common', 15, 'medium', NULL, NULL, 'Stealth disadvantage.', 750, 40),
+-- Armor (Heavy)
 ('Ring Mail', 'armor', 'common', 14, 'heavy', NULL, NULL, 'Stealth disadvantage.', 30, 40),
 ('Chain Mail', 'armor', 'common', 16, 'heavy', NULL, NULL, 'Str 13, Stealth disadv.', 75, 55),
 ('Splint', 'armor', 'common', 17, 'heavy', NULL, NULL, 'Str 15, Stealth disadv.', 200, 60),
 ('Plate', 'armor', 'common', 18, 'heavy', NULL, NULL, 'Str 15, Stealth disadv.', 1500, 65),
+-- Shield
 ('Shield', 'armor', 'common', 2, 'shield', NULL, NULL, '+2 AC', 10, 6),
 
 -- Weapons (Simple Melee)
-('Club', 'weapon', 'common', NULL, NULL, '1d4', 'bludgeoning', 'Light', 0, 2),
+('Club', 'weapon', 'common', NULL, NULL, '1d4', 'bludgeoning', 'Light', 0.1, 2),
 ('Dagger', 'weapon', 'common', NULL, NULL, '1d4', 'piercing', 'Finesse, light, thrown (20/60)', 2, 1),
-('Greatclub', 'weapon', 'common', NULL, NULL, '1d8', 'bludgeoning', 'Two-handed', 0, 10),
+('Greatclub', 'weapon', 'common', NULL, NULL, '1d8', 'bludgeoning', 'Two-handed', 0.2, 10),
 ('Handaxe', 'weapon', 'common', NULL, NULL, '1d6', 'slashing', 'Light, thrown (20/60)', 5, 2),
-('Javelin', 'weapon', 'common', NULL, NULL, '1d6', 'piercing', 'Thrown (30/120)', 0, 2),
+('Javelin', 'weapon', 'common', NULL, NULL, '1d6', 'piercing', 'Thrown (30/120)', 0.5, 2),
 ('Light Hammer', 'weapon', 'common', NULL, NULL, '1d4', 'bludgeoning', 'Light, thrown (20/60)', 2, 2),
 ('Mace', 'weapon', 'common', NULL, NULL, '1d6', 'bludgeoning', NULL, 5, 4),
-('Quarterstaff', 'weapon', 'common', NULL, NULL, '1d6', 'bludgeoning', 'Versatile (1d8)', 0, 4),
+('Quarterstaff', 'weapon', 'common', NULL, NULL, '1d6', 'bludgeoning', 'Versatile (1d8)', 0.2, 4),
 ('Sickle', 'weapon', 'common', NULL, NULL, '1d4', 'slashing', 'Light', 1, 2),
 ('Spear', 'weapon', 'common', NULL, NULL, '1d6', 'piercing', 'Thrown (20/60), versatile (1d8)', 1, 3),
 
 -- Weapons (Simple Ranged)
 ('Light Crossbow', 'weapon', 'common', NULL, NULL, '1d8', 'piercing', 'Ammunition (80/320), loading, two-handed', 25, 5),
-('Dart', 'weapon', 'common', NULL, NULL, '1d4', 'piercing', 'Finesse, thrown (20/60)', 0, 0.25),
+('Dart', 'weapon', 'common', NULL, NULL, '1d4', 'piercing', 'Finesse, thrown (20/60)', 0.05, 0.25),
 ('Shortbow', 'weapon', 'common', NULL, NULL, '1d6', 'piercing', 'Ammunition (80/320), two-handed', 25, 2),
-('Sling', 'weapon', 'common', NULL, NULL, '1d4', 'bludgeoning', 'Ammunition (30/120)', 0, 0),
+('Sling', 'weapon', 'common', NULL, NULL, '1d4', 'bludgeoning', 'Ammunition (30/120)', 0.1, 0),
 
 -- Weapons (Martial Melee)
 ('Battleaxe', 'weapon', 'common', NULL, NULL, '1d8', 'slashing', 'Versatile (1d10)', 10, 4),
+('Flail', 'weapon', 'common', NULL, NULL, '1d8', 'bludgeoning', NULL, 10, 2),
+('Glaive', 'weapon', 'common', NULL, NULL, '1d10', 'slashing', 'Heavy, reach, two-handed', 20, 6),
 ('Greataxe', 'weapon', 'common', NULL, NULL, '1d12', 'slashing', 'Heavy, two-handed', 30, 7),
 ('Greatsword', 'weapon', 'common', NULL, NULL, '2d6', 'slashing', 'Heavy, two-handed', 50, 6),
 ('Halberd', 'weapon', 'common', NULL, NULL, '1d10', 'slashing', 'Heavy, reach, two-handed', 20, 6),
+('Lance', 'weapon', 'common', NULL, NULL, '1d12', 'piercing', 'Reach, special', 10, 6),
 ('Longsword', 'weapon', 'common', NULL, NULL, '1d8', 'slashing', 'Versatile (1d10)', 15, 3),
 ('Maul', 'weapon', 'common', NULL, NULL, '2d6', 'bludgeoning', 'Heavy, two-handed', 10, 10),
 ('Morningstar', 'weapon', 'common', NULL, NULL, '1d8', 'piercing', NULL, 15, 4),
+('Pike', 'weapon', 'common', NULL, NULL, '1d10', 'piercing', 'Heavy, reach, two-handed', 5, 18),
 ('Rapier', 'weapon', 'common', NULL, NULL, '1d8', 'piercing', 'Finesse', 25, 2),
 ('Scimitar', 'weapon', 'common', NULL, NULL, '1d6', 'slashing', 'Finesse, light', 25, 3),
 ('Shortsword', 'weapon', 'common', NULL, NULL, '1d6', 'piercing', 'Finesse, light', 10, 2),
+('Trident', 'weapon', 'common', NULL, NULL, '1d6', 'piercing', 'Thrown (20/60), versatile (1d8)', 5, 4),
+('War Pick', 'weapon', 'common', NULL, NULL, '1d8', 'piercing', NULL, 5, 2),
 ('Warhammer', 'weapon', 'common', NULL, NULL, '1d8', 'bludgeoning', 'Versatile (1d10)', 15, 2),
+('Whip', 'weapon', 'common', NULL, NULL, '1d4', 'slashing', 'Finesse, reach', 2, 3),
 
 -- Weapons (Martial Ranged)
 ('Blowgun', 'weapon', 'common', NULL, NULL, '1', 'piercing', 'Ammunition (25/100), loading', 10, 1),
 ('Hand Crossbow', 'weapon', 'common', NULL, NULL, '1d6', 'piercing', 'Ammunition (30/120), light, loading', 75, 3),
 ('Heavy Crossbow', 'weapon', 'common', NULL, NULL, '1d10', 'piercing', 'Ammunition (100/400), heavy, loading, two-handed', 50, 18),
 ('Longbow', 'weapon', 'common', NULL, NULL, '1d8', 'piercing', 'Ammunition (150/600), heavy, two-handed', 50, 2),
+('Net', 'weapon', 'common', NULL, NULL, NULL, NULL, 'Special, thrown (5/15)', 1, 3),
 
--- Adventuring Gear
-('Backpack', 'other', 'common', NULL, NULL, NULL, NULL, 'Tas punggung.', 2, 5),
-('Bedroll', 'other', 'common', NULL, NULL, NULL, NULL, 'Alas tidur.', 1, 7),
-('Rations (1 day)', 'consumable', 'common', NULL, NULL, NULL, NULL, 'Makanan kering.', 0, 2),
-('Rope, Hempen (50 feet)', 'other', 'common', NULL, NULL, NULL, NULL, 'Tali tambang.', 1, 10),
-('Torch', 'consumable', 'common', NULL, NULL, NULL, NULL, 'Obor menyala 1 jam.', 0, 1),
+-- AMMUNITION
+('Arrows (20)', 'other', 'common', NULL, NULL, NULL, NULL, 'Ammunition for bows.', 1, 1),
+('Bolts (20)', 'other', 'common', NULL, NULL, NULL, NULL, 'Ammunition for crossbows.', 1, 1.5),
+('Blowgun Needles (50)', 'other', 'common', NULL, NULL, NULL, NULL, 'Ammunition for blowguns.', 1, 1),
+('Sling Bullets (20)', 'other', 'common', NULL, NULL, NULL, NULL, 'Ammunition for slings.', 0.04, 1.5),
+
+-- ARCANE & DRUIDIC FOCUSES
+('Crystal (Arcane Focus)', 'other', 'common', NULL, NULL, NULL, NULL, 'An arcane focus.', 10, 1),
+('Orb (Arcane Focus)', 'other', 'common', NULL, NULL, NULL, NULL, 'An arcane focus.', 20, 3),
+('Rod (Arcane Focus)', 'other', 'common', NULL, NULL, NULL, NULL, 'An arcane focus.', 10, 2),
+('Staff (Arcane Focus)', 'other', 'common', NULL, NULL, NULL, NULL, 'An arcane focus.', 5, 4),
+('Wand (Arcane Focus)', 'other', 'common', NULL, NULL, NULL, NULL, 'An arcane focus.', 10, 1),
+('Sprig of Mistletoe', 'other', 'common', NULL, NULL, NULL, NULL, 'A druidic focus.', 1, 0),
+('Totem', 'other', 'common', NULL, NULL, NULL, NULL, 'A druidic focus.', 1, 0),
+('Wooden Staff', 'other', 'common', NULL, NULL, NULL, NULL, 'A druidic focus.', 5, 4),
+('Yew Wand', 'other', 'common', NULL, NULL, NULL, NULL, 'A druidic focus.', 10, 1),
+('Holy Symbol (Amulet)', 'other', 'common', NULL, NULL, NULL, NULL, 'A divine focus.', 5, 1),
+('Holy Symbol (Emblem)', 'other', 'common', NULL, NULL, NULL, NULL, 'A divine focus.', 5, 0),
+('Holy Symbol (Reliquary)', 'other', 'common', NULL, NULL, NULL, NULL, 'A divine focus.', 5, 2),
+('Component Pouch', 'other', 'common', NULL, NULL, NULL, NULL, 'Holds spell components.', 25, 2),
+('Spellbook', 'other', 'common', NULL, NULL, NULL, NULL, 'Essential for wizards.', 50, 3),
+
+-- PACKS (The Missing Links!)
+('Explorer''s Pack', 'other', 'common', NULL, NULL, NULL, NULL, 'Backpack, bedroll, mess kit, tinderbox, 10 torches, 10 days rations, waterskin, 50ft hempen rope.', 10, 59),
+('Dungeoneer''s Pack', 'other', 'common', NULL, NULL, NULL, NULL, 'Backpack, crowbar, hammer, 10 pitons, 10 torches, tinderbox, 10 days rations, waterskin, 50ft hempen rope.', 12, 61.5),
+('Burglar''s Pack', 'other', 'common', NULL, NULL, NULL, NULL, 'Backpack, ball bearings, 10ft string, bell, 5 candles, crowbar, hammer, 10 pitons, hooded lantern, 2 oil flasks, 5 days rations, tinderbox, waterskin, 50ft hempen rope.', 16, 47.5),
+('Diplomat''s Pack', 'other', 'common', NULL, NULL, NULL, NULL, 'Chest, 2 map/scroll cases, fine clothes, ink bottle, pen, lamp, 2 oil flasks, 5 paper sheets, perfume, sealing wax, soap.', 39, 46),
+('Entertainer''s Pack', 'other', 'common', NULL, NULL, NULL, NULL, 'Backpack, bedroll, 2 costumes, 5 candles, 5 days rations, waterskin, disguise kit.', 40, 38),
+('Priest''s Pack', 'other', 'common', NULL, NULL, NULL, NULL, 'Backpack, blanket, 10 candles, tinderbox, alms box, 2 incense blocks, censer, vestments, 2 days rations, waterskin.', 19, 24),
+('Scholar''s Pack', 'other', 'common', NULL, NULL, NULL, NULL, 'Backpack, book of lore, ink bottle, pen, 10 parchment sheets, bag of sand, small knife.', 40, 10),
+
+-- TOOLS & KITS
+('Thieves'' Tools', 'tool', 'common', NULL, NULL, NULL, NULL, 'Tools for disabling traps and picking locks.', 25, 1),
+('Disguise Kit', 'tool', 'common', NULL, NULL, NULL, NULL, 'Cosmetics and props for disguises.', 25, 3),
+('Poisoner''s Kit', 'tool', 'common', NULL, NULL, NULL, NULL, 'Tools for creating poisons.', 50, 2),
+('Herbalism Kit', 'tool', 'common', NULL, NULL, NULL, NULL, 'Tools for creating remedies and potions.', 5, 3),
+('Healer''s Kit', 'tool', 'common', NULL, NULL, NULL, NULL, 'Bandages and salves to stabilize the dying.', 5, 3),
+('Navigator''s Tools', 'tool', 'common', NULL, NULL, NULL, NULL, 'Instruments for navigation at sea.', 25, 2),
+('Alchemist''s Supplies', 'tool', 'common', NULL, NULL, NULL, NULL, 'Glassware and ingredients for alchemy.', 50, 8),
+('Smith''s Tools', 'tool', 'common', NULL, NULL, NULL, NULL, 'Hammers, tongs, and other smithing tools.', 20, 8),
+('Brewer''s Supplies', 'tool', 'common', NULL, NULL, NULL, NULL, 'Equipment for brewing ale.', 20, 9),
+('Mason''s Tools', 'tool', 'common', NULL, NULL, NULL, NULL, 'Tools for stone working.', 10, 8),
+('Tinker''s Tools', 'tool', 'common', NULL, NULL, NULL, NULL, 'Tools for mending small objects.', 50, 10),
+('Musical Instrument (Lute)', 'tool', 'common', NULL, NULL, NULL, NULL, 'A stringed instrument.', 35, 2),
+('Musical Instrument (Flute)', 'tool', 'common', NULL, NULL, NULL, NULL, 'A woodwind instrument.', 2, 1),
+('Musical Instrument (Drum)', 'tool', 'common', NULL, NULL, NULL, NULL, 'A percussion instrument.', 6, 3),
+('Musical Instrument (Horn)', 'tool', 'common', NULL, NULL, NULL, NULL, 'A brass instrument.', 3, 2),
+('Gaming Set (Dice)', 'tool', 'common', NULL, NULL, NULL, NULL, 'A set of dice.', 0.1, 0),
+('Gaming Set (Cards)', 'tool', 'common', NULL, NULL, NULL, NULL, 'A deck of cards.', 0.5, 0),
+
+-- MISC ADVENTURING GEAR
+('Backpack', 'other', 'common', NULL, NULL, NULL, NULL, 'Holds 30 lbs of gear.', 2, 5),
+('Bedroll', 'other', 'common', NULL, NULL, NULL, NULL, 'For sleeping outdoors.', 1, 7),
+('Blanket', 'other', 'common', NULL, NULL, NULL, NULL, 'A warm blanket.', 0.5, 3),
+('Candle', 'other', 'common', NULL, NULL, NULL, NULL, 'Sheds light for 1 hour.', 0.01, 0),
+('Clothes, Common', 'other', 'common', NULL, NULL, NULL, NULL, 'Simple clothes.', 0.5, 3),
+('Clothes, Costume', 'other', 'common', NULL, NULL, NULL, NULL, 'Theatrical clothes.', 5, 4),
+('Clothes, Fine', 'other', 'common', NULL, NULL, NULL, NULL, 'Expensive clothes.', 15, 6),
+('Clothes, Traveler''s', 'other', 'common', NULL, NULL, NULL, NULL, 'Sturdy clothes.', 2, 4),
+('Crowbar', 'other', 'common', NULL, NULL, NULL, NULL, 'Grants advantage on leverage checks.', 2, 5),
+('Hammer', 'other', 'common', NULL, NULL, NULL, NULL, 'A small hammer.', 1, 3),
+('Ink (1 ounce bottle)', 'other', 'common', NULL, NULL, NULL, NULL, 'Black ink.', 10, 0),
+('Ink Pen', 'other', 'common', NULL, NULL, NULL, NULL, 'Wooden pen.', 0.02, 0),
+('Lantern, Hooded', 'other', 'common', NULL, NULL, NULL, NULL, 'Sheds bright light for 30ft.', 5, 2),
+('Lock', 'other', 'common', NULL, NULL, NULL, NULL, 'A mechanical lock.', 10, 1),
+('Mess Kit', 'other', 'common', NULL, NULL, NULL, NULL, 'Cup and cutlery.', 0.2, 1),
+('Mirror, Steel', 'other', 'common', NULL, NULL, NULL, NULL, 'A small metal mirror.', 5, 0.5),
+('Oil (flask)', 'consumable', 'common', NULL, NULL, NULL, NULL, 'Fuel for lanterns.', 0.1, 1),
+('Paper (one sheet)', 'other', 'common', NULL, NULL, NULL, NULL, 'For writing.', 0.2, 0),
+('Parchment (one sheet)', 'other', 'common', NULL, NULL, NULL, NULL, 'Durable writing material.', 0.1, 0),
+('Perfume (vial)', 'other', 'common', NULL, NULL, NULL, NULL, 'Scented liquid.', 5, 0),
+('Piton', 'other', 'common', NULL, NULL, NULL, NULL, 'Climbing spike.', 0.05, 0.25),
 ('Potion of Healing', 'consumable', 'common', NULL, NULL, NULL, NULL, 'Heals 2d4+2 HP.', 50, 0.5),
-('Thieves Tools', 'tool', 'common', NULL, NULL, NULL, NULL, 'Alat pembuka kunci.', 25, 1);
+('Rations (1 day)', 'consumable', 'common', NULL, NULL, NULL, NULL, 'Dry food.', 0.5, 2),
+('Rope, Hempen (50 feet)', 'other', 'common', NULL, NULL, NULL, NULL, 'Basic rope.', 1, 10),
+('Rope, Silk (50 feet)', 'other', 'common', NULL, NULL, NULL, NULL, 'Strong, light rope.', 10, 5),
+('Sack', 'other', 'common', NULL, NULL, NULL, NULL, 'Holds 30 lbs.', 0.01, 0.5),
+('Sealing Wax', 'other', 'common', NULL, NULL, NULL, NULL, 'For sealing letters.', 0.5, 0),
+('Soap', 'other', 'common', NULL, NULL, NULL, NULL, 'A bar of soap.', 0.02, 0),
+('Tinderbox', 'other', 'common', NULL, NULL, NULL, NULL, 'Fire starter.', 0.5, 1),
+('Torch', 'consumable', 'common', NULL, NULL, NULL, NULL, 'Burns for 1 hour.', 0.01, 1),
+('Waterskin', 'other', 'common', NULL, NULL, NULL, NULL, 'Holds water.', 0.2, 5),
+('Whetstone', 'other', 'common', NULL, NULL, NULL, NULL, 'Sharpening stone.', 0.01, 1);
 
 INSERT INTO "public"."spells" (name, level, school, casting_time, range, components, duration, effect_type, description, damage_dice, damage_type) VALUES
 -- Cantrips
