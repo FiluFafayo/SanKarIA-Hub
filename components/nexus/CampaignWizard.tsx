@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { PixelCard } from '../grimoire/PixelCard';
 import { RuneButton } from '../grimoire/RuneButton';
 import { useAppStore } from '../../store/appStore';
+import { useGameStore } from '../../store/gameStore';
 import { campaignRepository } from '../../services/repository/campaignRepository';
 import { generationService } from '../../services/ai/generationService';
 import { Campaign, CampaignRules } from '../../types';
@@ -169,9 +170,33 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
         console.log("Step 4: Response received from Void.", newCampaign);
 
         if (newCampaign && newCampaign.id) {
+             // [FASE 0 SSoT FIX] Hard-Link Data ke GameStore
+             console.log("Step 4.5: Injecting directly into GameStore SSoT...");
+             
+             // QA NOTE: Konstruksi State Runtime Awal (Hydration) secara manual.
+             // Ini mencegah 'Race Condition' di mana GameScreen mencoba fetch data
+             // tapi database belum konsisten atau koneksi lambat.
+             const initialRuntimeState = {
+                 ...newCampaign,
+                 eventLog: [],
+                 monsters: [],
+                 players: [], // Player belum join secara teknis di state ini (hanya Owner)
+                 thinkingState: "idle",
+                 activeRollRequest: null,
+                 choices: [],
+                 turnId: null,
+                 // [ATLAS] Pastikan activeMapData aman (ambil dari return repository yang sudah di-map)
+                 activeMapData: newCampaign.activeMapData, 
+                 explorationGrid: newCampaign.activeMapData?.gridData || newCampaign.explorationGrid,
+                 fogOfWar: newCampaign.activeMapData?.fogData || newCampaign.fogOfWar
+             };
+
+             // FORCE SET STATE: Kunci data ke memori sebelum navigasi
+             useGameStore.getState().actions._setRuntimeCampaignState(initialRuntimeState as any);
+
              console.log("Step 5: Calling onComplete callback with ID:", newCampaign.id);
              onComplete(newCampaign.id);
-             console.log("✅ [CampaignWizard] Ritual Success.");
+             console.log("✅ [CampaignWizard] Ritual Success. SSoT Secured.");
         } else {
              throw new Error(`Campaign Created but invalid return structure: ${JSON.stringify(newCampaign)}`);
         }
