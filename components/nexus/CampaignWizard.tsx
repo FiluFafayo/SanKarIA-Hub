@@ -83,9 +83,19 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
   const [errorMsg, setErrorMsg] = useState<string | null>(null); // [FASE 1] Error State
 
   const manifestWorld = async (isTemplate: boolean) => {
-    if (!user) return;
+    // [AUDIT LOG] 1. Start
+    console.group("🔮 [CampaignWizard] Manifestation Ritual Started");
+    console.log("Step 1: Checking User State", { user, isTemplate });
+
+    if (!user) {
+        console.error("❌ [CampaignWizard] CRITICAL: User is NULL. Aborting.");
+        setErrorMsg("Jiwa tidak terdeteksi (Auth Error). Silakan relogin.");
+        console.groupEnd();
+        return;
+    }
+
     setIsProcessing(true);
-    setErrorMsg(null); // Reset error
+    setErrorMsg(null); 
     
     try {
         const defaultRules: CampaignRules = {
@@ -98,8 +108,14 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
 
         let finalData: any = {};
 
-        if (isTemplate && selectedTemplate) {
-            // Mode Library
+        // [AUDIT LOG] 2. Constructing Payload
+        console.log("Step 2: Constructing Payload...");
+
+        if (isTemplate) {
+            if (!selectedTemplate) {
+                throw new Error("Template Mode dipilih, tapi selectedTemplate NULL.");
+            }
+            console.log("Mode: Library/Template", selectedTemplate);
             finalData = {
                 ...selectedTemplate,
                 joinCode: generateJoinCode(),
@@ -108,7 +124,7 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                 duration: selectedTemplate.duration || 'One-Shot'
             };
         } else {
-            // Mode Incantation
+            console.log("Mode: Incantation/Custom", formData);
             finalData = {
                 title: formData.title,
                 description: formData.description,
@@ -135,8 +151,7 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                 mapMarkers: [],
                 quests: [],
                 npcs: [],
-                // [ATLAS PROTOCOL] Grid dikirim via DTO khusus untuk ditangkap Repository
-                // Repository akan memisahkannya ke tabel 'world_maps' via RPC
+                // [ATLAS PROTOCOL]
                 explorationGrid: Array.from({ length: 100 }, () => Array(100).fill(10001)),
                 fogOfWar: Array.from({ length: 100 }, () => Array(100).fill(true)),
                 
@@ -145,17 +160,27 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
             };
         }
 
+        // [AUDIT LOG] 3. Calling Repository
+        console.log("Step 3: Sending data to Void (Repository)...", finalData);
+        
         const newCampaign = await campaignRepository.createCampaign(finalData, user.id);
-        if (newCampaign) {
+        
+        console.log("Step 4: Response received from Void.", newCampaign);
+
+        if (newCampaign && newCampaign.id) {
+             console.log("Step 5: Calling onComplete callback with ID:", newCampaign.id);
              onComplete(newCampaign.id);
+             console.log("✅ [CampaignWizard] Ritual Success.");
         } else {
-             throw new Error("Campaign ID kosong dari Void.");
+             throw new Error(`Campaign Created but invalid return structure: ${JSON.stringify(newCampaign)}`);
         }
     } catch (error: any) {
-        console.error("Gagal menciptakan dimensi:", error);
+        console.error("❌ [CampaignWizard] FATAL ERROR during manifestation:", error);
+        console.error("Stack Trace:", error.stack);
         setErrorMsg(error.message || "Ritual gagal. Dewa Dice sedang marah.");
     } finally {
         setIsProcessing(false);
+        console.groupEnd();
     }
   };
 
