@@ -454,14 +454,27 @@ const reducer = (state: CampaignState, action: Action): CampaignState => {
 
         // FASE 3: Reducer Atlas Engine
         case "LOAD_MAP": {
+            const newMapData = {
+                id: action.payload.mapId,
+                campaignId: state.id,
+                name: action.payload.name,
+                gridData: action.payload.grid,
+                fogData: action.payload.fog,
+                markers: action.payload.markers,
+                isActive: true
+            };
+
             return {
                 ...state,
                 activeMapId: action.payload.mapId,
-                // Ganti data peta aktif
+                activeMapData: newMapData, // Update container object
+                
+                // Update legacy pointers untuk kompatibilitas UI lama
                 explorationGrid: action.payload.grid,
                 fogOfWar: action.payload.fog,
                 mapMarkers: action.payload.markers,
-                mapImageUrl: action.payload.imageUrl || state.mapImageUrl, // Pertahankan lama jika baru null, atau ganti
+                mapImageUrl: action.payload.imageUrl || state.mapImageUrl,
+                
                 // Reset posisi player ke tengah (atau titik spawn khusus nanti)
                 playerGridPosition: { x: 50, y: 50 },
                 // Reset battle state saat pindah peta

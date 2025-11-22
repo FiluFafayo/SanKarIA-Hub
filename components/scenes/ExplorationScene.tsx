@@ -86,13 +86,20 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
       
       {/* --- LAYER 1: MAP VIEW (TOP HALF) --- */}
       <div className="flex-1 relative bg-black border-b-4 border-wood overflow-hidden">
-         {/* Render Map hanya jika data grid valid */}
-         {(campaign.explorationGrid && campaign.explorationGrid.length > 0) ? (
-             <ExplorationMap 
-                grid={campaign.explorationGrid} 
-                fog={campaign.fogOfWar} 
-                playerPos={campaign.playerGridPosition || {x:0, y:0}} 
-             />
+         {/* [FASE 3] ATLAS RENDERER */}
+         {/* Render Map hanya jika data grid valid DAN activeMapId ada */}
+         {(campaign.activeMapId && campaign.explorationGrid && campaign.explorationGrid.length > 0) ? (
+             <>
+                 <ExplorationMap 
+                    grid={campaign.explorationGrid} 
+                    fog={campaign.fogOfWar} 
+                    playerPos={campaign.playerGridPosition || {x:0, y:0}} 
+                 />
+                 {/* Debug Info (Dev Only - Optional) */}
+                 {/* <div className="absolute bottom-2 left-2 text-[8px] text-green-500 font-mono bg-black/80 p-1">
+                     MAP: {campaign.activeMapData?.name || campaign.activeMapId}
+                 </div> */}
+             </>
          ) : (
              // Fallback Visual jika tidak ada Peta
              <div className="absolute inset-0 flex items-center justify-center flex-col gap-4 opacity-50">
