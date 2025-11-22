@@ -679,19 +679,27 @@ class GenerationService {
         return geminiService.makeApiCall(call);
     }
 
-    // BARU: FASE 1 - The Oracle (Incantation Auto-Complete)
-    async suggestIncantation(currentTheme: string): Promise<{ title: string; description: string; villain: string }> {
-        const prompt = `Anda adalah The Oracle, entitas kuno yang membantu Dungeon Master menulis takdir.
-        Pengguna ingin membuat kampanye D&D dengan tema: "${currentTheme || 'Acak'}".
+    // UPGRADE FASE 2: The Oracle (Multi-Option Generator)
+    async suggestIncantation(currentTheme: string, userConcept: string = ""): Promise<Array<{ title: string; description: string; villain: string }>> {
+        const prompt = `Anda adalah The Oracle, penasihat Dungeon Master.
+        Pengguna ingin membuat kampanye D&D.
+        Tema: "${currentTheme || 'Acak'}".
+        Inspirasi/Konsep Awal Pengguna: "${userConcept || 'Tidak ada, berikan ide liar'}".
         
-        Lengkapi 'Mantra Penciptaan' ini dengan ide yang kreatif, unik, dan memancing imajinasi.
-        
-        Berikan output JSON:
-        {
-            "title": "Judul Kampanye (Singkat, Keren, Bahasa Indonesia)",
-            "description": "Premis cerita (2 kalimat).",
-            "villain": "Nama & Gelar Musuh Utama (misal: 'Xarathos, Raja Abumera')"
-        }`;
+        Tugas: Berikan 3 VARIASI ide kampanye yang berbeda berdasarkan input tersebut.
+        1. Opsi Klasik/Straightforward.
+        2. Opsi Twist/Subversif.
+        3. Opsi Misterius/Gelap.
+
+        Output HARUS berupa JSON Array berisi 3 objek:
+        [
+            {
+                "title": "Judul (Indonesia, Keren)",
+                "description": "Premis menarik (2-3 kalimat).",
+                "villain": "Musuh Utama (Nama & Gelar)"
+            },
+            ...
+        ]`;
 
         const call = async (client: any) => {
             const response = await client.models.generateContent({
@@ -699,18 +707,33 @@ class GenerationService {
                 contents: prompt,
                 config: { responseMimeType: "application/json" }
             });
-            return JSON.parse(response.text);
+            const result = JSON.parse(response.text);
+            // Handle jika AI mengembalikan object tunggal atau array
+            return Array.isArray(result) ? result : [result];
         };
         
-        // Fallback jika offline/error
+        // Fallback Robust
         try {
             return await geminiService.makeApiCall(call);
         } catch (e) {
-            return {
-                title: "Bayang-bayang Terlupakan",
-                description: "Dunia di mana matahari berhenti terbit, dan kota-kota terakhir bertahan dengan cahaya sihir yang memudar.",
-                villain: "Umbra, Penelan Cahaya"
-            };
+            console.warn("Oracle gagal, menggunakan fallback vision.", e);
+            return [
+                {
+                    title: "Lembah Harapan Pupus",
+                    description: "Sebuah lembah yang tertutup kabut abadi, di mana para petualang masuk namun tak pernah keluar.",
+                    villain: "Umbra, Penelan Cahaya"
+                },
+                {
+                    title: "Pemberontakan Mesin Uap",
+                    description: "Golem kuno mulai bangkit sendiri dan menolak perintah penciptanya.",
+                    villain: "Prime Gear, Kesadaran Pertama"
+                },
+                {
+                    title: "Bisikan dari Laut Dalam",
+                    description: "Nelayan mulai menghilang, digantikan oleh sosok yang terlihat 'salah' di bawah sinar bulan.",
+                    villain: "Dagon, Pendeta Lautan"
+                }
+            ];
         }
     }
 

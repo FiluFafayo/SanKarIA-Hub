@@ -17,7 +17,16 @@ interface CampaignWizardProps {
 // Wizard Step Definition - Mengadopsi flow CharacterWizard
 type WizardStep = 'METHOD' | 'LIBRARY' | 'THEME' | 'SCALE' | 'CONCEPT' | 'REVIEW';
 
-const THEMES = ['Fantasy', 'Dark Fantasy', 'Sci-Fi', 'Cyberpunk', 'Eldritch Horror', 'Steampunk'];
+// DESKRIPSI TEMA (Fase 2)
+const THEME_DATA: Record<string, string> = {
+    'Fantasy': 'Pedang, sihir, naga, dan kepahlawanan klasik. Dunia penuh keajaiban.',
+    'Dark Fantasy': 'Dunia yang sekarat, moralitas abu-abu, dan bahaya yang nyata.',
+    'Sci-Fi': 'Bintang-bintang, teknologi canggih, dan misteri alam semesta.',
+    'Cyberpunk': 'High tech, low life. Korporasi jahat dan neon di tengah hujan.',
+    'Eldritch Horror': 'Teror kosmik yang tak terbayangkan. Kewarasan adalah harga.',
+    'Steampunk': 'Uap, roda gigi, dan revolusi industri dengan sentuhan sihir.',
+};
+
 const SCALES = [
     { id: 'One-Shot', label: 'Kisah Tunggal', desc: 'Satu peta, linear, 1-2 sesi. Cocok untuk pemula.' },
     { id: 'Endless Saga', label: 'Hikayat Tanpa Akhir', desc: 'Open World, Procedural Generation, Cerita Bercabang.' }
@@ -33,29 +42,41 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
     theme: 'Fantasy',
     scale: 'One-Shot',
     villain: '', 
-    description: ''
+    description: '',
+    storyInput: '' // BARU: Freeform input untuk user cerita
   });
 
   // State untuk preview Template yang dipilih
   const [selectedTemplate, setSelectedTemplate] = useState<Partial<Campaign> | null>(null);
+  
+  // State untuk Oracle Options (Fase 2)
+  const [oracleOptions, setOracleOptions] = useState<Array<{title: string, description: string, villain: string}> | null>(null);
 
   // --- LOGIC: ORACLE AI ---
   const invokeOracle = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
+    setOracleOptions(null); // Reset opsi sebelumnya
+    
     try {
-        const suggestion = await generationService.suggestIncantation(formData.theme);
-        setFormData(prev => ({
-            ...prev,
-            title: suggestion.title,
-            description: suggestion.description,
-            villain: suggestion.villain
-        }));
+        // Panggil AI dengan input cerita user (jika ada)
+        const suggestions = await generationService.suggestIncantation(formData.theme, formData.storyInput);
+        setOracleOptions(suggestions);
     } catch (e) {
         console.error("Oracle gagal:", e);
     } finally {
         setIsProcessing(false);
     }
+  };
+
+  const applyOracleOption = (opt: {title: string, description: string, villain: string}) => {
+      setFormData(prev => ({
+          ...prev,
+          title: opt.title,
+          description: opt.description,
+          villain: opt.villain
+      }));
+      setOracleOptions(null); // Tutup modal
   };
 
   // --- LOGIC: MANIFESTATION ---
@@ -219,14 +240,32 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
         case 'THEME':
             return (
                 <div className="flex flex-col h-full">
-                    <div className="flex flex-col gap-2 overflow-y-auto pr-2 animate-fade-in flex-1">
-                        {THEMES.map((t) => (
+                     <div className="flex flex-col gap-2 overflow-y-auto pr-2 animate-fade-in flex-1">
+                        {/* Tombol Surprise Me */}
+                        <div 
+                            onClick={() => {
+                                const randomTheme = Object.keys(THEME_DATA)[Math.floor(Math.random() * Object.keys(THEME_DATA).length)];
+                                setFormData({...formData, theme: randomTheme});
+                            }}
+                            className="p-3 border-2 border-dashed border-cyan-900/50 bg-cyan-900/10 cursor-pointer text-center hover:bg-cyan-900/30 hover:border-cyan-500 transition-all mb-2 group"
+                        >
+                            <div className="font-pixel text-sm text-cyan-400 group-hover:text-cyan-200 flex items-center justify-center gap-2">
+                                <span>🎲</span> SURPRISE ME
+                            </div>
+                        </div>
+
+                        {Object.entries(THEME_DATA).map(([t, desc]) => (
                             <div
                                 key={t}
                                 onClick={() => setFormData({...formData, theme: t})}
-                                className={`p-3 border-2 cursor-pointer text-center hover:bg-white/5 transition-colors ${formData.theme === t ? 'border-gold bg-gold/10' : 'border-wood'}`}
+                                className={`p-3 border-2 cursor-pointer transition-all ${formData.theme === t ? 'border-gold bg-gold/10' : 'border-wood hover:bg-white/5'}`}
                             >
-                                <div className="font-pixel text-md text-parchment">{t}</div>
+                                <div className="font-pixel text-md text-parchment text-center">{t}</div>
+                                {formData.theme === t && (
+                                    <div className="mt-2 pt-2 border-t border-white/10 text-[10px] font-retro text-faded text-center italic animate-fade-in">
+                                        "{desc}"
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -266,53 +305,92 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
 
         case 'CONCEPT':
             return (
-                <div className="flex flex-col gap-3 animate-fade-in h-full">
-                    <div className="p-3 bg-black/40 border border-wood rounded space-y-3 flex-1 overflow-y-auto">
-                        <div>
-                            <label className="text-[10px] text-gold font-pixel block mb-1 flex justify-between">
-                                <span>NAMA DUNIA</span>
-                                <span className={formData.title.length > 40 ? "text-red-500" : "text-faded"}>{formData.title.length}/50</span>
-                            </label>
-                            <input 
-                                type="text" 
-                                value={formData.title}
-                                maxLength={50}
-                                onChange={(e) => setFormData({...formData, title: e.target.value})}
-                                className="w-full bg-black border border-wood p-2 text-parchment font-pixel text-sm focus:border-gold outline-none"
-                                placeholder="Contoh: Eldoria"
-                            />
+                <div className="flex flex-col gap-3 animate-fade-in h-full relative">
+                    {/* ORACLE MODAL OVERLAY */}
+                    {oracleOptions && (
+                        <div className="absolute inset-0 z-50 bg-black/95 flex flex-col p-2 animate-fade-in">
+                            <div className="text-center mb-2 border-b border-wood pb-2">
+                                <h3 className="font-pixel text-gold text-sm">PENGLIHATAN ORACLE</h3>
+                                <p className="text-[10px] text-faded font-retro">Pilih satu takdir yang paling memanggilmu...</p>
+                            </div>
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                {oracleOptions.map((opt, idx) => (
+                                    <div 
+                                        key={idx}
+                                        onClick={() => applyOracleOption(opt)}
+                                        className="p-3 border border-wood bg-void/50 cursor-pointer hover:border-gold hover:bg-gold/10 transition-all group"
+                                    >
+                                        <div className="font-pixel text-xs text-gold mb-1 group-hover:text-white">{opt.title}</div>
+                                        <div className="text-[10px] text-faded font-retro italic mb-1">Vs. {opt.villain}</div>
+                                        <p className="text-[10px] text-parchment line-clamp-2">{opt.description}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <RuneButton label="BATAL" variant="secondary" onClick={() => setOracleOptions(null)} fullWidth className="mt-2" />
                         </div>
-                        <div>
-                            <label className="text-[10px] text-gold font-pixel block mb-1 flex justify-between">
-                                <span>ANCAMAN UTAMA</span>
-                                <span className={formData.villain.length > 40 ? "text-red-500" : "text-faded"}>{formData.villain.length}/50</span>
-                            </label>
-                            <input 
-                                type="text" 
-                                value={formData.villain}
-                                maxLength={50}
-                                onChange={(e) => setFormData({...formData, villain: e.target.value})}
-                                className="w-full bg-black border border-wood p-2 text-parchment font-retro text-sm focus:border-gold outline-none"
-                                placeholder="Contoh: Raja Iblis yang bangkit..."
+                    )}
+
+                    <div className="p-3 bg-black/40 border border-wood rounded space-y-3 flex-1 overflow-y-auto custom-scrollbar">
+                         {/* STORY INPUT MODE (NEW) */}
+                        <div className="bg-void/30 p-2 border border-dashed border-wood/50 rounded mb-2">
+                             <label className="text-[10px] text-blue-300 font-pixel block mb-1">
+                                 ✨ INSPIRASI AWAL (OPSIONAL)
+                             </label>
+                             <textarea 
+                                value={formData.storyInput}
+                                onChange={(e) => setFormData({...formData, storyInput: e.target.value})}
+                                className="w-full bg-black/50 border border-wood/50 p-2 text-blue-100 font-retro text-xs focus:border-blue-400 outline-none h-16 resize-none placeholder-faded/50"
+                                placeholder="Ceritakan idemu... misal: 'Dunia penuh pulau melayang dimana air sangat mahal dan bajak langit berkuasa...'"
                             />
-                        </div>
-                        <div className="relative">
-                            <label className="text-[10px] text-gold font-pixel block mb-1">DESKRIPSI SINGKAT</label>
-                            <textarea 
-                                value={formData.description}
-                                maxLength={500}
-                                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                                className="w-full bg-black border border-wood p-2 text-faded font-retro text-xs focus:border-gold outline-none h-24 resize-none custom-scrollbar"
-                                placeholder="Dunia ini hancur karena..."
-                            />
-                            <div className="absolute bottom-2 right-2">
+                             <div className="flex justify-end mt-1">
                                 <button
                                     onClick={invokeOracle}
                                     disabled={isProcessing}
                                     className="text-[9px] font-pixel bg-void border border-gold text-gold px-3 py-1 hover:bg-gold hover:text-void transition-colors flex items-center gap-1 shadow-pixel-sm"
                                 >
-                                    {isProcessing ? <span className="animate-spin">⚙️</span> : <span>🔮</span>} ORACLE
+                                    {isProcessing ? <span className="animate-spin">⚙️</span> : <span>🔮</span>} TANYA ORACLE
                                 </button>
+                            </div>
+                        </div>
+
+                        <div className="border-t border-wood/30 pt-2 space-y-2">
+                            <div>
+                                <label className="text-[10px] text-gold font-pixel block mb-1 flex justify-between">
+                                    <span>NAMA DUNIA</span>
+                                    <span className={formData.title.length > 40 ? "text-red-500" : "text-faded"}>{formData.title.length}/50</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    value={formData.title}
+                                    maxLength={50}
+                                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                                    className="w-full bg-black border border-wood p-2 text-parchment font-pixel text-sm focus:border-gold outline-none"
+                                    placeholder="Contoh: Eldoria"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-gold font-pixel block mb-1 flex justify-between">
+                                    <span>ANCAMAN UTAMA</span>
+                                    <span className={formData.villain.length > 40 ? "text-red-500" : "text-faded"}>{formData.villain.length}/50</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    value={formData.villain}
+                                    maxLength={50}
+                                    onChange={(e) => setFormData({...formData, villain: e.target.value})}
+                                    className="w-full bg-black border border-wood p-2 text-parchment font-retro text-sm focus:border-gold outline-none"
+                                    placeholder="Contoh: Raja Iblis yang bangkit..."
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-gold font-pixel block mb-1">DESKRIPSI SINGKAT</label>
+                                <textarea 
+                                    value={formData.description}
+                                    maxLength={500}
+                                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                                    className="w-full bg-black border border-wood p-2 text-faded font-retro text-xs focus:border-gold outline-none h-20 resize-none custom-scrollbar"
+                                    placeholder="Dunia ini hancur karena..."
+                                />
                             </div>
                         </div>
                     </div>
