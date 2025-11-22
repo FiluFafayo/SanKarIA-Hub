@@ -80,9 +80,13 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
   };
 
   // --- LOGIC: MANIFESTATION ---
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); // [FASE 1] Error State
+
   const manifestWorld = async (isTemplate: boolean) => {
     if (!user) return;
     setIsProcessing(true);
+    setErrorMsg(null); // Reset error
+    
     try {
         const defaultRules: CampaignRules = {
             startingLevel: 1,
@@ -142,11 +146,14 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
         }
 
         const newCampaign = await campaignRepository.createCampaign(finalData, user.id);
-        if (newCampaign) onComplete(newCampaign.id);
-    } catch (error) {
+        if (newCampaign) {
+             onComplete(newCampaign.id);
+        } else {
+             throw new Error("Campaign ID kosong dari Void.");
+        }
+    } catch (error: any) {
         console.error("Gagal menciptakan dimensi:", error);
-        // Dalam arsitektur paranoid, alert adalah dosa, tapi untuk MVP kita biarkan dulu
-        alert("Ritual gagal. Dewa Dice sedang marah.");
+        setErrorMsg(error.message || "Ritual gagal. Dewa Dice sedang marah.");
     } finally {
         setIsProcessing(false);
     }
@@ -438,6 +445,11 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                         </div>
                     )}
 
+                    {errorMsg && (
+                        <div className="p-2 bg-red-900/50 border border-red-500 text-red-200 text-xs font-pixel text-center mb-2 animate-pulse">
+                            ⚠️ {errorMsg.toUpperCase()}
+                        </div>
+                    )}
                     <div className="flex gap-2 mt-2 relative z-20">
                         <RuneButton label="UBAH MANTRA" variant="secondary" onClick={() => setStep('CONCEPT')} fullWidth />
                         <RuneButton 

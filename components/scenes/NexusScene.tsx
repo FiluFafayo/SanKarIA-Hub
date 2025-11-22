@@ -9,6 +9,7 @@ import { useAppStore } from '../../store/appStore';
 import { useDataStore } from '../../store/dataStore'; // GANTI DENGAN DATASTORE
 import { Character } from '../../types';
 import { authRepository } from '../../services/repository/authRepository';
+import { campaignRepository } from '../../services/repository/campaignRepository'; // [FASE 1] Import Repo
 
 interface NexusSceneProps {
   onStartGame: () => void;
@@ -201,9 +202,11 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
       {viewMode === 'CAMP_WIZARD' && (
         <CampaignWizard
           onCancel={() => setViewMode('GATE')}
-          onComplete={(id) => {
+          onComplete={async (id) => {
             console.log("Created Campaign:", id);
-            onStartGame(); // Auto start logic
+            // [FASE 1] Refresh Data agar campaign baru muncul di list SSoT
+            if (user) await dataActions.fetchInitialData(user.id, true);
+            onStartGame(); 
           }}
         />
       )}
@@ -212,12 +215,32 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
       {viewMode === 'GATE' && (
         <DungeonGate
           onBack={() => setViewMode('IDLE')}
-          onEnterWorld={(code) => {
+          onEnterWorld={async (code) => {
             if (code === 'NEW_CAMPAIGN_TRIGGER') {
               setViewMode('CAMP_WIZARD');
             } else {
-              console.log("Joining:", code);
-              onStartGame();
+              // [FASE 1] Logic Join Real
+              if (!selectedCharacterId || !user) return;
+              
+              try {
+                  const campaign = await campaignRepository.getCampaignByJoinCode(code);
+                  if (!campaign) {
+                      pushNotification({ type: 'error', message: 'Rune tidak valid. Dunia tidak ditemukan.' });
+                      return;
+                  }
+                  
+                  // Auto Join logic
+                  await campaignRepository.addPlayerToCampaign(campaign.id, selectedCharacterId);
+                  pushNotification({ type: 'success', message: `Berhasil memasuki ${campaign.title}!` });
+                  
+                  // Refresh & Start
+                  await dataActions.fetchInitialData(user.id, true);
+                  onStartGame();
+                  
+              } catch (e) {
+                  console.error(e);
+                  pushNotification({ type: 'error', message: 'Gagal menembus gerbang dimensi.' });
+              }
             }
           }}
         />

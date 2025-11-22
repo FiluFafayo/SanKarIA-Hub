@@ -10,6 +10,15 @@ interface DungeonGateProps {
 
 export const DungeonGate: React.FC<DungeonGateProps> = ({ onEnterWorld, onBack }) => {
   const [roomCode, setRoomCode] = useState('');
+  const [isChecking, setIsChecking] = useState(false); // [FASE 1] Loading State
+
+  const handleEnter = async () => {
+      if(!roomCode) return;
+      setIsChecking(true);
+      // Kita pass callback ke parent, parent yg handle async
+      await onEnterWorld(roomCode);
+      setIsChecking(false);
+  };
 
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-50 backdrop-blur-sm p-6 animate-fade-in">
@@ -32,10 +41,10 @@ export const DungeonGate: React.FC<DungeonGateProps> = ({ onEnterWorld, onBack }
           </div>
 
           <RuneButton 
-            label="MASUK GERBANG" 
+            label={isChecking ? "MEMERIKSA RUNE..." : "MASUK GERBANG"} 
             fullWidth 
-            disabled={!roomCode}
-            onClick={() => onEnterWorld(roomCode)}
+            disabled={!roomCode || isChecking}
+            onClick={handleEnter}
           />
           
           <div className="relative flex items-center py-2">
