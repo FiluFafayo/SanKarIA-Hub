@@ -195,6 +195,27 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
              // FORCE SET STATE: Kunci data ke memori Runtime (untuk GameScreen)
              useGameStore.getState().actions._setRuntimeCampaignState(initialRuntimeState as any);
 
+             // [FASE 2 FIX] DM IDENTITY INJECTION
+             // GameStore menolak berjalan jika playingCharacter null.
+             // Karena ini mode DM (Creator), kita suntikkan "Avatar DM" agar UI StatBar tidak crash.
+             console.log("Step 4.5b: Injecting DM Persona...");
+             
+             const dmAvatar: any = {
+                 id: `dm-${user.id}`,
+                 ownerId: user.id,
+                 name: "Dungeon Master",
+                 race: "Cosmic Entity",
+                 class: "World Builder",
+                 level: 99,
+                 maxHp: 9999,
+                 currentHp: 9999,
+                 stats: { strength: 20, dexterity: 20, constitution: 20, intelligence: 20, wisdom: 20, charisma: 20 },
+                 avatar_url: "https://ui-avatars.com/api/?name=DM&background=1a1a1a&color=d4af37&size=128&font-size=0.5",
+                 inventory: [],
+                 knownSpells: []
+             };
+             useGameStore.getState().actions._setRuntimeCharacterState(dmAvatar);
+
              // [FASE 1 FIX] SYNC DATASTORE (Global Registry)
              // Ini wajib dilakukan agar App.tsx (Gateway) tidak menganggap data 'corrupt' 
              // karena ID belum ada di daftar kampanye global.
