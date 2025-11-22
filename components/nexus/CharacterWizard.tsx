@@ -1144,6 +1144,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
             </div>
           </div>
         )}
+        </div> {/* <-- Tag penutup Container Scrollable yang hilang */}
       </PixelCard>
     </div>
   );
