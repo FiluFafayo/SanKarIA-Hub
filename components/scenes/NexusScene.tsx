@@ -4,6 +4,7 @@ import { CampfireMenu } from '../nexus/CampfireMenu';
 import { DungeonGate } from '../nexus/DungeonGate';
 import { CharacterWizard } from '../nexus/CharacterWizard'; // Import wizard
 import { CampaignWizard } from '../nexus/CampaignWizard';
+import { CampaignArchive } from '../nexus/CampaignArchive'; // [FASE 3.5] Impor Arsip
 import { SoulSheetModal } from '../nexus/SoulSheetModal'; // [FASE 3] Impor Modal Inspeksi
 import { useAppStore } from '../../store/appStore';
 import { useDataStore } from '../../store/dataStore'; // GANTI DENGAN DATASTORE
@@ -35,7 +36,7 @@ const LoadingIndicator = () => (
 
 
 export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
-  const [viewMode, setViewMode] = useState<'IDLE' | 'CAMPFIRE' | 'GATE' | 'CHAR_WIZARD' | 'CAMP_WIZARD'>('IDLE');
+  const [viewMode, setViewMode] = useState<'IDLE' | 'CAMPFIRE' | 'ARCHIVE' | 'GATE' | 'CHAR_WIZARD' | 'CAMP_WIZARD'>('IDLE');
   const [inspectingCharacter, setInspectingCharacter] = useState<Character | null>(null); // [FASE 3] State Inspeksi
 
   // HAPUS: State lokal untuk karakter dan status refresh
@@ -125,7 +126,7 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
                 useAppStore.getState().actions.pushNotification({ type: 'info', message: 'Pilih jiwa terlebih dahulu di Api Unggun.' });
                 setViewMode('CAMPFIRE');
               } else {
-                setViewMode('GATE');
+                setViewMode('ARCHIVE'); // [FASE 3.5] Buka Arsip dulu
               }
             }}
             className="group relative flex flex-col items-center gap-2 transition-transform active:scale-95"
@@ -181,6 +182,15 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
             />
           )}
         </>
+      )}
+
+      {/* 1.5 CAMPAIGN ARCHIVE (Load Game) */}
+      {viewMode === 'ARCHIVE' && (
+          <CampaignArchive
+              onSelectCampaign={(id) => onStartGame(id)}
+              onCreateNew={() => setViewMode('GATE')}
+              onBack={() => setViewMode('IDLE')}
+          />
       )}
 
       {/* 2. WIZARDS */}
