@@ -12,7 +12,7 @@ import { authRepository } from '../../services/repository/authRepository';
 import { campaignRepository } from '../../services/repository/campaignRepository'; // [FASE 1] Import Repo
 
 interface NexusSceneProps {
-  onStartGame: () => void;
+  onStartGame: (campaignId: string) => void; // [FASE 2] Wajib bawa ID
 }
 
 const BackgroundLayer = () => (
@@ -206,7 +206,7 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
             console.log("Created Campaign:", id);
             // [FASE 1] Refresh Data agar campaign baru muncul di list SSoT
             if (user) await dataActions.fetchInitialData(user.id, true);
-            onStartGame(); 
+            onStartGame(id); // [FASE 2] Pass ID
           }}
         />
       )}
@@ -235,7 +235,7 @@ export const NexusScene: React.FC<NexusSceneProps> = ({ onStartGame }) => {
                   
                   // Refresh & Start
                   await dataActions.fetchInitialData(user.id, true);
-                  onStartGame();
+                  onStartGame(campaign.id); // [FASE 2] Pass ID
                   
               } catch (e) {
                   console.error(e);

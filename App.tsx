@@ -1,6 +1,6 @@
 // File: src/App.tsx
 // GRIMOIRE ENGINE v1.0 (Restored & Hardened)
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react'; // [FASE 2] Import Suspense
 import { GameLayout } from './components/layout/GameLayout';
 import { NexusScene } from './components/scenes/NexusScene';
 import { BattleScene } from './components/scenes/BattleScene';
@@ -47,6 +47,29 @@ const DataErrorScreen: React.FC<{ error: string; onRetry: () => void }> = ({ err
     </div>
 );
 
+// [FASE 2] GRIMOIRE ERROR BOUNDARY (Self-Contained)
+class GrimoireErrorBoundary extends React.Component<{ children: React.ReactNode, onRetry: () => void }, { hasError: boolean, error: string }> {
+    constructor(props: any) {
+        super(props);
+        this.state = { hasError: false, error: '' };
+    }
+    static getDerivedStateFromError(error: any) {
+        return { hasError: true, error: error.toString() };
+    }
+    componentDidCatch(error: any, errorInfo: any) {
+        console.error("Grimoire Engine Crash:", error, errorInfo);
+    }
+    render() {
+        if (this.state.hasError) {
+            return <DataErrorScreen error={`RUNTIME CRASH: ${this.state.error}`} onRetry={() => {
+                this.setState({ hasError: false });
+                this.props.onRetry();
+            }} />;
+        }
+        return this.props.children;
+    }
+}
+
 const App: React.FC = () => {
   // 1. State Global (Direct Access - No Getters!)
   const { auth, initialize } = useAppStore(s => ({ auth: s.auth, initialize: s.initialize }));
@@ -59,6 +82,7 @@ const App: React.FC = () => {
 
   // 2. State Lokal Mesin (The Grimoire State Machine)
   const [appState, setAppState] = useState<'BOOT' | 'NEXUS' | 'EXPLORATION' | 'BATTLE'>('BOOT');
+  const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null); // [FASE 2] Active Campaign
   const [isBootStuck, setIsBootStuck] = useState(false);
 
   // EFFECT 1: Boot Sequence (Auth)
@@ -146,17 +170,52 @@ const App: React.FC = () => {
                     // Pastikan data sudah siap sebelum menampilkan NexusScene agar tidak glitch
                     (dataState.hasLoaded || dataState.characters.length >= 0) && (
                         <NexusScene 
-                            onStartGame={() => setAppState('EXPLORATION')} 
+                            onStartGame={(campaignId) => {
+                                // [FASE 2] Start Logic
+                                setActiveCampaignId(campaignId);
+                                setAppState('EXPLORATION');
+                            }} 
                         />
                     )
                 )
             )}
 
-            {/* B. EXPLORATION SCENE */}
+            {/* B. EXPLORATION SCENE (Protected) */}
             {appState === 'EXPLORATION' && user && (
-                <ExplorationScene 
-                    onEncounter={() => setAppState('BATTLE')}
-                />
+                <GrimoireErrorBoundary onRetry={() => setAppState('NEXUS')}>
+                    <Suspense fallback={<GrimoireLoading />}>
+                        {(() => {
+                            // [FASE 2] THE ATLAS PROTOCOL VALIDATION
+                            const activeCampaign = dataState.campaigns.find(c => c.id === activeCampaignId);
+                            
+                            if (!activeCampaignId || !activeCampaign) {
+                                return (
+                                    <DataErrorScreen 
+                                        error="DATA CORRUPTION: Campaign ID hilang atau tidak ditemukan di memori SSoT."
+                                        onRetry={() => setAppState('NEXUS')}
+                                    />
+                                );
+                            }
+                            
+                            if (!activeCampaign.activeMapId) {
+                                return (
+                                    <DataErrorScreen 
+                                        error="ATLAS PROTOCOL VIOLATION: Dunia ini tidak memiliki koordinat peta aktif (activeMapId: null)."
+                                        onRetry={() => setAppState('NEXUS')}
+                                    />
+                                );
+                            }
+
+                            // Jika lolos validasi, render scene
+                            return (
+                                <ExplorationScene 
+                                    onEncounter={() => setAppState('BATTLE')}
+                                    // [NOTE] Di Fase 3 kita akan inject 'activeCampaign' ke props/store
+                                />
+                            );
+                        })()}
+                    </Suspense>
+                </GrimoireErrorBoundary>
             )}
 
             {/* C. BATTLE SCENE */}
