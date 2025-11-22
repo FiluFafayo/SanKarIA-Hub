@@ -1,7 +1,9 @@
 import { dataService } from '../dataService';
 import { Campaign, GameEvent } from '../../types';
 
-// Helper untuk memetakan record DB kampanye (snake_case) ke tipe aplikasi (camelCase)
+// FASE 3: Relational Mapper (The Adapter)
+// Fungsi ini merakit kembali potongan data yang tersebar di tabel relasional
+// menjadi satu objek 'Campaign' utuh yang dimengerti frontend.
 function mapDbCampaign(dbCampaign: any): Campaign {
   const {
     campaign_players,
@@ -21,18 +23,53 @@ function mapDbCampaign(dbCampaign: any): Campaign {
     current_player_location,
     join_code,
     is_published,
-    quests,
-    npcs,
+    // Relational Fields (Fetch results)
+    campaign_npcs,
+    active_quests,
+    world_maps,
     ...rest
   } = dbCampaign || {};
 
   const playerIds = (campaign_players || []).map((p: { character_id: string }) => p.character_id);
 
+  // Map Active Map Data
+  let explorationGrid = Array.from({ length: 100 }, () => Array(100).fill(10001)); // Default Empty
+  let fogOfWar = Array.from({ length: 100 }, () => Array(100).fill(true)); // Default Foggy
+  let activeMapId = null;
+
+  // Cari peta yang aktif (is_active = true), atau ambil yang pertama jika ada
+  const activeMap = (world_maps || []).find((m: any) => m.is_active) || (world_maps || [])[0];
+  if (activeMap) {
+      explorationGrid = activeMap.grid_data || explorationGrid;
+      fogOfWar = activeMap.fog_data || fogOfWar;
+      activeMapId = activeMap.id;
+  }
+
+  // Map NPCS
+  const mappedNpcs = (campaign_npcs || []).map((n: any) => ({
+      id: n.id,
+      name: n.name,
+      description: n.description,
+      location: n.location,
+      disposition: n.disposition,
+      interactionHistory: n.interaction_history || [],
+      image: n.image_url,
+      opinion: n.opinion || {},
+      secret: n.secret
+  }));
+
+  // Map Quests
+  const mappedQuests = (active_quests || []).map((q: any) => ({
+      id: q.id,
+      title: q.title,
+      description: q.description,
+      status: q.status,
+      isMainQuest: false, // DB v2 belum strict, anggap false default
+      reward: q.reward_summary
+  }));
+
   return {
     ...rest,
-    // Pastikan array tidak undefined agar pemanggilan .filter aman
-    quests: quests || [],
-    npcs: npcs || [],
     ownerId: owner_id,
     joinCode: join_code,
     isPublished: is_published,
@@ -49,10 +86,18 @@ function mapDbCampaign(dbCampaign: any): Campaign {
     mapImageUrl: map_image_url,
     mapMarkers: map_markers || [],
     currentPlayerLocation: current_player_location,
-    explorationGrid: dbCampaign.exploration_grid || [],
-    fogOfWar: dbCampaign.fog_of_war || [],
+    
+    // Relational Mapped Data
+    quests: mappedQuests,
+    npcs: mappedNpcs,
+    explorationGrid,
+    fogOfWar,
+    activeMapId, // Atlas Protocol Reference
+
     battleState: dbCampaign.battle_state || null,
+    // Pastikan posisi grid aman
     playerGridPosition: dbCampaign.player_grid_position || { x: 50, y: 50 },
+    
     rulesConfig: dbCampaign.rules_config || { 
         startingLevel: 1, 
         advancementType: 'milestone', 
@@ -69,12 +114,21 @@ function mapDbCampaign(dbCampaign: any): Campaign {
   } as Campaign;
 }
 
+// DEEP SELECT QUERY (Standard for all fetches)
+const CAMPAIGN_SELECT_QUERY = `
+    *,
+    campaign_players(character_id),
+    campaign_npcs(*),
+    active_quests(*),
+    world_maps(*)
+`;
+
 export const campaignRepository = {
   getPublishedCampaigns: async (): Promise<Campaign[]> => {
     const supabase = dataService.getClient();
     const { data, error } = await supabase
       .from('campaigns')
-      .select('*, campaign_players(character_id)')
+      .select(CAMPAIGN_SELECT_QUERY)
       .eq('is_published', true);
 
     if (error) throw error;
@@ -85,6 +139,7 @@ export const campaignRepository = {
     if (characterIds.length === 0) return [];
     const supabase = dataService.getClient();
 
+    // 1. Get IDs first
     const { data: playerLinks, error: linkError } = await supabase
       .from('campaign_players')
       .select('campaign_id')
@@ -95,9 +150,10 @@ export const campaignRepository = {
 
     const campaignIds = [...new Set(playerLinks.map((p: any) => p.campaign_id))];
 
+    // 2. Fetch Full Data
     const { data: campaignsData, error: campaignError } = await supabase
       .from('campaigns')
-      .select('*, campaign_players(character_id)')
+      .select(CAMPAIGN_SELECT_QUERY)
       .in('id', campaignIds);
 
     if (campaignError) throw campaignError;
@@ -108,7 +164,7 @@ export const campaignRepository = {
     const supabase = dataService.getClient();
     const { data, error } = await supabase
       .from('campaigns')
-      .select('*, campaign_players(character_id)')
+      .select(CAMPAIGN_SELECT_QUERY)
       .eq('join_code', code.toUpperCase())
       .single();
 
@@ -120,27 +176,20 @@ export const campaignRepository = {
     return mapDbCampaign(data as any);
   },
 
+  // FASE 3: THE ADAPTER LOGIC
+  // Menerima 'Flat Object' (dari Wizard/Template) dan mendistribusikannya ke tabel relasional.
   createCampaign: async (
-    campaignData: Omit<
-      Campaign,
-      | 'id'
-      | 'ownerId'
-      | 'eventLog'
-      | 'monsters'
-      | 'players'
-      | 'playerIds'
-      | 'choices'
-      | 'turnId'
-      | 'initiativeOrder'
-    >,
+    campaignData: Partial<Campaign>, // Use Partial for flexibility during creation
     userId: string
   ): Promise<Campaign> => {
     const supabase = dataService.getClient();
-    const dbCampaign: any = {
+
+    // 1. Insert CORE Campaign Data
+    const dbCampaignCore: any = {
       owner_id: userId,
       title: campaignData.title,
       description: campaignData.description,
-      image: campaignData.image,
+      cover_url: campaignData.cover_url || campaignData.image, // Handle legacy 'image' prop
       join_code: campaignData.joinCode,
       is_published: campaignData.isPublished,
       maxPlayers: campaignData.maxPlayers,
@@ -162,99 +211,110 @@ export const campaignRepository = {
       map_image_url: campaignData.mapImageUrl,
       map_markers: campaignData.mapMarkers,
       current_player_location: campaignData.currentPlayerLocation,
-      quests: campaignData.quests,
-      npcs: campaignData.npcs,
-      exploration_grid: campaignData.explorationGrid,
-      fog_of_war: campaignData.fogOfWar,
       battle_state: campaignData.battleState,
-      player_grid_position: campaignData.playerGridPosition,
-      rules_config: campaignData.rulesConfig, // Mapping baru
+      rules_config: campaignData.rulesConfig,
     };
 
-    const { data, error } = await supabase
+    // Hapus undefined keys agar tidak menimpa default DB
+    Object.keys(dbCampaignCore).forEach(key => dbCampaignCore[key] === undefined && delete dbCampaignCore[key]);
+
+    const { data: createdCampaign, error: coreError } = await supabase
       .from('campaigns')
-      .insert(dbCampaign)
+      .insert(dbCampaignCore)
       .select()
       .single();
 
-    if (error) throw error;
-    return mapDbCampaign({ ...(data as any), campaign_players: [] });
+    if (coreError) throw coreError;
+    const campaignId = createdCampaign.id;
+
+    // 2. Insert RELATIONAL Data (The Fix)
+    const promises = [];
+
+    // A. Adapter: Exploration Grid -> World Maps
+    if (campaignData.explorationGrid) {
+        promises.push(supabase.from('world_maps').insert({
+            campaign_id: campaignId,
+            name: 'Overworld (Default)',
+            grid_data: campaignData.explorationGrid,
+            fog_data: campaignData.fogOfWar || [],
+            is_active: true
+        }));
+    }
+
+    // B. Adapter: NPCs -> Campaign NPCs
+    if (campaignData.npcs && campaignData.npcs.length > 0) {
+        const npcRows = campaignData.npcs.map(n => ({
+            campaign_id: campaignId,
+            name: n.name,
+            description: n.description,
+            location: n.location,
+            disposition: n.disposition || 'Neutral',
+            interaction_history: n.interactionHistory || [],
+            image_url: n.image,
+            secret: n.secret
+        }));
+        promises.push(supabase.from('campaign_npcs').insert(npcRows));
+    }
+
+    // C. Adapter: Quests -> Active Quests
+    if (campaignData.quests && campaignData.quests.length > 0) {
+        const questRows = campaignData.quests.map(q => ({
+            campaign_id: campaignId,
+            title: q.title,
+            description: q.description,
+            status: q.status || 'active',
+            reward_summary: q.reward
+        }));
+        promises.push(supabase.from('active_quests').insert(questRows));
+    }
+
+    // Tunggu semua relasi tersimpan
+    await Promise.all(promises);
+
+    // Return fully mapped object (simulate fetch or reconstruct)
+    return mapDbCampaign({
+        ...createdCampaign,
+        campaign_players: [],
+        // Inject data yang baru saja kita kirim (optimistic update) agar UI langsung dapat
+        world_maps: campaignData.explorationGrid ? [{ grid_data: campaignData.explorationGrid, fog_data: campaignData.fogOfWar, is_active: true }] : [],
+        campaign_npcs: campaignData.npcs ? campaignData.npcs.map((n, i) => ({ ...n, id: `temp-${i}` })) : [],
+        active_quests: campaignData.quests ? campaignData.quests.map((q, i) => ({ ...q, id: `temp-${i}` })) : []
+    });
   },
 
   saveCampaign: async (campaign: Campaign): Promise<Campaign> => {
     const supabase = dataService.getClient();
-    const {
-      id,
-      title,
-      description,
-      image,
-      joinCode,
-      isPublished,
-      maxPlayers,
-      theme,
-      mainGenre,
-      subGenre,
-      duration,
-      isNSFW,
-      dmPersonality,
-      dmNarrationStyle,
-      responseLength,
-      gameState,
-      currentPlayerId,
-      initiativeOrder,
-      longTermMemory,
-      currentTime,
-      currentWeather,
-      worldEventCounter,
-      mapImageUrl,
-      mapMarkers,
-      currentPlayerLocation,
-      quests,
-      npcs,
-      explorationGrid,
-      fogOfWar,
-      battleState,
-      playerGridPosition,
-    } = campaign as any;
-
+    
+    // Save Core Only (Update Relasional harus via method spesifik demi integritas)
     const dbCampaign: any = {
-      title,
-      description,
-      image,
-      join_code: joinCode,
-      is_published: isPublished,
-      maxPlayers,
-      theme,
-      mainGenre,
-      subGenre,
-      duration,
-      isNSFW,
-      dm_personality: dmPersonality,
-      dm_narration_style: dmNarrationStyle,
-      response_length: responseLength,
-      game_state: gameState,
-      current_player_id: currentPlayerId,
-      initiative_order: initiativeOrder,
-      long_term_memory: longTermMemory,
-      current_time: currentTime,
-      current_weather: currentWeather,
-      world_event_counter: worldEventCounter,
-      map_image_url: mapImageUrl,
-      map_markers: mapMarkers,
-      current_player_location: currentPlayerLocation,
-      quests,
-      npcs,
-      exploration_grid: explorationGrid,
-      fog_of_war: fogOfWar,
-      battle_state: battleState,
-      player_grid_position: playerGridPosition,
+      title: campaign.title,
+      description: campaign.description,
+      cover_url: campaign.cover_url,
+      join_code: campaign.joinCode,
+      is_published: campaign.isPublished,
+      dm_personality: campaign.dmPersonality,
+      dm_narration_style: campaign.dmNarrationStyle,
+      response_length: campaign.responseLength,
+      game_state: campaign.gameState,
+      current_player_id: campaign.currentPlayerId,
+      initiative_order: campaign.initiativeOrder,
+      long_term_memory: campaign.longTermMemory,
+      current_time: campaign.currentTime,
+      current_weather: campaign.currentWeather,
+      world_event_counter: campaign.worldEventCounter,
+      map_image_url: campaign.mapImageUrl,
+      map_markers: campaign.mapMarkers,
+      current_player_location: campaign.currentPlayerLocation,
+      battle_state: campaign.battleState,
+      // Note: Exploration Grid tidak di-save di sini lagi! Harus via updateMap endpoint (future phase)
+      // Tapi untuk menjaga kompatibilitas Fase 3, kita biarkan dulu.
     };
 
     const { data, error } = await supabase
       .from('campaigns')
       .update(dbCampaign)
-      .eq('id', id)
-      .select('*, campaign_players(character_id)')
+      .eq('id', campaign.id)
+      .select(CAMPAIGN_SELECT_QUERY)
       .single();
 
     if (error) throw error;
