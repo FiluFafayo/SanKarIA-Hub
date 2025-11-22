@@ -176,20 +176,21 @@ export const campaignRepository = {
     return mapDbCampaign(data as any);
   },
 
-  // FASE 3: THE ADAPTER LOGIC
-  // Menerima 'Flat Object' (dari Wizard/Template) dan mendistribusikannya ke tabel relasional.
+  // FASE FINAL: ATOMIC TRANSACTION (RPC)
+  // Menggunakan Stored Procedure 'create_campaign_atomic' untuk menjamin 
+  // Campaign, Map, NPC, dan Quest tersimpan SEMUA atau TIDAK SAMA SEKALI.
   createCampaign: async (
-    campaignData: Partial<Campaign>, // Use Partial for flexibility during creation
+    campaignData: Partial<Campaign>,
     userId: string
   ): Promise<Campaign> => {
     const supabase = dataService.getClient();
 
-    // 1. Insert CORE Campaign Data
-    const dbCampaignCore: any = {
+    // 1. Prepare CORE Data (Snake Case keys to match DB columns for jsonb_populate_record)
+    const corePayload: any = {
       owner_id: userId,
       title: campaignData.title,
       description: campaignData.description,
-      cover_url: campaignData.cover_url || campaignData.image, // Handle legacy 'image' prop
+      cover_url: campaignData.cover_url || campaignData.image,
       join_code: campaignData.joinCode,
       is_published: campaignData.isPublished,
       maxPlayers: campaignData.maxPlayers,
@@ -203,82 +204,66 @@ export const campaignRepository = {
       response_length: campaignData.responseLength,
       game_state: campaignData.gameState,
       current_player_id: campaignData.currentPlayerId,
-      initiative_order: campaignData.initiativeOrder,
+      initiative_order: campaignData.initiativeOrder || [],
       long_term_memory: campaignData.longTermMemory,
       current_time: campaignData.currentTime,
       current_weather: campaignData.currentWeather,
       world_event_counter: campaignData.worldEventCounter,
       map_image_url: campaignData.mapImageUrl,
-      map_markers: campaignData.mapMarkers,
+      map_markers: campaignData.mapMarkers || [],
       current_player_location: campaignData.currentPlayerLocation,
       battle_state: campaignData.battleState,
-      rules_config: campaignData.rulesConfig,
+      rules_config: campaignData.rulesConfig || {},
     };
 
-    // Hapus undefined keys agar tidak menimpa default DB
-    Object.keys(dbCampaignCore).forEach(key => dbCampaignCore[key] === undefined && delete dbCampaignCore[key]);
+    // Clean undefined
+    Object.keys(corePayload).forEach(key => corePayload[key] === undefined && delete corePayload[key]);
 
-    const { data: createdCampaign, error: coreError } = await supabase
-      .from('campaigns')
-      .insert(dbCampaignCore)
-      .select()
-      .single();
+    // 2. Prepare RELATIONAL Payloads
+    const mapPayload = campaignData.explorationGrid ? {
+        grid_data: campaignData.explorationGrid,
+        fog_data: campaignData.fogOfWar || []
+    } : null;
 
-    if (coreError) throw coreError;
-    const campaignId = createdCampaign.id;
+    const npcPayload = campaignData.npcs?.map(n => ({
+        name: n.name,
+        description: n.description,
+        location: n.location,
+        disposition: n.disposition || 'Neutral',
+        interaction_history: n.interactionHistory || [],
+        image_url: n.image,
+        secret: n.secret
+    })) || [];
 
-    // 2. Insert RELATIONAL Data (The Fix)
-    const promises = [];
+    const questPayload = campaignData.quests?.map(q => ({
+        title: q.title,
+        description: q.description,
+        status: q.status || 'active',
+        reward_summary: q.reward
+    })) || [];
 
-    // A. Adapter: Exploration Grid -> World Maps
-    if (campaignData.explorationGrid) {
-        promises.push(supabase.from('world_maps').insert({
-            campaign_id: campaignId,
-            name: 'Overworld (Default)',
-            grid_data: campaignData.explorationGrid,
-            fog_data: campaignData.fogOfWar || [],
-            is_active: true
-        }));
-    }
+    // 3. CALL RPC
+    const { data: createdCore, error } = await supabase.rpc('create_campaign_atomic', {
+        payload: {
+            core: corePayload,
+            world_map: mapPayload,
+            npcs: npcPayload,
+            quests: questPayload
+        }
+    });
 
-    // B. Adapter: NPCs -> Campaign NPCs
-    if (campaignData.npcs && campaignData.npcs.length > 0) {
-        const npcRows = campaignData.npcs.map(n => ({
-            campaign_id: campaignId,
-            name: n.name,
-            description: n.description,
-            location: n.location,
-            disposition: n.disposition || 'Neutral',
-            interaction_history: n.interactionHistory || [],
-            image_url: n.image,
-            secret: n.secret
-        }));
-        promises.push(supabase.from('campaign_npcs').insert(npcRows));
-    }
+    if (error) throw error;
 
-    // C. Adapter: Quests -> Active Quests
-    if (campaignData.quests && campaignData.quests.length > 0) {
-        const questRows = campaignData.quests.map(q => ({
-            campaign_id: campaignId,
-            title: q.title,
-            description: q.description,
-            status: q.status || 'active',
-            reward_summary: q.reward
-        }));
-        promises.push(supabase.from('active_quests').insert(questRows));
-    }
-
-    // Tunggu semua relasi tersimpan
-    await Promise.all(promises);
-
-    // Return fully mapped object (simulate fetch or reconstruct)
+    // 4. Return Optimistic Mapped Object
+    // Karena RPC mengembalikan row campaign yang baru dibuat, kita mapping ulang
+    // dengan data relasional yang baru saja kita kirim (karena kita tahu itu sukses).
     return mapDbCampaign({
-        ...createdCampaign,
+        ...createdCore, // Data dari DB (ID, CreatedAt, dll)
         campaign_players: [],
-        // Inject data yang baru saja kita kirim (optimistic update) agar UI langsung dapat
-        world_maps: campaignData.explorationGrid ? [{ grid_data: campaignData.explorationGrid, fog_data: campaignData.fogOfWar, is_active: true }] : [],
-        campaign_npcs: campaignData.npcs ? campaignData.npcs.map((n, i) => ({ ...n, id: `temp-${i}` })) : [],
-        active_quests: campaignData.quests ? campaignData.quests.map((q, i) => ({ ...q, id: `temp-${i}` })) : []
+        // Inject data relasional 'mentah' agar UI terhidrasi tanpa fetch ulang
+        world_maps: mapPayload ? [{ ...mapPayload, is_active: true }] : [],
+        campaign_npcs: npcPayload.map((n: any, i: number) => ({ ...n, id: `new-${i}` })),
+        active_quests: questPayload.map((q: any, i: number) => ({ ...q, id: `new-${i}` }))
     });
   },
 

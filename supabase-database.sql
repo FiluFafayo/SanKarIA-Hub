@@ -312,8 +312,96 @@ CREATE TABLE "public"."campaigns" (
     "current_player_id" "uuid" REFERENCES "public"."characters"("id") ON DELETE SET NULL,
     "initiative_order" "text"[] DEFAULT '{}',
     "turn_id" "text",
-    "battle_state" "jsonb" -- Snapshot battle state (Unit positions, etc)
+    "battle_state" "jsonb", -- Snapshot battle state (Unit positions, etc)
+    
+    -- [PATCH FASE FINAL] Missing Columns for Legacy/AI Context
+    "long_term_memory" "text",
+    "map_image_url" "text",
+    "map_markers" "jsonb" DEFAULT '[]'::jsonb,
+    "current_player_location" "text"
 );
+
+-- [PATCH FASE FINAL] RPC untuk Transaction Safety
+-- Fungsi ini menerima satu payload JSON besar dan menyimpannya secara atomik.
+-- Jika salah satu insert gagal, SEMUANYA dibatalkan (Rollback).
+CREATE OR REPLACE FUNCTION "public"."create_campaign_atomic"(payload jsonb)
+RETURNS jsonb AS $$
+DECLARE
+    new_campaign_id uuid;
+    core_data jsonb;
+    map_data jsonb;
+    npc_list jsonb;
+    quest_list jsonb;
+    result_row jsonb;
+BEGIN
+    -- 1. Ekstrak Data
+    core_data := payload -> 'core';
+    map_data := payload -> 'world_map';
+    npc_list := payload -> 'npcs';
+    quest_list := payload -> 'quests';
+
+    -- 2. Insert Campaign Core (Auto-Map JSON ke Columns)
+    -- Menggunakan jsonb_populate_record untuk memetakan key JSON ke kolom tabel secara otomatis.
+    -- null::campaigns adalah target row type.
+    INSERT INTO "public"."campaigns"
+    SELECT * FROM jsonb_populate_record(null::"public"."campaigns", core_data)
+    RETURNING "id" INTO new_campaign_id;
+
+    -- 3. Insert World Map (Jika ada data grid)
+    IF map_data IS NOT NULL THEN
+        INSERT INTO "public"."world_maps" ("campaign_id", "name", "grid_data", "fog_data", "is_active")
+        VALUES (
+            new_campaign_id,
+            'Overworld (Default)',
+            map_data -> 'grid_data',
+            map_data -> 'fog_data',
+            true
+        );
+    END IF;
+
+    -- 4. Insert NPCs (Jika array tidak kosong)
+    IF npc_list IS NOT NULL AND jsonb_array_length(npc_list) > 0 THEN
+        INSERT INTO "public"."campaign_npcs" (
+            "campaign_id", "name", "description", "location", "disposition", 
+            "interaction_history", "image_url", "secret"
+        )
+        SELECT 
+            new_campaign_id,
+            p ->> 'name',
+            p ->> 'description',
+            p ->> 'location',
+            p ->> 'disposition',
+            ARRAY(SELECT jsonb_array_elements_text(p -> 'interaction_history')), -- Cast JSON Array ke Text Array
+            p ->> 'image_url',
+            p ->> 'secret'
+        FROM jsonb_array_elements(npc_list) AS p;
+    END IF;
+
+    -- 5. Insert Active Quests (Jika array tidak kosong)
+    IF quest_list IS NOT NULL AND jsonb_array_length(quest_list) > 0 THEN
+        INSERT INTO "public"."active_quests" (
+            "campaign_id", "title", "description", "status", "reward_summary"
+        )
+        SELECT 
+            new_campaign_id,
+            q ->> 'title',
+            q ->> 'description',
+            q ->> 'status',
+            q ->> 'reward_summary'
+        FROM jsonb_array_elements(quest_list) AS q;
+    END IF;
+
+    -- 6. Return Created Campaign (Sebagai konfirmasi)
+    SELECT row_to_json(c) INTO result_row FROM "public"."campaigns" c WHERE c.id = new_campaign_id;
+    RETURN result_row;
+
+EXCEPTION WHEN OTHERS THEN
+    -- Error akan otomatis memicu ROLLBACK di level Postgres
+    RAISE; 
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION "public"."create_campaign_atomic"(jsonb) TO authenticated;
 
 CREATE TABLE "public"."campaign_players" (
     "id" "uuid" PRIMARY KEY DEFAULT "gen_random_uuid"(),
