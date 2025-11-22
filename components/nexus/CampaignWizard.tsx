@@ -33,7 +33,8 @@ const SCALES = [
 ];
 
 export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCancel }) => {
-  const { user } = useAppStore();
+  // [QA FIX] Mengambil user dari slice 'auth', bukan root state
+  const user = useAppStore((state) => state.auth.user);
   const [step, setStep] = useState<WizardStep>('METHOD');
   const [isProcessing, setIsProcessing] = useState(false);
   
