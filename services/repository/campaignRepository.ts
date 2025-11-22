@@ -144,7 +144,9 @@ export const campaignRepository = {
 
   getMyCampaigns: async (characterIds: string[]): Promise<Campaign[]> => {
     const supabase = dataService.getClient();
-    const userId = dataService.getCurrentUserId(); // Ambil ID user yang sedang login
+    // [FIX] Gunakan getCurrentUser (async) karena getCurrentUserId tidak ada
+    const user = await dataService.getCurrentUser();
+    const userId = user?.id;
 
     // 1. Cari ID Campaign di mana user adalah PLAYER
     let playerCampaignIds: string[] = [];
