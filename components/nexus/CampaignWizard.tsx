@@ -200,6 +200,9 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
              // Karena ini mode DM (Creator), kita suntikkan "Avatar DM" agar UI StatBar tidak crash.
              console.log("Step 4.5b: Injecting DM Persona...");
              
+             // [FIX FASE 2.1] DM IDENTITY STRUCTURE PATCH
+             // Menggunakan nama properti yang sesuai dengan types.ts (abilityScores, bukan stats)
+             // dan menambahkan array kosong untuk mencegah crash pada .includes() atau .map()
              const dmAvatar: any = {
                  id: `dm-${user.id}`,
                  ownerId: user.id,
@@ -209,10 +212,23 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                  level: 99,
                  maxHp: 9999,
                  currentHp: 9999,
-                 stats: { strength: 20, dexterity: 20, constitution: 20, intelligence: 20, wisdom: 20, charisma: 20 },
+                 armorClass: 20,
+                 speed: 30,
+                 // FIX CRITICAL: Rename 'stats' -> 'abilityScores'
+                 abilityScores: { strength: 20, dexterity: 20, constitution: 20, intelligence: 20, wisdom: 20, charisma: 20 },
+                 // FIX SAFETY: Tambahkan properti array wajib
+                 proficientSkills: [], 
+                 proficientSavingThrows: [],
+                 skills: [],
                  avatar_url: "https://ui-avatars.com/api/?name=DM&background=1a1a1a&color=d4af37&size=128&font-size=0.5",
                  inventory: [],
-                 knownSpells: []
+                 knownSpells: [],
+                 // Visual defaults
+                 bodyType: 'average',
+                 scars: [],
+                 hair: 'none',
+                 facialHair: 'none',
+                 headAccessory: 'none'
              };
              useGameStore.getState().actions._setRuntimeCharacterState(dmAvatar);
 
