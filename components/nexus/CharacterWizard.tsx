@@ -420,37 +420,14 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         if (sp && !selectedSpells.includes(name)) spells.push(sp);
       });
 
-      // [Fase 1 Fix] Hapus parameter ownerId, biarkan backend mengambil dari sesi
-      const newChar = await characterRepository.saveNewCharacter(characterData, inventory, spells);
-      
-      // [FASE 2] Simpan Character Arc (Secret Agenda)
-      if (selectedSoul && newChar && newChar.id) {
-          // Kita butuh campaignId, tapi di Wizard ini belum tentu ada campaign context.
-          // Solusi: Gunakan dummy UUID atau biarkan NULL jika SQL mengizinkan.
-          // ATAU: Simpan sebagai 'unassigned' arc.
-          // Untuk sekarang, kita asumsikan karakter ini akan di-assign nanti, 
-          // jadi kita simpan Arc-nya dengan referensi characterId saja.
-          // TAPI: Skema SQL menuntut campaign_id NOT NULL.
-          // WORKAROUND: Kita skip insert DB untuk Arc di sini jika belum join campaign.
-          // Arc akan disimpan di LocalStorage sementara atau di metadata karakter?
-          // IDEALNYA: Character Wizard ini dipanggil DALAM konteks Campaign (saat join).
-          // JIKA dipanggil dari Profile, Arc ini sifatnya 'potensial'.
-          
-          // KEPUTUSAN: Untuk saat ini, kita simpan di 'notes' atau field metadata karakter dulu
-          // atau kita abaikan save ke tabel 'character_arcs' sampai dia join campaign.
-          // TAPI, agar data tidak hilang, kita bisa append ke `background` atau `personalityTrait` sebagai hidden text.
-          
-          // UPDATE: Karena kita Arsitek Paranoid, kita sadar tabel `character_arcs` butuh `campaign_id`.
-          // Karakter yang dibuat di Profile (belum join campaign) TIDAK BISA punya entri di `character_arcs`.
-          // Solusi: Simpan data Soul ini di `true_desire` (jika kolom ada di char) atau append ke `personality_trait`.
-          // Saya akan append ke `personality_trait` dengan penanda khusus agar nanti bisa di-parse saat join campaign.
-          
+      // [FASE 2 - OPTIMIZED] Inject Secret Agenda SEBELUM save untuk mencegah Double-Write ke DB
+      if (selectedSoul) {
           const secretData = `\n\n[SECRET_ARC]\nTYPE: ${selectedSoul.type}\nAGENDA: ${selectedSoul.agenda}\nDESIRE: ${selectedSoul.desire}\nTRIGGER: ${selectedSoul.trigger}`;
-          
-          // Update karakter barusan dengan secret data ini
-          const updatedChar = { ...newChar, personalityTrait: newChar.personalityTrait + secretData };
-          await characterRepository.saveCharacter(updatedChar);
+          characterData.personalityTrait = (characterData.personalityTrait || "") + secretData;
       }
+
+      // Simpan Character (Sekarang sudah termasuk Secret Arc di personalityTrait)
+      await characterRepository.saveNewCharacter(characterData, inventory, spells);
 
       onComplete();
     } catch (e) {
@@ -540,7 +517,17 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         {step === 'NAME' && (
           <div className="flex flex-col gap-4">
             <p className="text-parchment font-retro text-center">Siapa nama yang akan terukir di batu nisanmu?</p>
-            <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="bg-black border-2 border-wood p-3 text-center font-pixel text-parchment focus:border-gold outline-none" placeholder="NAMA PAHLAWAN" />
+            <div className="relative">
+                <input 
+                    type="text" 
+                    value={formData.name} 
+                    maxLength={30}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                    className="w-full bg-black border-2 border-wood p-3 text-center font-pixel text-parchment focus:border-gold outline-none" 
+                    placeholder="NAMA PAHLAWAN" 
+                />
+                <span className="absolute right-2 bottom-2 text-[9px] text-faded">{formData.name.length}/30</span>
+            </div>
             <div className="flex gap-2 mt-4">
               <RuneButton label="BATAL" variant="secondary" onClick={onCancel} fullWidth />
               <RuneButton label="LANJUT" fullWidth disabled={!formData.name} onClick={() => setStep('RACE')} />
@@ -1079,31 +1066,38 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         {step === 'REVIEW' && (
           <div className="flex flex-col gap-4 animate-fade-in">
             <div className="flex gap-4 items-start">
-              {/* Kiri: Summary Text */}
-              <div className="w-1/2 flex flex-col gap-2 text-xs text-faded border-r border-wood/30 pr-2">
-                <h3 className="font-pixel text-gold text-sm border-b border-wood/50 pb-1">RINGKASAN JIWA</h3>
-                <div><span className="text-parchment">Nama:</span> {formData.name}</div>
-                <div><span className="text-parchment">Ras:</span> {formData.raceId} ({formData.gender})</div>
-                <div><span className="text-parchment">Kelas:</span> {formData.classId}</div>
-                <div><span className="text-parchment">Latar:</span> {formData.backgroundName}</div>
-
-                {/* New Context Info */}
-                <div className="mt-1 border-t border-wood/30 pt-1">
-                  <span className="text-parchment">Skill Dominan:</span>
-                  <p className="italic text-[9px]">{selectedSkills.slice(0, 3).join(', ')}{selectedSkills.length > 3 ? '...' : ''}</p>
+              {/* Kiri: Soul Contract (Narrative) */}
+              <div className="w-1/2 flex flex-col gap-2 text-xs border-r border-wood/30 pr-2 overflow-y-auto custom-scrollbar">
+                <h3 className="font-pixel text-gold text-sm border-b border-wood/50 pb-1 mb-1">KONTRAK JIWA</h3>
+                
+                <div className="font-cinzel text-parchment text-justify leading-relaxed space-y-2">
+                    <p>
+                        "Saya, <span className="text-gold font-bold border-b border-gold/50">{formData.name}</span>, 
+                        seorang <span className="text-white">{formData.gender} {formData.raceId}</span>.
+                    </p>
+                    <p>
+                        Terlahir sebagai <span className="text-white">{formData.backgroundName}</span>, 
+                        kini saya menempuh jalan <span className="text-gold font-bold">{formData.classId}</span>."
+                    </p>
+                    
+                    {selectedSoul && (
+                        <div className="bg-white/5 p-2 border-l-2 border-red-500/50 mt-2 italic text-faded">
+                            <span className="text-[9px] text-red-400 block mb-1 font-pixel">SUMPAH RAHASIA (HIDDEN):</span>
+                            "{selectedSoul.agenda}"
+                        </div>
+                    )}
                 </div>
-                <div>
-                  <span className="text-parchment">Equipment:</span>
-                  <p className="italic text-[9px]">
-                    {Object.values(selectedEquipment).flatMap(e => e.itemNames).slice(0, 3).join(', ')}
-                  </p>
-                </div>
 
-                <div className="mt-1 border-t border-wood/30 pt-1"><span className="text-parchment">Atribut:</span></div>
-                <div className="grid grid-cols-3 gap-1 text-[9px]">
-                  {Object.entries(formData.abilityScores).map(([k, v]) => (
-                    <div key={k} className="bg-black/40 px-1 rounded">{k.substring(0, 3).toUpperCase()}: {v}</div>
-                  ))}
+                {/* Technical Stats (Compact) */}
+                <div className="mt-auto pt-2 border-t border-wood/30">
+                    <div className="grid grid-cols-3 gap-1 text-[9px] font-pixel text-faded">
+                        {Object.entries(formData.abilityScores).map(([k, v]) => (
+                            <div key={k} className="bg-black/40 px-1 rounded flex justify-between">
+                                <span>{k.substring(0, 3).toUpperCase()}</span>
+                                <span className="text-gold">{v}</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
               </div>
 
