@@ -143,25 +143,45 @@ export const campaignRepository = {
   },
 
   getMyCampaigns: async (characterIds: string[]): Promise<Campaign[]> => {
-    if (characterIds.length === 0) return [];
     const supabase = dataService.getClient();
+    const userId = dataService.getCurrentUserId(); // Ambil ID user yang sedang login
 
-    // 1. Get IDs first
-    const { data: playerLinks, error: linkError } = await supabase
-      .from('campaign_players')
-      .select('campaign_id')
-      .in('character_id', characterIds);
+    // 1. Cari ID Campaign di mana user adalah PLAYER
+    let playerCampaignIds: string[] = [];
+    if (characterIds.length > 0) {
+        const { data: playerLinks, error: linkError } = await supabase
+          .from('campaign_players')
+          .select('campaign_id')
+          .in('character_id', characterIds);
+        
+        if (!linkError && playerLinks) {
+            playerCampaignIds = playerLinks.map((p: any) => p.campaign_id);
+        }
+    }
 
-    if (linkError) throw linkError;
-    if (!playerLinks || playerLinks.length === 0) return [];
+    // 2. Cari ID Campaign di mana user adalah OWNER (DM) - [FIX FASE 4]
+    let ownerCampaignIds: string[] = [];
+    if (userId) {
+        const { data: ownerLinks, error: ownerError } = await supabase
+            .from('campaigns')
+            .select('id')
+            .eq('owner_id', userId);
+        
+        if (!ownerError && ownerLinks) {
+            ownerCampaignIds = ownerLinks.map((c: any) => c.id);
+        }
+    }
 
-    const campaignIds = [...new Set(playerLinks.map((p: any) => p.campaign_id))];
+    // 3. Gabungkan & Hapus Duplikat
+    const allCampaignIds = [...new Set([...playerCampaignIds, ...ownerCampaignIds])];
 
-    // 2. Fetch Full Data
+    if (allCampaignIds.length === 0) return [];
+
+    // 4. Fetch Data Lengkap
     const { data: campaignsData, error: campaignError } = await supabase
       .from('campaigns')
       .select(CAMPAIGN_SELECT_QUERY)
-      .in('id', campaignIds);
+      .in('id', allCampaignIds);
 
     if (campaignError) throw campaignError;
     return (campaignsData || []).map((db: any) => mapDbCampaign(db));

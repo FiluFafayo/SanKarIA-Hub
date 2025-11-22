@@ -20,6 +20,7 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
   const { playingCampaign, playingCharacter, runtimeSettings } = useGameStore(s => s.runtime);
   const _setRuntimeCampaignState = useGameStore(s => s.actions._setRuntimeCampaignState);
   const _setRuntimeCharacterState = useGameStore(s => s.actions._setRuntimeCharacterState);
+  const exitGameSession = useGameStore(s => s.actions.exitGameSession); // [FASE 4] Exit Action
 
   // Guard Clause: Paranoid Check
   if (!playingCampaign || !playingCharacter) {
@@ -122,8 +123,16 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
                 </div>
             </div>
             
-            {/* World Clock / Weather Badge */}
-            <div className="flex flex-col items-end">
+            {/* World Clock / Weather Badge & EXIT BUTTON */}
+            <div className="flex flex-col items-end gap-2">
+                {/* Tombol Keluar [FASE 4] */}
+                <button 
+                    onClick={exitGameSession}
+                    className="bg-red-900/80 border border-red-500 text-red-100 px-2 py-1 rounded text-[10px] font-pixel hover:bg-red-700 transition-colors shadow-lg z-50"
+                >
+                    💾 KELUAR & SIMPAN
+                </button>
+
                 <div className="bg-black/50 border border-wood px-2 py-1 rounded text-[10px] text-gold font-pixel">
                     {campaign.currentWeather?.toUpperCase() || "CERAH"}
                 </div>
@@ -149,10 +158,19 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
                         {log.text}
                     </div>
                 ))}
-                {/* Typing Indicator */}
+                {/* Typing Indicator & Force Reset [FASE 4] */}
                 {campaign.thinkingState === 'thinking' && (
-                    <div className="text-xs text-gold animate-pulse font-pixel mt-2">
-                        DM SEDANG MENULIS KISAH...
+                    <div className="flex items-center gap-2 mt-2">
+                        <div className="text-xs text-gold animate-pulse font-pixel">
+                            DM SEDANG MENULIS KISAH...
+                        </div>
+                        <button 
+                            onClick={() => campaignActions.setThinkingState('idle')}
+                            className="text-[8px] bg-wood/50 border border-wood px-1 py-0.5 text-faded hover:text-white hover:bg-red-900"
+                            title="Klik jika DM macet lebih dari 1 menit"
+                        >
+                            (GUNCANG DM)
+                        </button>
                     </div>
                 )}
              </div>
