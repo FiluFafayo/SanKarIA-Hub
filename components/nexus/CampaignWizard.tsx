@@ -230,22 +230,22 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                             </div>
                         ))}
                     </div>
-                    <div className="flex gap-2 mt-4 relative z-20">
+                    <div className="shrink-0 flex gap-2 mt-4 pt-4 border-t border-wood/30 relative z-20">
                         <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('METHOD')} fullWidth />
                         <RuneButton label="LANJUT" fullWidth onClick={() => setStep('SCALE')} />
                     </div>
-                </>
+                </div>
             );
 
         case 'SCALE':
             return (
-                <>
-                     <div className="flex flex-col gap-4 animate-fade-in">
+                <div className="flex flex-col h-full">
+                     <div className="flex flex-col gap-4 animate-fade-in flex-1 overflow-y-auto pr-2">
                         {SCALES.map((s) => (
                             <div
                                 key={s.id}
                                 onClick={() => setFormData({...formData, scale: s.id})}
-                                className={`p-4 border-2 cursor-pointer transition-colors ${formData.scale === s.id ? 'border-gold bg-gold/10' : 'border-wood hover:bg-white/5'}`}
+                                className={`p-4 border-2 cursor-pointer transition-colors shrink-0 ${formData.scale === s.id ? 'border-gold bg-gold/10' : 'border-wood hover:bg-white/5'}`}
                             >
                                 <div className="font-pixel text-gold text-sm mb-1">{s.label}</div>
                                 <div className="font-retro text-xs text-faded">{s.desc}</div>
@@ -257,11 +257,11 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                             </div>
                         ))}
                     </div>
-                    <div className="flex gap-2 mt-4 relative z-20">
+                    <div className="shrink-0 flex gap-2 mt-4 pt-4 border-t border-wood/30 relative z-20">
                         <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('THEME')} fullWidth />
                         <RuneButton label="LANJUT" fullWidth onClick={() => setStep('CONCEPT')} />
                     </div>
-                </>
+                </div>
             );
 
         case 'CONCEPT':
