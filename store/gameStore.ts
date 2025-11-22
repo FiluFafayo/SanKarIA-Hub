@@ -96,31 +96,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
                         campaign.playerIds
                     );
 
-				// [FASE 3] ATLAS HYDRATION
-                // Cek apakah campaign memiliki activeMapId dan apakah dataStore punya peta tersebut
-                const activeMapId = campaign.activeMapId;
-                let loadedMapData = undefined;
-
-                if (activeMapId) {
-                    // Kita akses dataStore secara langsung untuk mengambil 'world_maps' cache
-                    // (Pastikan useDataStore sudah mengimpor world_maps di types/store nya, 
-                    // jika belum, kita pakai fallback fetch)
-                    const allMaps = useDataStore.getState().state.worldMaps || []; // Asumsi properti ada
-                    const mapFound = allMaps.find(m => m.id === activeMapId);
-                    
-                    if (mapFound) {
-                        loadedMapData = {
-                            id: mapFound.id,
-                            campaignId: mapFound.campaign_id, // Sesuaikan dengan nama properti DB/Type
-                            name: mapFound.name,
-                            gridData: mapFound.grid_data || mapFound.gridData,
-                            fogData: mapFound.fog_data || mapFound.fogData,
-                            markers: mapFound.markers || [],
-                            isActive: true
-                        };
-                    } else {
-                         console.warn(`[Atlas] Peta aktif ID ${activeMapId} tidak ditemukan di cache SSoT.`);
-                    }
+				// [FASE FINAL FIX] ATLAS HYDRATION (Simplified)
+                // Repository sudah melakukan mapping relational via 'mapDbCampaign'.
+                // Kita cukup validasi dan pakai 'activeMapData' yang sudah ada di objek campaign.
+                
+                let finalActiveMapData = campaign.activeMapData;
+                
+                // Fallback: Jika repo belum mapping (legacy data), coba construct dari properti flat lama
+                if (!finalActiveMapData && campaign.activeMapId) {
+                     console.warn("[Atlas] Hydration Warning: activeMapData missing, attempting legacy reconstruction.");
+                     // Construct dummy/legacy container if needed, or just rely on explorationGrid
                 }
 
 				const campaignState: CampaignState = {
@@ -132,11 +117,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
 					activeRollRequest: null,
 					choices: [],
 					turnId: null,
-                    // Inject Active Map Data
-                    activeMapData: loadedMapData,
-                    // Pastikan explorationGrid sinkron dengan activeMapData jika ada
-                    explorationGrid: loadedMapData ? loadedMapData.gridData : campaign.explorationGrid,
-                    fogOfWar: loadedMapData ? loadedMapData.fogData : campaign.fogOfWar,
+                    // [FIX] Trust the repository data. Jangan overwrite dengan undefined.
+                    activeMapData: finalActiveMapData,
+                    // Pastikan properti flat sinkron (Prioritas: Data Peta > Data Flat Campaign)
+                    explorationGrid: finalActiveMapData ? finalActiveMapData.gridData : campaign.explorationGrid,
+                    fogOfWar: finalActiveMapData ? finalActiveMapData.fogData : campaign.fogOfWar,
 				};
 
 				set({
