@@ -210,7 +210,27 @@ export const useDataStore = create<DataStore>((set, get) => ({
                 const fetchedCampaigns = await campaign.getMyCampaigns(
                     myCharacterIds
                 );
-                get().actions._setCampaigns(fetchedCampaigns);
+                
+                // [FIX FASE 1.5] MERGE GUARD PROTECTION
+                // Masalah: getMyCampaigns mungkin tidak mengembalikan campaign yang baru saja dibuat
+                // (karena replication lag atau karena user adalah Owner tapi belum jadi Player).
+                // Solusi: Jangan menimpa buta. Gabungkan data fetch dengan data lokal yang 'hilang' di fetch.
+                
+                const currentCampaigns = get().state.campaigns;
+                const fetchedIds = new Set(fetchedCampaigns.map(c => c.id));
+                
+                // Cari campaign yang ada di memori lokal TAPI tidak ada di hasil fetch baru.
+                // Ini biasanya campaign yang baru saja dibuat (Optimistic Update).
+                const localOnlyCampaigns = currentCampaigns.filter(c => !fetchedIds.has(c.id));
+                
+                if (localOnlyCampaigns.length > 0) {
+                    console.log(`🛡️ [DataStore] Merge Guard: Preserving ${localOnlyCampaigns.length} local-only campaigns (e.g. newly created).`);
+                }
+
+                // Gabungkan: Prioritas Fetch + Data Lokal yang hilang
+                const finalCampaigns = [...fetchedCampaigns, ...localOnlyCampaigns];
+                
+                get().actions._setCampaigns(finalCampaigns);
 
                 set((state) => ({ state: { ...state.state, hasLoaded: true } }));
             } catch (error: any) {
