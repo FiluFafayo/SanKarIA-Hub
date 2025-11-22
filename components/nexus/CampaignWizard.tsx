@@ -269,20 +269,28 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                 <div className="flex flex-col gap-3 animate-fade-in">
                     <div className="p-3 bg-black/40 border border-wood rounded space-y-3">
                         <div>
-                            <label className="text-[10px] text-gold font-pixel block mb-1">NAMA DUNIA</label>
+                            <label className="text-[10px] text-gold font-pixel block mb-1 flex justify-between">
+                                <span>NAMA DUNIA</span>
+                                <span className={formData.title.length > 40 ? "text-red-500" : "text-faded"}>{formData.title.length}/50</span>
+                            </label>
                             <input 
                                 type="text" 
                                 value={formData.title}
+                                maxLength={50}
                                 onChange={(e) => setFormData({...formData, title: e.target.value})}
                                 className="w-full bg-black border border-wood p-2 text-parchment font-pixel text-sm focus:border-gold outline-none"
                                 placeholder="Contoh: Eldoria"
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] text-gold font-pixel block mb-1">ANCAMAN UTAMA</label>
+                            <label className="text-[10px] text-gold font-pixel block mb-1 flex justify-between">
+                                <span>ANCAMAN UTAMA</span>
+                                <span className={formData.villain.length > 40 ? "text-red-500" : "text-faded"}>{formData.villain.length}/50</span>
+                            </label>
                             <input 
                                 type="text" 
                                 value={formData.villain}
+                                maxLength={50}
                                 onChange={(e) => setFormData({...formData, villain: e.target.value})}
                                 className="w-full bg-black border border-wood p-2 text-parchment font-retro text-sm focus:border-gold outline-none"
                                 placeholder="Contoh: Raja Iblis yang bangkit..."
@@ -292,8 +300,9 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                             <label className="text-[10px] text-gold font-pixel block mb-1">DESKRIPSI SINGKAT</label>
                             <textarea 
                                 value={formData.description}
+                                maxLength={500}
                                 onChange={(e) => setFormData({...formData, description: e.target.value})}
-                                className="w-full bg-black border border-wood p-2 text-faded font-retro text-xs focus:border-gold outline-none h-24 resize-none"
+                                className="w-full bg-black border border-wood p-2 text-faded font-retro text-xs focus:border-gold outline-none h-24 resize-none custom-scrollbar"
                                 placeholder="Dunia ini hancur karena..."
                             />
                             <button 
@@ -317,28 +326,34 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
              return (
                 <div className="flex flex-col gap-4 animate-fade-in">
                     <div className="text-center mb-2">
-                        <h3 className="font-pixel text-gold text-lg">KONFIRMASI RITUAL</h3>
-                        <p className="font-retro text-xs text-faded">Apakah mantramu sudah benar?</p>
+                        <h3 className="font-pixel text-gold text-lg">GEMA MANTRA</h3>
+                        <p className="font-retro text-xs text-faded">Bacalah kembali takdir yang kau tulis...</p>
                     </div>
 
-                    <div className="bg-surface border-2 border-gold p-4 shadow-lg relative overflow-hidden">
-                        <div className="absolute top-0 right-0 bg-gold text-black text-[9px] font-bold px-2 py-1">
-                            {formData.scale.toUpperCase()}
-                        </div>
-                        
-                        <h4 className="font-pixel text-parchment text-md mb-1">{formData.title}</h4>
-                        <div className="text-[10px] text-gold mb-3 italic">{formData.theme} RPG</div>
-                        
-                        <p className="font-retro text-xs text-faded mb-3 line-clamp-4">
-                            "{formData.description}"
+                    <div className="bg-black/60 border-2 border-wood p-4 shadow-lg relative overflow-hidden rounded-sm">
+                        {/* Decorative Corner */}
+                        <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-gold/50" />
+                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-gold/50" />
+
+                        <p className="font-cinzel text-parchment text-sm leading-relaxed text-justify">
+                            "Saya memanggil dunia <span className="text-gold border-b border-gold/50">{formData.theme.toUpperCase()}</span>, 
+                            sebuah <span className="text-gold border-b border-gold/50">{SCALES.find(s => s.id === formData.scale)?.label}</span> yang bernama 
+                            <span className="text-gold border-b border-gold/50 font-bold mx-1">{formData.title.toUpperCase()}</span>.
+                            <br/><br/>
+                            Di sini, takdir diuji oleh <span className="text-red-400 border-b border-red-900/50">{formData.villain || "KEGELAPAN ABSTRAK"}</span>.
+                            <br/>
+                            <span className="italic text-faded text-xs mt-2 block">"{formData.description || 'Kisah ini belum terungkap...'}"</span>"
                         </p>
-                        
-                        <div className="border-t border-wood/30 pt-2 mt-2">
-                            <p className="text-[10px] text-red-400">
-                                <span className="font-bold">KONFLIK:</span> {formData.villain || "Belum terdeteksi..."}
+                    </div>
+
+                    {formData.scale === 'Endless Saga' && (
+                        <div className="flex items-start gap-2 p-2 bg-red-900/10 border border-red-900/30 rounded">
+                            <span className="text-lg">⚠️</span>
+                            <p className="text-[10px] text-red-300/80 font-retro leading-tight">
+                                <strong>Peringatan Atlas:</strong> Mode ini akan mengaktifkan <em>Procedural Generation</em>. Peta dan Quest akan dibuat secara otomatis oleh AI seiring perjalanan.
                             </p>
                         </div>
-                    </div>
+                    )}
 
                     <div className="flex gap-2 mt-2 relative z-20">
                         <RuneButton label="UBAH MANTRA" variant="secondary" onClick={() => setStep('CONCEPT')} fullWidth />
