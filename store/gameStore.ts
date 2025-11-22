@@ -87,6 +87,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
 	actions: {
 		// --- Runtime Actions (Dipindah dari appStore) ---
 		loadGameSession: async (campaign, character) => {
+            // [QA FIX FASE 1] Circuit Breaker / Optimistic Guard
+            // Jika data campaign di state SUDAH SAMA dengan yang diminta (misal hasil injeksi Wizard),
+            // JANGAN lakukan fetch ulang yang berisiko race condition/404.
+            const currentData = get().runtime.playingCampaign;
+            if (currentData && currentData.id === campaign.id && currentData.activeMapData) {
+                console.log(`🛡️ [GameStore] SSoT Hydrated via Injection for Campaign ${campaign.id}. Skipping dangerous re-fetch.`);
+                
+                // Tetap set character & loading false
+                set((state) => ({
+					runtime: {
+						...state.runtime,
+                        playingCharacter: character,
+						isGameLoading: false,
+                        sessionAbortController: new AbortController(),
+					},
+				}));
+                return; // STOP DI SINI.
+            }
+
 			set((state) => ({ runtime: { ...state.runtime, isGameLoading: true } }));
             try {
                 const { runtime } = getRepositories();

@@ -262,20 +262,47 @@ export const campaignRepository = {
     if (error) throw error;
 
     // 4. Return Optimistic Mapped Object
-    return mapDbCampaign({
+    // [QA FIX FASE 1] Memastikan struktur 'activeMap' terbaca jelas oleh mapDbCampaign
+    // Kita harus meniru struktur JOIN hasil query 'CAMPAIGN_SELECT_QUERY'
+    const optimisticMap = mapPayload ? {
+        id: 'temp-optimistic-id', // ID Sementara agar tidak crash
+        campaign_id: createdCore.id,
+        name: 'Overworld (Default)',
+        grid_data: mapPayload.grid_data,
+        fog_data: mapPayload.fog_data,
+        is_active: true,
+        markers: []
+    } : null;
+
+    const optimisticCampaignData = {
         ...createdCore,
-        campaign_players: [],
-        world_maps: mapPayload ? [{
-            id: 'temp-optimistic-id',
-            campaign_id: createdCore.id,
-            name: 'Overworld (Default)',
-            grid_data: mapPayload.grid_data,
-            fog_data: mapPayload.fog_data,
-            is_active: true
-        }] : [],
+        // Simulasi relasi kosong/baru
+        campaign_players: [], 
+        world_maps: optimisticMap ? [optimisticMap] : [],
         campaign_npcs: npcPayload.map((n: any, i: number) => ({ ...n, id: `new-${i}` })),
         active_quests: questPayload.map((q: any, i: number) => ({ ...q, id: `new-${i}` }))
-    });
+    };
+
+    const mappedResult = mapDbCampaign(optimisticCampaignData);
+
+    // [QA PARANOID CHECK] Validasi Atlas Protocol
+    if (campaignData.explorationGrid && !mappedResult.activeMapData) {
+         console.warn("⚠️ [Repository] Warning: Map data created but activeMapData is missing in return object. Forcing manual attachment.");
+         mappedResult.activeMapData = {
+             id: 'temp-optimistic-id',
+             campaignId: createdCore.id,
+             name: 'Overworld (Default)',
+             gridData: mapPayload!.grid_data,
+             fogData: mapPayload!.fog_data,
+             markers: [],
+             isActive: true
+         };
+         // Sinkronisasi properti flat (Legacy Support)
+         mappedResult.explorationGrid = mapPayload!.grid_data;
+         mappedResult.fogOfWar = mapPayload!.fog_data;
+    }
+
+    return mappedResult;
   },
 
   saveCampaign: async (campaign: Campaign): Promise<Campaign> => {
