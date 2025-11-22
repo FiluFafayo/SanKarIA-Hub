@@ -25,7 +25,9 @@ export const CampaignArchive: React.FC<CampaignArchiveProps> = ({ onSelectCampai
       <PixelCard className="w-full max-w-2xl h-[80vh] flex flex-col bg-[#0b0a0d] border-wood shadow-2xl">
         
         {/* HEADER */}
-        <div className="p-4 border-b-2 border-wood bg-[url('/patterns/wood_pattern.png')] bg-repeat flex justify-between items-center shrink-0">
+        <div className="p-4 border-b-2 border-wood bg-[#1a1921] flex justify-between items-center shrink-0 relative overflow-hidden">
+  {/* Decorative Gradient Overlay */}
+  <div className="absolute inset-0 bg-gradient-to-r from-wood/20 to-transparent pointer-events-none" />
           <div>
             <h2 className="font-pixel text-xl text-gold drop-shadow-md">ARSIP KRONIK</h2>
             <p className="font-retro text-xs text-faded">Pilih dunia yang ingin Anda kunjungi kembali.</p>
