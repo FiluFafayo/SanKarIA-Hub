@@ -131,8 +131,11 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                 mapMarkers: [],
                 quests: [],
                 npcs: [],
+                // [ATLAS PROTOCOL] Grid dikirim via DTO khusus untuk ditangkap Repository
+                // Repository akan memisahkannya ke tabel 'world_maps' via RPC
                 explorationGrid: Array.from({ length: 100 }, () => Array(100).fill(10001)),
                 fogOfWar: Array.from({ length: 100 }, () => Array(100).fill(true)),
+                
                 battleState: null,
                 playerGridPosition: { x: 50, y: 50 },
             };

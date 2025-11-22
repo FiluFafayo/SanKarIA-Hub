@@ -32,17 +32,24 @@ function mapDbCampaign(dbCampaign: any): Campaign {
 
   const playerIds = (campaign_players || []).map((p: { character_id: string }) => p.character_id);
 
-  // Map Active Map Data
-  let explorationGrid = Array.from({ length: 100 }, () => Array(100).fill(10001)); // Default Empty
-  let fogOfWar = Array.from({ length: 100 }, () => Array(100).fill(true)); // Default Foggy
-  let activeMapId = null;
+  // [ATLAS PROTOCOL] Map Active Map Data
+  let activeMapId: string | null = null;
+  let activeMapData: any = undefined;
 
   // Cari peta yang aktif (is_active = true), atau ambil yang pertama jika ada
   const activeMap = (world_maps || []).find((m: any) => m.is_active) || (world_maps || [])[0];
+  
   if (activeMap) {
-      explorationGrid = activeMap.grid_data || explorationGrid;
-      fogOfWar = activeMap.fog_data || fogOfWar;
       activeMapId = activeMap.id;
+      activeMapData = {
+          id: activeMap.id,
+          campaignId: activeMap.campaign_id,
+          name: activeMap.name,
+          gridData: activeMap.grid_data || Array.from({ length: 100 }, () => Array(100).fill(10001)),
+          fogData: activeMap.fog_data || Array.from({ length: 100 }, () => Array(100).fill(true)),
+          markers: activeMap.markers || [],
+          isActive: true
+      };
   }
 
   // Map NPCS
@@ -90,9 +97,9 @@ function mapDbCampaign(dbCampaign: any): Campaign {
     // Relational Mapped Data
     quests: mappedQuests,
     npcs: mappedNpcs,
-    explorationGrid,
-    fogOfWar,
-    activeMapId, // Atlas Protocol Reference
+    // [ATLAS PROTOCOL] Flattened grids removed. Use activeMapData.
+    activeMapId,
+    activeMapData,
 
     battleState: dbCampaign.battle_state || null,
     // Pastikan posisi grid aman
@@ -255,13 +262,17 @@ export const campaignRepository = {
     if (error) throw error;
 
     // 4. Return Optimistic Mapped Object
-    // Karena RPC mengembalikan row campaign yang baru dibuat, kita mapping ulang
-    // dengan data relasional yang baru saja kita kirim (karena kita tahu itu sukses).
     return mapDbCampaign({
-        ...createdCore, // Data dari DB (ID, CreatedAt, dll)
+        ...createdCore,
         campaign_players: [],
-        // Inject data relasional 'mentah' agar UI terhidrasi tanpa fetch ulang
-        world_maps: mapPayload ? [{ ...mapPayload, is_active: true }] : [],
+        world_maps: mapPayload ? [{
+            id: 'temp-optimistic-id',
+            campaign_id: createdCore.id,
+            name: 'Overworld (Default)',
+            grid_data: mapPayload.grid_data,
+            fog_data: mapPayload.fog_data,
+            is_active: true
+        }] : [],
         campaign_npcs: npcPayload.map((n: any, i: number) => ({ ...n, id: `new-${i}` })),
         active_quests: questPayload.map((q: any, i: number) => ({ ...q, id: `new-${i}` }))
     });
