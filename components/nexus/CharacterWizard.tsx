@@ -503,17 +503,21 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
 
   return (
     <div className="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-      <PixelCard className="w-full max-w-md border-gold shadow-pixel-glow bg-surface">
-        <h2 className="font-pixel text-gold text-center mb-6 text-xl">
-          {step === 'NAME' && "IDENTITAS JIWA"}
-          {step === 'RACE' && "ASAL USUL (RAS)"}
-          {step === 'CLASS' && "TAKDIR (KELAS)"}
-          {step === 'BACKGROUND' && "LATAR BELAKANG"}
-          {step === 'SOUL' && "BISIKAN JIWA (RAHASIA)"}
-          {step === 'VISUAL' && "PENAMPAKAN (VISUAL)"}
-          {step === 'STATS' && "ATRIBUT KEKUATAN"}
-        </h2>
+      <PixelCard className="w-full max-w-md border-gold shadow-pixel-glow bg-surface flex flex-col max-h-[90vh]">
+        <div className="shrink-0 border-b border-wood/50 pb-4 mb-4">
+            <h2 className="font-pixel text-gold text-center text-lg md:text-xl leading-tight">
+            {step === 'NAME' && "IDENTITAS JIWA"}
+            {step === 'RACE' && "ASAL USUL (RAS)"}
+            {step === 'CLASS' && "TAKDIR (KELAS)"}
+            {step === 'BACKGROUND' && "LATAR BELAKANG"}
+            {step === 'SOUL' && "BISIKAN JIWA (RAHASIA)"}
+            {step === 'VISUAL' && "PENAMPAKAN (VISUAL)"}
+            {step === 'STATS' && "ATRIBUT KEKUATAN"}
+            {step === 'REVIEW' && "KONTRAK TERAKHIR"}
+            </h2>
+        </div>
 
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 min-h-0">
         {step === 'NAME' && (
           <div className="flex flex-col gap-4">
             <p className="text-parchment font-retro text-center">Siapa nama yang akan terukir di batu nisanmu?</p>
@@ -538,8 +542,8 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         {step === 'RACE' && (
           <>
             {!selectedRaceData ? (
-              <div className="flex flex-col gap-2 animate-fade-in">
-                <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
+              <div className="flex flex-col gap-2 animate-fade-in h-full">
+                <div className="flex flex-col gap-2 overflow-y-auto pr-2">
                   {RACES.map((race) => (
                     <div
                       key={race.name}
@@ -626,8 +630,8 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         {step === 'CLASS' && (
           <>
             {!formData.classId ? (
-              <div className="flex flex-col gap-2 animate-fade-in">
-                <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
+              <div className="flex flex-col gap-2 animate-fade-in h-full">
+                <div className="flex flex-col gap-2 overflow-y-auto pr-2">
                   {Object.values(CLASS_DEFINITIONS).map((cls) => (
                     <div key={cls.name} onClick={() => {
                       setFormData({ ...formData, classId: cls.name });
@@ -698,8 +702,8 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         {step === 'BACKGROUND' && (
           <>
             {!formData.backgroundName ? (
-              <div className="flex flex-col gap-2 animate-fade-in">
-                <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
+              <div className="flex flex-col gap-2 animate-fade-in h-full">
+                <div className="flex flex-col gap-2 overflow-y-auto pr-2">
                   {BACKGROUNDS.map((bg) => (
                     <div key={bg.name} onClick={() => setFormData({ ...formData, backgroundName: bg.name })}
                       className="p-3 border-2 border-wood cursor-pointer text-center hover:bg-white/5 transition-colors">
@@ -774,7 +778,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
                         <p className="font-pixel text-faded text-xs animate-pulse">MEMBACA MASA LALU...</p>
                     </div>
                 ) : soulSuggestions ? (
-                    <div className="flex flex-col gap-3 overflow-y-auto max-h-[400px] pr-2">
+                    <div className="flex flex-col gap-3 overflow-y-auto pr-2">
                         {(['light', 'gray', 'dark'] as const).map((type) => {
                             const opt = soulSuggestions[type];
                             // [FIX CRITICAL] Cegah crash jika AI mengembalikan data parsial/rusak
@@ -839,7 +843,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 overflow-y-auto max-h-[350px] pr-2">
+            <div className="flex flex-col gap-3 overflow-y-auto pr-2">
               {/* Opsi Rambut */}
               <div className="border border-wood p-2 bg-black/40">
                 <p className="font-pixel text-xs text-gold mb-2">RAMBUT</p>
@@ -921,7 +925,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 overflow-y-auto max-h-[350px] pr-2">
+            <div className="flex flex-col gap-3 overflow-y-auto pr-2">
               {formData.classId && CLASS_DEFINITIONS[formData.classId].startingEquipment.choices.map((choice, idx) => (
                 <div key={idx} className="border border-wood p-3 bg-black/40">
                   <p className="font-pixel text-xs text-gold mb-2 uppercase border-b border-wood/30 pb-1">
@@ -996,7 +1000,7 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
             </div>
 
             {/* Main Stats Grid */}
-            <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 gap-2 overflow-y-auto pr-1">
               {ALL_ABILITIES.map((ability) => {
                 const currentScore = formData.abilityScores[ability] || (statsMethod === 'POINT_BUY' ? 8 : 0);
 
@@ -1064,13 +1068,13 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
         )}
 
         {step === 'REVIEW' && (
-          <div className="flex flex-col gap-4 animate-fade-in">
-            <div className="flex gap-4 items-start">
+          <div className="flex flex-col gap-4 animate-fade-in h-full">
+            <div className="flex gap-4 items-start h-full">
               {/* Kiri: Soul Contract (Narrative) */}
               <div className="w-1/2 flex flex-col gap-2 text-xs border-r border-wood/30 pr-2 overflow-y-auto custom-scrollbar">
                 <h3 className="font-pixel text-gold text-sm border-b border-wood/50 pb-1 mb-1">KONTRAK JIWA</h3>
                 
-                <div className="font-cinzel text-parchment text-justify leading-relaxed space-y-2">
+                <div className="font-retro text-parchment text-justify leading-relaxed space-y-2 text-sm">
                     <p>
                         "Saya, <span className="text-gold font-bold border-b border-gold/50">{formData.name}</span>, 
                         seorang <span className="text-white">{formData.gender} {formData.raceId}</span>.
@@ -1128,9 +1132,9 @@ export const CharacterWizard: React.FC<CharacterWizardProps> = ({ onComplete, on
               </div>
             </div>
 
-            <div className="flex gap-2 mt-4">
-              <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('STATS')} fullWidth />
-              <RuneButton
+            <div className="shrink-0 flex gap-2 mt-4 pt-4 border-t border-wood/30">
+            <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('STATS')} fullWidth />
+            <RuneButton
                 label={isSubmitting ? "MENGIKAT JIWA..." : "BANGKITKAN"}
                 variant="danger"
                 fullWidth

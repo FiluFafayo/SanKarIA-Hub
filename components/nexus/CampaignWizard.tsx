@@ -168,9 +168,9 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
 
         case 'LIBRARY':
             return (
-                <div className="flex flex-col gap-2 animate-fade-in">
+                <div className="flex flex-col gap-2 animate-fade-in h-full">
                     {!selectedTemplate ? (
-                        <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2">
+                        <div className="flex flex-col gap-2 overflow-y-auto pr-2 h-full">
                             {DEFAULT_CAMPAIGNS.map((tpl, idx) => (
                                 <div 
                                     key={idx} 
@@ -218,8 +218,8 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
 
         case 'THEME':
             return (
-                <>
-                    <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2 animate-fade-in">
+                <div className="flex flex-col h-full">
+                    <div className="flex flex-col gap-2 overflow-y-auto pr-2 animate-fade-in flex-1">
                         {THEMES.map((t) => (
                             <div
                                 key={t}
@@ -266,8 +266,8 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
 
         case 'CONCEPT':
             return (
-                <div className="flex flex-col gap-3 animate-fade-in">
-                    <div className="p-3 bg-black/40 border border-wood rounded space-y-3">
+                <div className="flex flex-col gap-3 animate-fade-in h-full">
+                    <div className="p-3 bg-black/40 border border-wood rounded space-y-3 flex-1 overflow-y-auto">
                         <div>
                             <label className="text-[10px] text-gold font-pixel block mb-1 flex justify-between">
                                 <span>NAMA DUNIA</span>
@@ -305,17 +305,19 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                                 className="w-full bg-black border border-wood p-2 text-faded font-retro text-xs focus:border-gold outline-none h-24 resize-none custom-scrollbar"
                                 placeholder="Dunia ini hancur karena..."
                             />
-                            <button 
-                                onClick={invokeOracle}
-                                disabled={isProcessing}
-                                className="absolute bottom-2 right-2 text-[9px] bg-cyan-900/80 border border-cyan-700 text-cyan-200 px-2 py-1 hover:bg-cyan-700 rounded flex items-center gap-1"
-                            >
-                                {isProcessing ? <span className="animate-spin">⚙️</span> : <span>✨</span>} ORACLE
-                            </button>
+                            <div className="absolute bottom-2 right-2">
+                                <button
+                                    onClick={invokeOracle}
+                                    disabled={isProcessing}
+                                    className="text-[9px] font-pixel bg-void border border-gold text-gold px-3 py-1 hover:bg-gold hover:text-void transition-colors flex items-center gap-1 shadow-pixel-sm"
+                                >
+                                    {isProcessing ? <span className="animate-spin">⚙️</span> : <span>🔮</span>} ORACLE
+                                </button>
+                            </div>
                         </div>
                     </div>
                     
-                    <div className="flex gap-2 mt-2 relative z-20">
+                    <div className="shrink-0 flex gap-2 mt-2 relative z-20">
                         <RuneButton label="KEMBALI" variant="secondary" onClick={() => setStep('SCALE')} fullWidth />
                         <RuneButton label="LANJUT" fullWidth disabled={!formData.title} onClick={() => setStep('REVIEW')} />
                     </div>
@@ -335,7 +337,7 @@ export const CampaignWizard: React.FC<CampaignWizardProps> = ({ onComplete, onCa
                         <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-gold/50" />
                         <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-gold/50" />
 
-                        <p className="font-cinzel text-parchment text-sm leading-relaxed text-justify">
+                        <p className="font-retro text-parchment text-sm leading-relaxed text-justify">
                             "Saya memanggil dunia <span className="text-gold border-b border-gold/50">{formData.theme.toUpperCase()}</span>, 
                             sebuah <span className="text-gold border-b border-gold/50">{SCALES.find(s => s.id === formData.scale)?.label}</span> yang bernama 
                             <span className="text-gold border-b border-gold/50 font-bold mx-1">{formData.title.toUpperCase()}</span>.
