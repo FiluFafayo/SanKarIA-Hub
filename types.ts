@@ -268,92 +268,87 @@ export interface ActiveEffect {
 }
 
 // Tipe Karakter SSoT (Single Source of Truth)
-// Ini adalah gabungan dari data di tabel 'characters', 
-// 'character_inventory', dan 'character_spells'.
-// Ini adalah SSoT untuk Karakter, persisten di semua campaign.
+// Ref: Mandat 3.4 & Atlas Protocol
 export interface CharacterArc {
-    id?: string;
+    id: string;
     characterId: string;
     campaignId: string;
     publicGoal: string;
-    secretAgenda: string;
+    secretAgenda: string; // PARANOID: Only visible to Owner & DM
     trueDesire: string;
     loyaltyScore: number;
     breakingPoint: string;
-    milestones?: string[];
+    milestones?: string[]; // JSONB
     isCompleted?: boolean;
 }
 
 export interface Character {
     id: string;
-    ownerId: string; // 'owner_id' dari 'profiles'
+    ownerId: string; // Ref to profiles.id
     name: string;
     class: string;
     race: string;
     level: number;
     xp: number;
     avatar_url: string;
-    gender: 'Pria' | 'Wanita'; // (Penyederhanaan untuk Fase 2)
-    bodyType: string; // (e.g., 'normal', 'missing_arm_right')
-    scars: string[]; // (e.g., 'scar_eye_left')
-    hair: string; // (e.g., 'Rambut Panjang Hitam')
-    facialHair: string; // (e.g., 'Jenggot Panjang')
-    headAccessory: string; // (e.g., 'Tanduk Kecil')
+    gender: 'Pria' | 'Wanita';
     
-    // Detail Karakter (dari Background - Fase 1)
+    // Visual Layers (Pixel Art)
+    bodyType: string; 
+    scars: string[]; 
+    hair: string; 
+    facialHair: string; 
+    headAccessory: string; 
+    
+    // Roleplay Data
     background: string;
     personalityTrait: string;
     ideal: string;
     bond: string;
     flaw: string;
     
-    // Status & Mekanika Inti (Data Persisten per Mandat 3.4)
+    // Core Stats (Persistent)
     abilityScores: AbilityScores;
     maxHp: number;
-    currentHp: number; // STATE PERSISTEN
+    currentHp: number;
     tempHp: number;
-    armorClass: number; // Akan di-cache di sini
-    speed: number; // Akan di-cache di sini
-    hitDice: Record<string, { max: number; spent: number }>; // e.g., { "d10": { max: 1, spent: 0 } }
+    armorClass: number; 
+    speed: number; 
+    hitDice: Record<string, { max: number; spent: number }>; 
     deathSaves: { successes: number; failures: number };
-    conditions: string[]; // e.g., 'poisoned', 'exhaustion_1', 'Prone', 'Hidden'
+    conditions: string[]; 
     
-    // Proficiency & Fitur (dari Ras & Kelas - Fase 1)
+    // Features
     racialTraits: CharacterFeature[];
     classFeatures: CharacterFeature[];
     proficientSkills: Skill[];
     proficientSavingThrows: Ability[];
+    armorProficiencies: string[];
+    weaponProficiencies: string[];
+    toolProficiencies: string[];
+    languages: string[];
+    senses: { darkvision?: number; tremorsense?: number; truesight?: number };
+    passivePerception: number;
+    inspiration: boolean;
 
-    // Resource (Data Persisten per Mandat 3.4)
-    spellSlots: CharacterSpellSlot[]; // STATE PERSISTEN
+    // Resources & Spells
+    spellSlots: CharacterSpellSlot[]; 
+    preparedSpells: string[]; // IDs only in DB, populated runtime
+    featureUses: Record<string, { max: number; spent: number; resetOn: 'short_rest' | 'long_rest' }>;
 
-    // PATCH 1: Kepatuhan data tambahan (disimpan di DB)
-    languages?: string[];
-    toolProficiencies?: string[];
-    weaponProficiencies?: string[];
-    armorProficiencies?: string[];
-    senses?: { darkvision?: number; tremorsense?: number; truesight?: number };
-    passivePerception?: number;
-    inspiration?: boolean;
-    preparedSpells?: string[]; // daftar ID/nama spell yang sedang dipersiapkan
-    featureUses?: Record<string, { max: number; spent: number; resetOn: 'short_rest' | 'long_rest' }>;
-
-    // Data Relasional (digabungkan saat loading)
-    inventory: CharacterInventoryItem[]; // STATE PERSISTEN
+    // Relational Data (Populated via JOINs)
+    inventory: CharacterInventoryItem[]; 
     knownSpells: SpellDefinition[];
 
-    // Status Runtime (Non-Persisten) untuk kombat
+    // Runtime Flags (Memory Only)
     usedBonusAction?: boolean;
     usedReaction?: boolean;
     usedAction?: boolean;
-
-    // Efek berkelanjutan (runtime, non-persisten)
     activeEffects?: ActiveEffect[];
-    // Hanya satu konsentrasi aktif per caster
     concentration?: {
         spellId: string;
         spellName: string;
-        remainingRounds: number; // dihitung dalam ronde/giliran
+        remainingRounds: number;
     } | null;
 }
 
@@ -469,7 +464,7 @@ export interface CampaignRules {
     maxPartySize: number;
 }
 
-// Ini adalah objek Campaign DEFINISI (yang kita dapat dari list)
+// Objek Campaign Utama (Aligned with Atlas Protocol)
 export interface Campaign {
     id: string;
     ownerId: string;
@@ -478,88 +473,77 @@ export interface Campaign {
     cover_url: string;
     joinCode: string;
     isPublished: boolean;
-    maxPlayers: number; // Saya tambahkan ini dari file lama, penting
-    theme: string; // Saya tambahkan ini dari file lama, penting
-    mainGenre: string; // Saya tambahkan ini dari file lama
-    subGenre: string; // Saya tambahkan ini dari file lama
-    duration: string; // Saya tambahkan ini dari file lama
-    isNSFW: boolean; // Saya tambahkan ini dari file lama
+    
+    // Metadata
+    theme: string;
+    mainGenre: string;
+    subGenre: string;
+    duration: string;
+    isNSFW: boolean;
+    maxPlayers: number;
 
     // DM Settings
     dmPersonality: string;
     dmNarrationStyle: 'Deskriptif' | 'Langsung & Percakapan';
     responseLength: 'Singkat' | 'Standar' | 'Rinci';
+    rulesConfig: CampaignRules;
     
-    // Game State (disimpan di DB)
+    // Global Game State
     gameState: 'exploration' | 'combat';
-    currentPlayerId: string | null; // ID Karakter
-    initiativeOrder: string[]; // Array of 'character.id' dan 'monster.instanceId'
-    longTermMemory: string;
-    
-    // World State (disimpan di DB)
-    currentTime: number; // (Poin 5) Diubah dari WorldTime (string) ke number (total detik)
+    currentTime: number; // Seconds from midnight
     currentWeather: WorldWeather;
     worldEventCounter: number;
     
-    // Map State (disimpan di DB)
-    mapImageUrl?: string;
-    mapMarkers: MapMarker[];
-    currentPlayerLocation?: string;
-    
-    // Dynamic Data (disimpan di DB)
-    quests: Quest[];
-    npcs: NPC[];
-
-    // Data relasional (di-load saat runtime)
-    monsters: MonsterInstance[];
-    eventLog: GameEvent[];
-    playerIds: string[]; // Daftar ID Karakter yang ada di campaign ini
-
-    // Config Mekanik (Disimpan di DB sebagai rules_config)
-    rulesConfig: CampaignRules;
-
-    // Runtime-only state (Tidak disimpan di DB 'campaigns')
-    choices: string[];
+    // Active Session Data
+    currentPlayerId: string | null;
+    initiativeOrder: string[];
     turnId: string | null;
+    battleState: BattleState | null; // Complex object from 'battle_state' column
 
-    // =================================================================
-    // BAGIAN 4B: TIPE BATTLE STATE (BARU DARI P2)
-    // =================================================================
+    // Atlas Protocol (Reference IDs)
+    activeMapId: string | null; // Points to 'world_maps' table
+    currentStoryNodeId: string | null; // Points to 'active_quests' / 'story_nodes'
     
-    // Grid Peta Eksplorasi (BARU)
-    explorationGrid: number[][]; // (Skala Zoom-Out, 10000+)
-    fogOfWar: boolean[][]; // Grid paralel untuk fog of war
-
-    // --- FASE 3: THE ATLAS ENGINE ---
-    activeMapId?: string; // ID dari entry di tabel 'world_maps'
-    currentStoryNodeId?: string; // ID dari entry di tabel 'story_nodes'
-    availableMaps?: { id: string; name: string }[]; // Cache daftar peta yang terbuka (untuk Travel UI)
-    // -------------------------------
-
-    // Battle State (BARU)
-    battleState: BattleState | null; // Null jika tidak sedang kombat
+    // Relational Data (Loaded via JOINs at runtime)
+    monsters: MonsterInstance[];
+    npcs: NPC[];
+    eventLog: GameEvent[];
+    playerIds: string[]; // Cached for UI
     
-    // Posisi Pemain di Peta Eksplorasi (BARU: FASE 5)
-    playerGridPosition: { x: number; y: number };
+    // Runtime-Only (Client Side Memory)
+    choices: string[];
+    activeMapData?: WorldMap; // The loaded map object
+    activeQuestLog?: Quest[]; // Derived from 'active_quests' table
 }
 
-// BARU: Definisi Atlas Protocol
+// Atlas Protocol Entities
 export interface WorldMap {
     id: string;
     campaignId: string;
     name: string;
-    gridData: number[][];
-    fogData: boolean[][];
+    gridData: number[][]; // JSONB
+    fogData: boolean[][]; // JSONB
     markers: MapMarker[];
     isActive: boolean;
 }
 
 export interface StoryNode {
     id: string;
+    campaignId: string;
     title: string;
     description?: string;
-    status: 'locked' | 'available' | 'active' | 'completed' | 'skipped';
     type: 'main_arc' | 'side_story' | 'character_arc';
+    status: 'locked' | 'available' | 'active' | 'completed' | 'skipped';
+    worldStateChange?: Record<string, any>;
+    prerequisites?: Record<string, any>;
+}
+
+export interface StoryEdge {
+    id: string;
+    fromNodeId: string;
+    toNodeId: string;
+    condition: string;
+    isSecret: boolean;
 }
 
 // =================================================================
