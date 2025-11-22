@@ -321,9 +321,8 @@ CREATE TABLE "public"."campaigns" (
     "current_player_location" "text"
 );
 
--- [PATCH FASE FINAL] RPC untuk Transaction Safety
--- Fungsi ini menerima satu payload JSON besar dan menyimpannya secara atomik.
--- Jika salah satu insert gagal, SEMUANYA dibatalkan (Rollback).
+-- [PATCHED] create_campaign_atomic (Paranoid Mode)
+-- Mencegah NULL menimpa Default Value
 CREATE OR REPLACE FUNCTION "public"."create_campaign_atomic"(payload jsonb)
 RETURNS jsonb AS $$
 DECLARE
@@ -333,6 +332,7 @@ DECLARE
     npc_list jsonb;
     quest_list jsonb;
     result_row jsonb;
+    campaign_rec "public"."campaigns"; -- Variable record eksplisit untuk sanitasi
 BEGIN
     -- 1. Ekstrak Data
     core_data := payload -> 'core';
@@ -340,14 +340,28 @@ BEGIN
     npc_list := payload -> 'npcs';
     quest_list := payload -> 'quests';
 
-    -- 2. Insert Campaign Core (Auto-Map JSON ke Columns)
-    -- Menggunakan jsonb_populate_record untuk memetakan key JSON ke kolom tabel secara otomatis.
-    -- null::campaigns adalah target row type.
-    INSERT INTO "public"."campaigns"
-    SELECT * FROM jsonb_populate_record(null::"public"."campaigns", core_data)
+    -- 2. Populate Record (RAW) 
+    -- Hati-hati: jsonb_populate_record akan mengisi kolom yang tidak ada di JSON menjadi NULL
+    campaign_rec := jsonb_populate_record(null::"public"."campaigns", core_data);
+
+    -- 3. [PARANOID GUARD] Paksa Default Value untuk Field Vital jika NULL
+    -- Ini memperbaiki bug di mana gen_random_uuid() tertimpa NULL
+    IF campaign_rec.id IS NULL THEN campaign_rec.id := gen_random_uuid(); END IF;
+    IF campaign_rec.created_at IS NULL THEN campaign_rec.created_at := now(); END IF;
+    IF campaign_rec.updated_at IS NULL THEN campaign_rec.updated_at := now(); END IF;
+    IF campaign_rec.game_state IS NULL THEN campaign_rec.game_state := 'exploration'; END IF;
+    IF campaign_rec.is_published IS NULL THEN campaign_rec.is_published := false; END IF;
+    IF campaign_rec.world_event_counter IS NULL THEN campaign_rec.world_event_counter := 0; END IF;
+    IF campaign_rec.initiative_order IS NULL THEN campaign_rec.initiative_order := '{}'; END IF;
+    IF campaign_rec.map_markers IS NULL THEN campaign_rec.map_markers := '[]'::jsonb; END IF;
+    IF campaign_rec.current_time IS NULL THEN campaign_rec.current_time := 43200; END IF; -- Default siang hari
+    IF campaign_rec.current_weather IS NULL THEN campaign_rec.current_weather := 'Cerah'; END IF;
+
+    -- 4. Insert Campaign Core (Menggunakan record yang sudah disanitasi)
+    INSERT INTO "public"."campaigns" VALUES (campaign_rec.*)
     RETURNING "id" INTO new_campaign_id;
 
-    -- 3. Insert World Map (Jika ada data grid)
+    -- 5. Insert World Map (Jika ada data grid)
     IF map_data IS NOT NULL THEN
         INSERT INTO "public"."world_maps" ("campaign_id", "name", "grid_data", "fog_data", "is_active")
         VALUES (
@@ -359,7 +373,7 @@ BEGIN
         );
     END IF;
 
-    -- 4. Insert NPCs (Jika array tidak kosong)
+    -- 6. Insert NPCs (Jika array tidak kosong)
     IF npc_list IS NOT NULL AND jsonb_array_length(npc_list) > 0 THEN
         INSERT INTO "public"."campaign_npcs" (
             "campaign_id", "name", "description", "location", "disposition", 
@@ -371,13 +385,13 @@ BEGIN
             p ->> 'description',
             p ->> 'location',
             p ->> 'disposition',
-            ARRAY(SELECT jsonb_array_elements_text(p -> 'interaction_history')), -- Cast JSON Array ke Text Array
+            ARRAY(SELECT jsonb_array_elements_text(p -> 'interaction_history')), 
             p ->> 'image_url',
             p ->> 'secret'
         FROM jsonb_array_elements(npc_list) AS p;
     END IF;
 
-    -- 5. Insert Active Quests (Jika array tidak kosong)
+    -- 7. Insert Active Quests (Jika array tidak kosong)
     IF quest_list IS NOT NULL AND jsonb_array_length(quest_list) > 0 THEN
         INSERT INTO "public"."active_quests" (
             "campaign_id", "title", "description", "status", "reward_summary"
@@ -391,7 +405,7 @@ BEGIN
         FROM jsonb_array_elements(quest_list) AS q;
     END IF;
 
-    -- 6. Return Created Campaign (Sebagai konfirmasi)
+    -- 8. Return Created Campaign (Sebagai konfirmasi ke Frontend)
     SELECT row_to_json(c) INTO result_row FROM "public"."campaigns" c WHERE c.id = new_campaign_id;
     RETURN result_row;
 
