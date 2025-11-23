@@ -53,8 +53,12 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
 
   // Sinkronisasi Reducer -> Global Store (CRITICAL)
   useEffect(() => {
-    _setRuntimeCampaignState(campaign);
-  }, [campaign, _setRuntimeCampaignState]);
+    // [FIX STUCK SCREEN] Hanya sinkronisasi JIKA campaign asli ada.
+    // Mencegah 'safeCampaign' (fallback) menimpa state global saat logout.
+    if (playingCampaign) {
+      _setRuntimeCampaignState(campaign);
+    }
+  }, [campaign, playingCampaign, _setRuntimeCampaignState]);
 
   // 3. Guard Clause: Render Block (Bukan Hook Block)
   // Jika data aslinya null (sedang proses logout), kita return null/loading visual
@@ -72,7 +76,7 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
     if (campaign.gameState === 'combat') {
       onEncounter();
     }
-  }, [campaign.gameState, onEncounter]);
+  }, [campaign, onEncounter]); // Depend on 'campaign' object to catch gameState changes
 
   // Auto-scroll log (bisa dipindah ke LogDrawer sebenernya, tapi manual trigger lebih aman)
   useEffect(() => {
