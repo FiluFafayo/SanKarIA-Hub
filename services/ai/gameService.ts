@@ -360,24 +360,6 @@ class GameService {
             }
         };
 
-            // 2. Urai Panggilan Alat (Tools)
-            const tool_calls: ToolCall[] = [];
-            if (response.functionCalls) {
-                for (const fc of response.functionCalls) {
-                    tool_calls.push({
-                        functionName: fc.name as ToolCall['functionName'],
-                        args: fc.args
-                    });
-                }
-            }
-
-            // 3. Gabungkan menjadi satu StructuredApiResponse
-            return {
-                ...mainResponse,
-                tool_calls: tool_calls.length > 0 ? tool_calls : undefined,
-            };
-        };
-
         try {
             const result = await geminiService.makeApiCall(call, signal);
             console.log("✅ Request Success");
