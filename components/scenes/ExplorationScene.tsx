@@ -56,19 +56,6 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
       );
   }
 
-  // 3. Inisialisasi AI System
-  const { handlePlayerAction } = useExplorationSystem({
-    campaign,
-    character: playingCharacter,
-    players: campaign.players,
-    campaignActions,
-    onCharacterUpdate: (updatedChar) => {
-        // Update character di local reducer sudah otomatis, 
-        // kita perlu update store global jika ada perubahan stats
-        _setRuntimeCharacterState(updatedChar);
-    }
-  });
-
   // 4. Sinkronisasi Reducer -> Global Store (CRITICAL)
   // Setiap kali campaign berubah (karena aksi/AI), simpan ke Global Store
   // agar App.tsx atau BattleScene bisa mengambil state terbaru.
