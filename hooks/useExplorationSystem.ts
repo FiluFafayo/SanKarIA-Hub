@@ -89,12 +89,6 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
                         const updatedPlayerState = campaign.players.find(p => p.id === call.args.characterId);
                         if (updatedPlayerState) {
                             onCharacterUpdate(updatedPlayerState);
-
-                            // FASE 0: Logika Level Up (UI) dipindahkan ke GameScreen.tsx
-                            // const xpForNextLevel = xpToNextLevel(updatedPlayerState.level);
-                            // if (xpForNextLevel > 0 && updatedPlayerState.xp >= xpForNextLevel) {
-                            //     useAppStore.getState().actions.triggerLevelUp(updatedPlayerState);
-                            // }
                         }
                     }
                     break;
@@ -201,21 +195,6 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
 
 
     // =================================================================
-    // REFAKTOR G-2: handlePlayerAction (Sekarang ATOMIK)
-    // =================================================================
-    const handlePlayerAction = useCallback(async (actionText: string, pendingSkill: Skill | null) => {
-        if (campaign.turnId) return; // Mencegah aksi ganda
-
-        const turnId = campaignActions.startTurn();
-        campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: actionText }, turnId);
-        campaignActions.clearChoices();
-
-        // Cancel any in-flight AI call
-        aiAbortRef.current?.abort();
-        aiAbortRef.current = new AbortController();
-        const mySeq = ++seqRef.current;
-
-        // =================================================================
     // REFAKTOR G-2: handlePlayerAction (Sekarang ATOMIK + LOGGING FASE 1)
     // =================================================================
     const handlePlayerAction = useCallback(async (actionText: string, pendingSkill: Skill | null) => {
