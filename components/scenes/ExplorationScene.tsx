@@ -20,16 +20,41 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
   const { playingCampaign, playingCharacter, runtimeSettings } = useGameStore(s => s.runtime);
   const _setRuntimeCampaignState = useGameStore(s => s.actions._setRuntimeCampaignState);
   const _setRuntimeCharacterState = useGameStore(s => s.actions._setRuntimeCharacterState);
-  const exitGameSession = useGameStore(s => s.actions.exitGameSession); // [FASE 4] Exit Action
+  const exitGameSession = useGameStore(s => s.actions.exitGameSession);
 
-  // Guard Clause: Paranoid Check
-  if (!playingCampaign || !playingCharacter) {
-    return <div className="p-10 text-red-500 font-pixel">FATAL: DATA CAMPAIGN/CHARACTER HILANG.</div>;
-  }
+  // [QA FIX FASE FINAL] Safe Fallback Data
+  // Mencegah 'Rendered fewer hooks' error jika data store terhapus sebelum unmount.
+  // Hooks useCampaign WAJIB jalan setiap render, jadi kita kasih data palsu kalau null.
+  const safeCampaign = playingCampaign || { 
+      id: 'fallback', players: [], eventLog: [], explorationGrid: [], fogOfWar: [], npcs: [], quests: [] 
+  } as any;
+  const safePlayers = playingCampaign?.players || [];
+  const safeCharacter = playingCharacter || { id: 'fallback', name: 'Unknown', inventory: [] } as any;
 
   // 2. Inisialisasi Logic Engine (Reducer Lokal)
-  // Kita menggunakan initial state dari Store, tapi logic berjalan di reducer lokal useCampaign.
-  const { campaign, campaignActions } = useCampaign(playingCampaign, playingCampaign.players);
+  // HOOKS DIJALANKAN UNCONDITIONALLY (AMAN)
+  const { campaign, campaignActions } = useCampaign(safeCampaign, safePlayers);
+
+  const { handlePlayerAction } = useExplorationSystem({
+    campaign,
+    character: safeCharacter,
+    players: safePlayers,
+    campaignActions,
+    onCharacterUpdate: (updatedChar) => {
+        _setRuntimeCharacterState(updatedChar);
+    }
+  });
+
+  // 3. Guard Clause: Render Block (Bukan Hook Block)
+  // Jika data aslinya null (sedang proses logout), kita return null/loading visual
+  // TAPI SETELAH semua hooks di atas tereksekusi.
+  if (!playingCampaign || !playingCharacter) {
+      return (
+          <div className="absolute inset-0 bg-black z-[999] flex items-center justify-center">
+              <span className="text-faded font-pixel animate-pulse">MENYIMPAN & MENUTUP...</span>
+          </div>
+      );
+  }
 
   // 3. Inisialisasi AI System
   const { handlePlayerAction } = useExplorationSystem({
