@@ -165,11 +165,19 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
                             DM SEDANG MENULIS KISAH...
                         </div>
                         <button 
-                            onClick={() => campaignActions.setThinkingState('idle')}
-                            className="text-[8px] bg-wood/50 border border-wood px-1 py-0.5 text-faded hover:text-white hover:bg-red-900"
-                            title="Klik jika DM macet lebih dari 1 menit"
+                            onClick={() => {
+                                console.warn("⚠️ [User] Mengguncang DM (Force Reset)");
+                                // 1. Matikan Network Request
+                                useGameStore.getState().actions.cancelAllInFlight();
+                                // 2. Reset UI State
+                                campaignActions.setThinkingState('idle');
+                                // 3. Beri Feedback Visual
+                                campaignActions.logEvent({ type: 'system', text: "⚡ [SYSTEM] Anda membangunkan DM secara paksa. Koneksi di-reset." }, campaign.turnId || 'force-reset');
+                            }}
+                            className="text-[8px] bg-red-900/40 border border-red-500/50 px-2 py-0.5 text-red-200 hover:bg-red-700 hover:text-white transition-all font-pixel flex items-center gap-1"
+                            title="Klik untuk memutus paksa koneksi AI yang macet"
                         >
-                            (GUNCANG DM)
+                            <span>⚡</span> GUNCANG DM
                         </button>
                     </div>
                 )}

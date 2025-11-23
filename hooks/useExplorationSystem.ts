@@ -215,6 +215,32 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
         aiAbortRef.current = new AbortController();
         const mySeq = ++seqRef.current;
 
+        // =================================================================
+    // REFAKTOR G-2: handlePlayerAction (Sekarang ATOMIK + LOGGING FASE 1)
+    // =================================================================
+    const handlePlayerAction = useCallback(async (actionText: string, pendingSkill: Skill | null) => {
+        if (campaign.turnId) {
+            console.warn("⚠️ [ExplorationSystem] Action ignored: Turn already active.");
+            return;
+        }
+
+        // [QA LOG] 1. Start Transaction
+        const turnId = campaignActions.startTurn();
+        console.group(`🕹️ [Turn ${turnId}] Player Action Process`);
+        console.log("📝 Input:", actionText);
+        console.log("👤 Actor:", character.name);
+
+        campaignActions.logEvent({ type: 'player_action', characterId: character.id, text: actionText }, turnId);
+        campaignActions.clearChoices();
+
+        // Cancel any in-flight AI call
+        if (aiAbortRef.current) {
+            console.log("🚫 Aborting previous AI request...");
+            aiAbortRef.current.abort();
+        }
+        aiAbortRef.current = new AbortController();
+        const mySeq = ++seqRef.current;
+
         // --- BARU: FASE 5 (Fog of War Reveal) ---
         // Diadaptasi dari P2 (pixel-vtt-stylizer ExplorationView)
         const FOG_REVEAL_RADIUS = 3.5;
@@ -295,47 +321,66 @@ export function useExplorationSystem({ campaign, character, players, campaignAct
             }
 
             // ================== PANGGILAN ATOMIK G-2 ==================
-            // SATU panggilan untuk Narasi + Mekanik
+            console.time("⏳ AI Generation Time");
             const response = await gameService.generateTurnResponse(
                 campaign,
                 players,
                 actionText,
-                character.id, // (Poin 6) Kirim ID pelaku aksi
-                campaignActions.setThinkingState,
+                character.id,
+                (state) => {
+                    console.log(`🤔 AI State: ${state}`);
+                    campaignActions.setThinkingState(state);
+                },
                 composeAbortSignals(
                     aiAbortRef.current?.signal,
                     useGameStore.getState().runtime.sessionAbortController?.signal
                 )
             );
+            console.timeEnd("⏳ AI Generation Time");
+            console.log("🤖 Raw Response:", response);
             // ==========================================================
 
-            // Drop stale responses if a newer action started or turn changed
+            // Drop stale responses
             if (seqRef.current !== mySeq || campaign.turnId !== turnId) {
+                console.warn("⚠️ Response discarded: Stale sequence or turn ID changed.");
+                console.groupEnd();
                 return;
             }
 
-            // 1. Log Narasi (Sekarang aman)
+            // 1. Log Narasi
             if (response.reaction) {
                 campaignActions.logEvent({ type: 'dm_reaction', text: response.reaction }, turnId);
             }
-            // (Poin 3) Gunakan parser baru untuk dialog
             parseAndLogNarration(response.narration, turnId, campaignActions);
 
-            // 2. Proses Mekanik (Sekarang dijamin ada atau fallback)
+            // 2. Proses Mekanik
+            console.log("⚙️ Processing Mechanics...");
             await processMechanics(turnId, response, actionText);
+            console.log("✅ Turn Process Completed.");
 
-        } catch (error) {
+        } catch (error: any) {
             // Ini adalah FALLBACK PESIMIS G-2 (Visi #5)
-            console.error("[G-2] Gagal total mendapatkan TurnResponse:", error);
+            console.error("❌ [ExplorationSystem] CRITICAL ERROR:", error);
+            if (error.name === 'AbortError') {
+                 console.log("info: Request aborted by user/system.");
+            } else {
+                 campaignActions.logEvent({
+                    type: 'system',
+                    text: `SYSTEM ERROR: ${error.message || 'Koneksi terputus.'}`
+                }, turnId);
+            }
             campaignActions.logEvent({
                 type: 'system',
                 text: "Terjadi kesalahan kritis saat menghubungi AI. DM perlu waktu sejenak."
             }, turnId);
 
             // Gunakan fallback hardcoded untuk mencegah 'stuck'
+            console.warn("⚠️ Applying Emergency Fallback Choices.");
             const fallbackChoices = generateContextualFallbackChoices(campaign.eventLog);
             campaignActions.setChoices(fallbackChoices);
-            campaignActions.endTurn(); // Selalu end turn jika error parah
+            campaignActions.endTurn(); 
+        } finally {
+            console.groupEnd();
         }
     }, [campaign, character.id, players, campaignActions, processMechanics, generateContextualFallbackChoices]);
 

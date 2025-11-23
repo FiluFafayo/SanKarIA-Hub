@@ -175,19 +175,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
 			}
 		},
 		exitGameSession: () => {
-            // Batalkan semua panggilan AI yang masih berjalan (level sesi)
+            console.group("🛑 [GameStore] Exiting Session...");
+            // 1. Hard-Stop AI Network
             const controller = get().runtime.sessionAbortController;
-            controller?.abort();
+            if (controller) {
+                console.log("Aborting in-flight requests...");
+                controller.abort();
+            }
 
             const { playingCampaign, playingCharacter } = get().runtime;
 
+            // 2. Save Data First (Critical)
 			if (playingCampaign) {
-				// Simpan SSoT Campaign
+                console.log("Saving Campaign SSoT...");
 				useDataStore.getState().actions.saveCampaign(playingCampaign);
 			}
-			if (playingCharacter) {
-				// Simpan SSoT Karakter (ambil state terbaru dari dalam campaign)
-				const finalCharacterState = playingCampaign?.players.find(
+			if (playingCharacter && playingCampaign) {
+                console.log("Saving Character State...");
+				const finalCharacterState = playingCampaign.players.find(
 					(p) => p.id === playingCharacter.id
 				);
 				if (finalCharacterState) {
@@ -195,12 +200,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
 				}
 			}
 
-			// Reset state runtime
-			set({ runtime: initialRuntimeState });
-			// Reset navigasi global
+            // 3. Navigate AWAY First (Prevent UI Crash due to null state)
+            // Kita pindahkan user ke Nexus DULUAN agar component ExplorationScene unmount
+            // saat datanya masih ada di memori.
+            console.log("Navigating to Nexus...");
 			useAppStore.getState().actions.returnToNexus();
 
-			// Notifikasi sukses
+            // 4. Wipe Memory (Delayed)
+            // Beri waktu 1 tick (100ms) agar React selesai unmount ExplorationScene
+            // sebelum kita menghapus 'playingCampaign' dari memori.
+            setTimeout(() => {
+                set({ runtime: initialRuntimeState });
+                console.log("✅ Runtime memory wiped safely.");
+                console.groupEnd();
+            }, 100);
+
 			useAppStore.getState().actions.pushNotification({
 				message: 'Sesi berakhir. Kemajuan disimpan.',
 				type: 'success',
