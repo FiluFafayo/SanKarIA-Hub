@@ -276,11 +276,16 @@ class GameService {
         campaign: Campaign,
         players: Character[],
         playerAction: string,
-        actingCharacterId: string | null, // (Poin 6) ID pelaku aksi
+        actingCharacterId: string | null,
         onStateChange: (state: 'thinking' | 'retrying') => void,
         signal?: AbortSignal
     ): Promise<StructuredApiResponse> {
         onStateChange('thinking');
+        
+        // [INSTRUMENTATION] Start Trace
+        const traceId = `REQ-${Date.now().toString().slice(-6)}`;
+        console.groupCollapsed(`🧠 [GameService] Generate Turn (${traceId})`);
+        console.log("🎬 Action:", playerAction);
 
         let styleInstruction = '';
         if (campaign.dmNarrationStyle === 'Langsung & Percakapan') {
@@ -315,26 +320,45 @@ class GameService {
         7.  TRAVEL & STORY: Jika pemain berpindah tempat, GUNAKAN 'travel_to_location'. Jika babak cerita selesai, GUNAKAN 'advance_story_node'.
         8.  JANGAN panggil 'spawn_monsters' BERSAMAAN dengan 'choices' or 'rollRequest'.`;
 
-        const prompt = this.buildPrompt(campaign, players, playerAction, actingCharacterId); // (Poin 6)
+        const prompt = this.buildPrompt(campaign, players, playerAction, actingCharacterId);
+        
+        // [INSTRUMENTATION] Log Context Payload
+        console.log("📜 Constructed Prompt Preview:", prompt.slice(0, 500) + "...");
+        console.log("📏 Context Length:", prompt.length, "chars");
 
         const call = async (client: any) => {
+            console.time(`⏱️ Latency (${traceId})`);
             const response = await client.models.generateContent({
                 model: geminiService.getTextModelName(),
                 contents: prompt,
                 config: {
                     systemInstruction,
                     responseMimeType: "application/json",
-                    responseSchema: COMBINED_RESPONSE_SCHEMA, // Gunakan SKEMA BARU
-                    tools: [{ functionDeclarations: TOOLS }], // Sediakan ALAT
+                    responseSchema: COMBINED_RESPONSE_SCHEMA,
+                    tools: [{ functionDeclarations: TOOLS }],
                     temperature: 0.7,
                 }
             });
+            console.timeEnd(`⏱️ Latency (${traceId})`);
 
-            // response.text DIJAMIN JSON karena responseSchema
-            const jsonText = response.text;
+            const jsonText = response.text(); // FIX: .text() is usually a method or getter in some SDKs, ensure consistency
+            console.log("📦 Raw JSON Received:", jsonText);
 
-            // 1. Urai Objek JSON Utama (Narasi, Choices, RollRequest)
-            const mainResponse = parseStructuredApiResponse(jsonText);
+            try {
+                // 1. Urai Objek JSON Utama
+                const mainResponse = parseStructuredApiResponse(jsonText);
+                return {
+                    ...mainResponse,
+                    tool_calls: response.functionCalls?.map(fc => ({
+                        functionName: fc.name,
+                        args: fc.args
+                    })) || undefined,
+                };
+            } catch (parseError) {
+                console.error("❌ JSON Parse Failed. Raw Text:", jsonText);
+                throw new Error(`Invalid JSON from AI: ${parseError.message}`);
+            }
+        };
 
             // 2. Urai Panggilan Alat (Tools)
             const tool_calls: ToolCall[] = [];
@@ -355,14 +379,19 @@ class GameService {
         };
 
         try {
-            return await geminiService.makeApiCall(call, signal);
-        } catch (error) {
-            console.error("[G-2] Gagal total menghasilkan TurnResponse:", error);
+            const result = await geminiService.makeApiCall(call, signal);
+            console.log("✅ Request Success");
+            console.groupEnd();
+            return result;
+        } catch (error: any) {
+            console.error(`❌ [GameService] Request Failed (${traceId}):`, error);
+            console.groupEnd();
+
             // Kembalikan respons fallback yang aman
             return {
                 reaction: "DM tampak bingung sejenak...",
-                narration: `Terjadi kesalahan saat DM merangkai kata. (Error: ${error.message})`,
-                choices: ["Coba ulangi aksimu", "Lihat sekeliling"], // Fallback aman
+                narration: `(Sistem) Maaf, koneksi ke 'otak' DM terputus atau terjadi kesalahan internal. \n\nError: ${error.message || 'Unknown Error'}`,
+                choices: ["Coba lagi (Resend)", "Tunggu sebentar"],
                 rollRequest: undefined,
                 tool_calls: undefined,
             };
