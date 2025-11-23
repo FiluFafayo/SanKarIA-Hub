@@ -45,6 +45,17 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
     }
   });
 
+  // [FIX REACT #300] Pindahkan SEMUA hooks ke atas sebelum guard clause.
+  // Hooks harus dipanggil dalam urutan yang sama setiap render.
+  const [inputVal, setInputVal] = useState("");
+  const [activeDrawer, setActiveDrawer] = useState<'NONE' | 'INVENTORY' | 'CHARACTER'>('NONE');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Sinkronisasi Reducer -> Global Store (CRITICAL)
+  useEffect(() => {
+    _setRuntimeCampaignState(campaign);
+  }, [campaign, _setRuntimeCampaignState]);
+
   // 3. Guard Clause: Render Block (Bukan Hook Block)
   // Jika data aslinya null (sedang proses logout), kita return null/loading visual
   // TAPI SETELAH semua hooks di atas tereksekusi.
@@ -56,22 +67,12 @@ export const ExplorationScene: React.FC<ExplorationSceneProps> = ({ onEncounter 
       );
   }
 
-  // 4. Sinkronisasi Reducer -> Global Store (CRITICAL)
-  // Setiap kali campaign berubah (karena aksi/AI), simpan ke Global Store
-  // agar App.tsx atau BattleScene bisa mengambil state terbaru.
+  // 4. Deteksi State Jump (setelah guard clause, karena hanya relevan saat ada campaign)
   useEffect(() => {
-    _setRuntimeCampaignState(campaign);
-
-    // Deteksi State Jump: Jika logic mengubah state menjadi 'combat'
     if (campaign.gameState === 'combat') {
       onEncounter();
     }
-  }, [campaign, _setRuntimeCampaignState, onEncounter]);
-
-  // 5. Local State untuk UI
-  const [inputVal, setInputVal] = useState("");
-  const [activeDrawer, setActiveDrawer] = useState<'NONE' | 'INVENTORY' | 'CHARACTER'>('NONE'); // FASE 5
-  const scrollRef = useRef<HTMLDivElement>(null);
+  }, [campaign.gameState, onEncounter]);
 
   // Auto-scroll log (bisa dipindah ke LogDrawer sebenernya, tapi manual trigger lebih aman)
   useEffect(() => {
